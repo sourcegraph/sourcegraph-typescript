@@ -1,0 +1,6 @@
+{
+  "rules": {
+    "await-promise": [true, "Thenable"]
+  },
+  "extends": ["@sourcegraph/tslint-config"]
+}
