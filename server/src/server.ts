@@ -1,6 +1,10 @@
 import decompress from 'decompress'
-import { createWriteStream } from 'mz/fs'
+import glob from 'globby'
+// @ts-ignore
+import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import * as fs from 'mz/fs'
+import { createWriteStream } from 'mz/fs'
+import { Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
@@ -18,9 +22,34 @@ import {
 } from 'vscode-ws-jsonrpc'
 import * as rpcServer from 'vscode-ws-jsonrpc/lib/server'
 import { Server } from 'ws'
+import { tracePromise } from './tracing'
 import { install } from './yarn'
 
+const TEMP_ROOT = process.env.TEMP_ROOT || tmpdir()
+
+/**
+ * Rewrites all `uri` properties in an object, recursively
+ */
+function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
+    if (typeof obj !== 'object' || obj === null) {
+        return
+    }
+    if ('uri' in obj) {
+        obj.uri = transform(new URL(obj.uri)).href
+    }
+    for (const key of Object.keys(obj)) {
+        rewriteUris(obj[key], transform)
+    }
+}
+
 const logger = console
+const tracer: Tracer = process.env.LIGHTSTEP_ACCESS_TOKEN
+    ? new LightstepTracer({
+          access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
+          component_name: 'lang-typescript-server',
+          verbosity: 0,
+      })
+    : new Tracer()
 
 const server = new Server({ port: 8080 })
 
@@ -86,8 +115,11 @@ server.on('connection', async connection => {
     }
 
     webSocketReader.listen(async message => {
-        logger.log('Incoming WebSocket message', message)
+        let span = new Span()
         try {
+            if (isRequestMessage(message) || isNotificationMessage(message)) {
+                span = tracer.startSpan('Handle ' + message.method)
+            }
             if (isRequestMessage(message) && message.method === 'initialize') {
                 const params: InitializeParams = message.params
                 if (!params.rootUri) {
@@ -100,10 +132,9 @@ server.on('connection', async connection => {
                 if (zipRootUri.protocol !== 'http:' && zipRootUri.protocol !== 'https:') {
                     throw new Error('Protocol must be http or https')
                 }
-                console.log('Creating temp folders')
                 // Create temp folders
                 tempDir = path.join(
-                    tmpdir(),
+                    TEMP_ROOT,
                     (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
                 )
                 await fs.mkdir(tempDir)
@@ -112,55 +143,61 @@ server.on('connection', async connection => {
                 yarnCacheFolder = path.join(tempDir, 'cache')
                 yarnGlobalFolder = path.join(tempDir, 'global')
                 await Promise.all([fs.mkdir(extractPath), fs.mkdir(yarnCacheFolder), fs.mkdir(yarnGlobalFolder)])
-                const packageJsons: string[] = []
                 console.log('Fetching zip from', zipRootUri.href)
+
                 // Fetch zip and extract into temp folder
                 const archivePath = path.join(tempDir, 'archive.zip')
-                await new Promise<void>((resolve, reject) => {
-                    request(zipRootUri.href)
-                        .on('error', reject)
-                        .pipe(createWriteStream(archivePath))
-                        .on('finish', resolve)
-                        .on('error', reject)
+                tracePromise('Fetch source archive', span, async span => {
+                    span.setTag('url', zipRootUri.href)
+                    await new Promise<void>((resolve, reject) => {
+                        request(zipRootUri.href)
+                            .on('error', reject)
+                            .pipe(createWriteStream(archivePath))
+                            .on('finish', resolve)
+                            .on('error', reject)
+                    })
                 })
-                await decompress(archivePath, extractPath, {
-                    strip: 1,
+                tracePromise('Extract source archive', span, async span => {
+                    await decompress(archivePath, extractPath, {
+                        strip: 1,
+                    })
                 })
-                // Install dependencies
-                logger.log('package.jsons found:', packageJsons)
-                await Promise.all(
-                    packageJsons.map(
-                        packageJson =>
-                            new Promise<void>((resolve, reject) => {
-                                const yarnProcess = install({
-                                    cwd: path.join(extractPath, packageJson),
-                                    globalFolder: yarnGlobalFolder,
-                                    cacheFolder: yarnCacheFolder,
-                                    logger,
-                                })
-                                yarnProcess.on('success', resolve)
-                                yarnProcess.on('error', reject)
-                                toDispose.push(() => yarnProcess.kill())
-                            })
-                    )
+
+                // Find package.jsons to install
+                const packageJsons = await tracePromise('Find package.jsons', span, span =>
+                    glob('**/package.json', { cwd: extractPath })
                 )
+                logger.log('package.jsons found:', packageJsons)
+
+                // Install dependencies
+                await tracePromise('Install dependencies', span, async span => {
+                    await Promise.all(
+                        packageJsons.map(
+                            packageJson =>
+                                new Promise<void>((resolve, reject) => {
+                                    const yarnProcess = install(
+                                        {
+                                            cwd: path.join(extractPath, packageJson),
+                                            globalFolder: yarnGlobalFolder,
+                                            cacheFolder: yarnCacheFolder,
+                                            logger,
+                                        },
+                                        span
+                                    )
+                                    yarnProcess.on('success', resolve)
+                                    yarnProcess.on('error', reject)
+                                    toDispose.push(() => yarnProcess.kill())
+                                })
+                        )
+                    )
+                })
+
                 // Rewrite HTTP zip root URI to a file URI pointing to the checkout dir
                 fileRootUri = new URL('file:')
                 fileRootUri.pathname = extractPath.replace(/\\/g, '/')
                 params.rootUri = fileRootUri.href
                 params.rootPath = undefined
                 params.workspaceFolders = null
-            }
-            function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
-                if (typeof obj !== 'object' || obj === null) {
-                    return
-                }
-                if ('uri' in obj) {
-                    obj.uri = transform(new URL(obj.uri)).href
-                }
-                for (const key of Object.keys(obj)) {
-                    rewriteUris(obj[key], transform)
-                }
             }
             if (isRequestMessage(message) || isNotificationMessage(message)) {
                 rewriteUris(message.params, transformZipToFileUri)
@@ -172,10 +209,13 @@ server.on('connection', async connection => {
                     rewriteUris(message.error.data, transformFileToZipUri)
                 }
             }
+
             // Forward message to language server
-            console.log('Forwarding message to language server', message)
             languageServerConnection.writer.write(message)
         } catch (err) {
+            span.setTag('error', true)
+            span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+
             logger.error('Error handling message', message, err)
             if (isRequestMessage(message)) {
                 console.log('is request message')
@@ -193,12 +233,11 @@ server.on('connection', async connection => {
                 }
                 webSocketConnection.writer.write(errResponse)
             }
+        } finally {
+            span.finish()
         }
     })
-    languageServerConnection.forward(webSocketConnection, message => {
-        console.log('Outgoing language server message', message)
-        return message
-    })
+    languageServerConnection.forward(webSocketConnection)
 })
 
 logger.log('WebSocket server listening on port 8080')

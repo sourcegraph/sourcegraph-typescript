@@ -135,7 +135,6 @@ export function activate(): void {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
             })
-            console.log('hover result', hoverResult)
             return convertHover(hoverResult)
         },
     })
