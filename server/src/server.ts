@@ -1,5 +1,6 @@
 import decompress from 'decompress'
 import glob from 'globby'
+import * as https from 'https'
 // @ts-ignore
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import * as fs from 'mz/fs'
@@ -25,7 +26,7 @@ import { Server } from 'ws'
 import { tracePromise } from './tracing'
 import { install } from './yarn'
 
-const TEMP_ROOT = process.env.TEMP_ROOT || tmpdir()
+const CACHE_DIR = process.env.CACHE_DIR || tmpdir()
 
 /**
  * Rewrites all `uri` properties in an object, recursively
@@ -51,9 +52,18 @@ const tracer: Tracer = process.env.LIGHTSTEP_ACCESS_TOKEN
       })
     : new Tracer()
 
-const server = new Server({ port: 8080 })
+let httpsServer: https.Server | undefined
+if (process.env.TLS_CERT && process.env.TLS_KEY) {
+    httpsServer = https.createServer({
+        cert: process.env.TLS_CERT,
+        key: process.env.TLS_KEY,
+    })
+}
 
-server.on('connection', async connection => {
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080
+const webSocketServer = new Server({ port, server: httpsServer })
+
+webSocketServer.on('connection', async connection => {
     logger.log('New WebSocket connection')
     const webSocket: IWebSocket = {
         onMessage: handler => connection.on('message', handler),
@@ -134,7 +144,7 @@ server.on('connection', async connection => {
                 }
                 // Create temp folders
                 tempDir = path.join(
-                    TEMP_ROOT,
+                    CACHE_DIR,
                     (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
                 )
                 await fs.mkdir(tempDir)
