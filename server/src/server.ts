@@ -250,4 +250,4 @@ webSocketServer.on('connection', async connection => {
     languageServerConnection.forward(webSocketConnection)
 })
 
-logger.log('WebSocket server listening on port 8080')
+logger.log(`WebSocket server listening on port ${port}`)
