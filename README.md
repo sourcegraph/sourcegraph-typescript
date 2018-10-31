@@ -106,22 +106,30 @@ Support for other OpenTracing implementations can easily added here.
 
 #### Improving performance with an SSD
 
-To improve performance of dependency installation, the server can be configured to use a mounted SSD at a given directory
+To improve performance of dependency installation, the server can be configured to use a mounted SSD at a given directory by setting the `CACHE_DIR` environment variable. The instructions for how to mount a SSD depend on your deployment environment.
 
-Example for Kubernetes:
+##### Example for Kubernetes:
 
-1. Add a volume mount to the container spec:
+1. Add a volume for the mount path of the SSD:
+    ```diff
+      spec:
+    + volumes:
+    +   - hostPath:
+    +       path: /path/to/mounted/ssd
+    +     name: cache-ssd
+    ```
+    For example, Google Cloud Platform mounts the first SSD disk to `/mnt/disks/ssd0`.
 
-```diff
-  image: sourcegraph/lang-typescript
-+ volumeMounts:
-+   - mountPath: /mnt/cache
-+     name: cache-ssd
-```
+2. Add a volume mount to the container spec:
 
-TODO `volumes` entry with `emptyDir`?
+    ```diff
+      image: sourcegraph/lang-typescript
+    + volumeMounts:
+    +   - mountPath: /mnt/cache
+    +     name: cache-ssd
+    ```
 
-2. Tell the language server to use the mount as the root for temporary directories:
+3. Tell the language server to use the mount as the root for temporary directories:
 
 ```diff
   env:
