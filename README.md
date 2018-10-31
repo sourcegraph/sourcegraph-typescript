@@ -131,11 +131,11 @@ To improve performance of dependency installation, the server can be configured 
 
 3. Tell the language server to use the mount as the root for temporary directories:
 
-```diff
-  env:
-+   - name: CACHE_DIR
-+     value: /mnt/cache
-```
+    ```diff
+      env:
+    +   - name: CACHE_DIR
+    +     value: /mnt/cache
+    ```
 
 #### Improving performance with an npm registry proxy
 
