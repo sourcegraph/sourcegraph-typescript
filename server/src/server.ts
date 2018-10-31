@@ -47,7 +47,7 @@ const logger = console
 const tracer: Tracer = process.env.LIGHTSTEP_ACCESS_TOKEN
     ? new LightstepTracer({
           access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
-          component_name: 'lang-typescript-server',
+          component_name: 'lang-typescript',
           verbosity: 0,
       })
     : new Tracer()
