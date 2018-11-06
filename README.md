@@ -38,11 +38,11 @@ spec:
         - name: lang-typescript
           image: sourcegraph/lang-typescript
           ports:
-            - containerPort: 433
+            - containerPort: 443
               name: wss
           env:
             - name: PORT
-              value: 433
+              value: 443
             # TLS certificate and key to secure the WebSocket connection (optional)
             - name: TLS_CERT
               value: ... your TLS certificate ...
@@ -80,7 +80,7 @@ metadata:
 spec:
   ports:
     - name: wss
-      port: 433
+      port: 443
   selector:
     app: lang-typescript
   type: LoadBalancer

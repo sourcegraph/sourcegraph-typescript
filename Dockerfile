@@ -15,5 +15,5 @@ RUN apk add --no-cache bash git openssh
 COPY ./ /srv
 
 WORKDIR /srv/server
-EXPOSE 80 433 8080
+EXPOSE 80 443 8080
 CMD ["node", "--max_old_space_size=4096", "./dist/server.js"]
