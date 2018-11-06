@@ -69,6 +69,7 @@ async function connect(rootUri: string): Promise<MessageConnection> {
         socket.addEventListener('open', resolve, { once: true })
         socket.addEventListener('error', resolve, { once: true })
     })
+    console.log('WebSocket connection to TypeScript server opened')
     if (event.type === 'error') {
         throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
     }
