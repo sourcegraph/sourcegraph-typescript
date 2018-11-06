@@ -1,3 +1,10 @@
+// Polyfill
+// @ts-ignore
+import { URL, URLSearchParams } from 'whatwg-url'
+// @ts-ignore
+Object.assign(URL, self.URL)
+Object.assign(self, { URL, URLSearchParams })
+
 import {
     createMessageConnection,
     MessageConnection,
@@ -14,13 +21,6 @@ import {
     LogMessageNotification,
     MarkupContent,
 } from 'vscode-languageserver-protocol'
-
-// Polyfill
-// @ts-ignore
-import { URL, URLSearchParams } from 'whatwg-url'
-// @ts-ignore
-Object.assign(URL, self.URL)
-Object.assign(self, { URL, URLSearchParams })
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
