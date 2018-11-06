@@ -72,6 +72,28 @@ if (process.env.TLS_CERT && process.env.TLS_KEY) {
     httpServer = http.createServer()
 }
 
+type CleanupFn = () => void | Promise<void>
+async function cleanupAll(cleanupFns: Iterable<CleanupFn>): Promise<void> {
+    for (const cleanup of cleanupFns) {
+        try {
+            await cleanup()
+        } catch (err) {
+            logger.error('Error cleaning up', err)
+        }
+    }
+}
+
+const globalCleanupFns = new Set<CleanupFn>()
+
+// Cleanup when receiving signals
+for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
+    process.once(signal, async () => {
+        logger.log(`Received ${signal}, cleaning up`)
+        await cleanupAll(globalCleanupFns)
+        process.exit(0)
+    })
+}
+
 const webSocketServer = new Server({ server: httpServer })
 
 webSocketServer.on('connection', async connection => {
@@ -111,28 +133,16 @@ webSocketServer.on('connection', async connection => {
     let extractPath: string
     let yarnGlobalFolder: string
     let yarnCacheFolder: string
-    const toDispose: (() => void | Promise<void>)[] = []
-    toDispose.push(() => languageServerConnection.dispose())
-    async function disposeAll(): Promise<void> {
-        for (const dispose of toDispose) {
-            try {
-                await dispose()
-            } catch (err) {
-                logger.error('Error disposing', err)
-            }
-        }
-    }
+
+    const connectionCleanupFns: CleanupFn[] = []
+    const cleanupConnection = () => cleanupAll(connectionCleanupFns)
+    globalCleanupFns.add(cleanupConnection)
+    connectionCleanupFns.push(() => languageServerConnection.dispose())
     connection.on('close', async (code, reason) => {
         logger.log('WebSocket closed', { code, reason })
-        await disposeAll()
+        await cleanupAll(connectionCleanupFns)
+        globalCleanupFns.delete(cleanupConnection)
     })
-    for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
-        process.once(signal, async () => {
-            logger.log(`Received ${signal}, cleaning up`)
-            await disposeAll()
-            process.exit(0)
-        })
-    }
 
     const transformZipToFileUri = (zipUri: URL): URL => {
         const fileUri = new URL(fileRootUri.href)
@@ -174,7 +184,7 @@ webSocketServer.on('connection', async connection => {
                     (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
                 )
                 await fs.mkdir(tempDir)
-                toDispose.push(async () => {
+                connectionCleanupFns.push(async () => {
                     logger.log('Deleting temp dir ', tempDir)
                     await rmfr(tempDir)
                 })
@@ -227,7 +237,7 @@ webSocketServer.on('connection', async connection => {
                                     )
                                     yarnProcess.on('success', resolve)
                                     yarnProcess.on('error', reject)
-                                    toDispose.unshift(() => {
+                                    connectionCleanupFns.unshift(() => {
                                         logger.log('Killing yarn process in ', cwd)
                                         yarnProcess.kill()
                                     })
