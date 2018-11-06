@@ -5,7 +5,7 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import * as fs from 'mz/fs'
 import { createWriteStream } from 'mz/fs'
-import { Span, Tracer } from 'opentracing'
+import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
@@ -157,17 +157,22 @@ webSocketServer.on('connection', async connection => {
 
                 // Fetch zip and extract into temp folder
                 const archivePath = path.join(tempDir, 'archive.zip')
-                tracePromise('Fetch source archive', span, async span => {
+                await tracePromise('Fetch source archive', span, async span => {
                     span.setTag('url', zipRootUri.href)
                     await new Promise<void>((resolve, reject) => {
-                        request(zipRootUri.href)
+                        const headers = {
+                            Accept: 'application/zip',
+                            'User-Agent': 'lang-typescript Sourcegraph extension',
+                        }
+                        span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
+                        request(zipRootUri.href, { headers })
                             .on('error', reject)
                             .pipe(createWriteStream(archivePath))
                             .on('finish', resolve)
                             .on('error', reject)
                     })
                 })
-                tracePromise('Extract source archive', span, async span => {
+                await tracePromise('Extract source archive', span, async span => {
                     await decompress(archivePath, extractPath, {
                         strip: 1,
                     })

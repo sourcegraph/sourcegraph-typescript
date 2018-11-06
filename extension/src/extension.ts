@@ -1,4 +1,13 @@
+// Polyfill
+// @ts-ignore
+import { URL, URLSearchParams } from 'whatwg-url'
+// @ts-ignore
+Object.assign(URL, self.URL)
+Object.assign(self, { URL, URLSearchParams })
+
+import * as path from 'path'
 import * as sourcegraph from 'sourcegraph'
+import gql from 'tagged-template-noop'
 import {
     Hover,
     HoverRequest,
@@ -15,26 +24,66 @@ import {
     WebSocketMessageWriter,
 } from 'vscode-ws-jsonrpc'
 
-// Polyfill
-// @ts-ignore
-import { URL, URLSearchParams } from 'whatwg-url'
-// @ts-ignore
-Object.assign(URL, self.URL)
-Object.assign(self, { URL, URLSearchParams })
-
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
-function resolveRootUri(textDocumentUri: string): string {
+async function queryGraphQL(query: string, variables: any = {}): Promise<any> {
+    const { data, errors } = await sourcegraph.commands.executeCommand('queryGraphQL', query, variables)
+    if (errors) {
+        throw Object.assign(new Error(errors.map((err: any) => err.message).join('\n')), { errors })
+    }
+    return data
+}
+
+let accessTokenPromise: Promise<string>
+async function getOrCreateAccessToken(): Promise<string> {
+    const accessToken = sourcegraph.configuration.get().get('typescript.accessToken') as string | undefined
+    if (accessToken) {
+        return accessToken
+    }
+    if (accessTokenPromise) {
+        return await accessTokenPromise
+    }
+    accessTokenPromise = createAccessToken()
+    return await accessTokenPromise
+}
+
+async function createAccessToken(): Promise<string> {
+    const { currentUser } = await queryGraphQL(gql`
+        query {
+            currentUser {
+                id
+            }
+        }
+    `)
+    const currentUserId: string = currentUser.id
+    const result = await queryGraphQL(
+        gql`
+            mutation CreateAccessToken($user: ID!, $scopes: [String!]!, $note: String!) {
+                createAccessToken(user: $user, scopes: $scopes, note: $note) {
+                    id
+                    token
+                }
+            }
+        `,
+        { user: currentUserId, scopes: ['user:all'], note: 'lang-typescript' }
+    )
+    const token: string = result.createAccessToken.token
+    await sourcegraph.configuration.get().update('typescript.accessToken', token)
+    return token
+}
+
+async function resolveRootUri(textDocumentUri: string): Promise<URL> {
     // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
     const parsedUri = new URL(textDocumentUri)
-    // TODO this should point to the public Sourcegraph "raw" API, with an access token.
-    // This only works for public GitHub repos!
-    const rootUri =
-        'https://' + parsedUri.hostname + parsedUri.pathname + '/archive/' + parsedUri.search.substr(1) + '.zip'
+    const rev = parsedUri.search.substr(1)
+    const accessToken = await getOrCreateAccessToken()
+    const rootUri = new URL(sourcegraph.internal.sourcegraphURL.toString())
+    rootUri.username = accessToken
+    rootUri.pathname = `${parsedUri.hostname}${parsedUri.pathname}@${rev}/-/raw/`
     return rootUri
 }
 
-async function connect(rootUri: string): Promise<MessageConnection> {
+async function connect(rootUri: URL): Promise<MessageConnection> {
     const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
     if (typeof serverUrl !== 'string') {
         throw new Error(
@@ -68,8 +117,8 @@ async function connect(rootUri: string): Promise<MessageConnection> {
     await new Promise<Event>(resolve => socket.addEventListener('open', resolve, { once: true }))
     const initializeParams: InitializeParams = {
         processId: 0,
-        rootUri,
-        workspaceFolders: [{ name: '', uri: rootUri }],
+        rootUri: rootUri.href,
+        workspaceFolders: [{ name: '', uri: rootUri.href }],
         capabilities: {},
     }
     const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
@@ -78,15 +127,15 @@ async function connect(rootUri: string): Promise<MessageConnection> {
 }
 
 async function getOrCreateConnection(textDocumentUri: string): Promise<MessageConnection> {
-    const rootUri = resolveRootUri(textDocumentUri)
-    let connectionPromise = connectionsByRootUri.get(rootUri)
+    const rootUri = await resolveRootUri(textDocumentUri)
+    let connectionPromise = connectionsByRootUri.get(rootUri.href)
     if (!connectionPromise) {
         connectionPromise = connect(rootUri)
-        connectionsByRootUri.set(rootUri, connectionPromise)
+        connectionsByRootUri.set(rootUri.href, connectionPromise)
     }
     const connection = await connectionPromise
     connection.onClose(() => {
-        connectionsByRootUri.delete(rootUri)
+        connectionsByRootUri.delete(rootUri.href)
     })
     return connection
 }
@@ -126,10 +175,12 @@ function convertHover(hover: Hover | null): sourcegraph.Hover | null {
 export function activate(): void {
     sourcegraph.languages.registerHoverProvider([{ pattern: '**/*.ts' }], {
         provideHover: async (textDocument, position) => {
-            const rootUri = resolveRootUri(textDocument.uri)
-            const serverTextDocumentUri = new URL(rootUri)
+            const rootUri = await resolveRootUri(textDocument.uri)
+            const serverTextDocumentUri = new URL(rootUri.href)
             // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
-            serverTextDocumentUri.hash = new URL(textDocument.uri).hash
+            const filePath = new URL(textDocument.uri).hash
+            // example: https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
+            serverTextDocumentUri.pathname = path.posix.join(serverTextDocumentUri.pathname, filePath)
             const connection = await getOrCreateConnection(textDocument.uri)
             const hoverResult = await connection.sendRequest(HoverRequest.type, {
                 textDocument: { uri: serverTextDocumentUri.href },

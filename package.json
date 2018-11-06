@@ -19,6 +19,10 @@
           "description": "The WebSocket language server to connect to",
           "type": "string",
           "format": "url"
+        },
+        "typescript.accessToken": {
+          "description": "The access token for the language server to use to fetch files from the Sourcegraph API. The extension will create this token and save it in your settings automatically.",
+          "type": "string"
         }
       }
     }
@@ -37,6 +41,7 @@
     "build-server": "tsc -p ./server/tsconfig.json",
     "build-ext": "parcel build --experimental-scope-hoisting --out-file extension.js extension/src/extension.ts",
     "serve-ext": "parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
+    "start-server": "node server/dist/server.js",
     "typecheck-ext": "tsc -p ./extension/tsconfig.json",
     "sourcegraph:prepublish": "npm run build-ext"
   },
@@ -59,7 +64,7 @@
     "prettier": "^1.14.3",
     "semantic-release": "^15.10.6",
     "tslint": "^5.11.0",
-    "typescript": "^3.1.4"
+    "typescript": "^3.1.6"
   },
   "dependencies": {
     "decompress": "^4.2.0",
@@ -71,7 +76,8 @@
     "request": "^2.88.0",
     "rmfr": "^2.0.0",
     "source-map-support": "^0.5.9",
-    "sourcegraph": "^18.0.2",
+    "sourcegraph": "^18.4.1",
+    "tagged-template-noop": "^2.1.0",
     "uuid": "^3.3.2",
     "vscode-languageserver-protocol": "^3.13.0",
     "vscode-languageserver-types": "^3.13.0",
