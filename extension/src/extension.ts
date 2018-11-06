@@ -1,5 +1,4 @@
 // Polyfill
-// @ts-ignore
 import { URL, URLSearchParams } from 'whatwg-url'
 // @ts-ignore
 Object.assign(URL, self.URL)
