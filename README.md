@@ -251,7 +251,7 @@ For dependencies on private git repositories, mount an SSH key into `~/.ssh`.
 
 ## Contributing
 
-You need NodeJS >=10 and yarn installed.
+You need NodeJS >=11.1.0 and yarn installed.
 
 ```sh
 # Install dependencies

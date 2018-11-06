@@ -1,4 +1,4 @@
-FROM node:10-alpine
+FROM node:11-alpine
 
 # Use tini (https://github.com/krallin/tini) for proper signal handling.
 RUN apk add --no-cache tini
@@ -15,5 +15,5 @@ RUN apk add --no-cache bash git openssh
 COPY ./ /srv
 
 WORKDIR /srv/server
-EXPOSE 2088
+EXPOSE 80 433 8080
 CMD ["node", "--max_old_space_size=4096", "./dist/server.js"]
