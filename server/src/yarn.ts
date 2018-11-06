@@ -90,6 +90,7 @@ export function install(options: InstallOptions, childOf = new Span()): YarnProc
     if (options.verbose) {
         args.push('--verbose')
     }
+    logger.log(`Spawning in ${options.cwd} node ${args.join(' ')}`)
     const yarn: YarnProcess = spawn(process.execPath, args, { cwd: options.cwd })
 
     /** Emitted error messages by yarn */
@@ -119,6 +120,7 @@ export function install(options: InstallOptions, childOf = new Span()): YarnProc
             } catch (err) {
                 // E.g. JSON parse error
                 yarn.emit('error', err)
+                logger.error('yarn install', err, buffer)
             }
         })
     }
@@ -129,6 +131,7 @@ export function install(options: InstallOptions, childOf = new Span()): YarnProc
 
     yarn.on('exit', (code, signal) => {
         if (code === 0) {
+            logger.log('yarn install done')
             yarn.emit('success')
         } else if (!signal) {
             const error = Object.assign(new Error(`yarn install failed: ${errors.join(', ')}`), {
