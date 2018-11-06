@@ -66,7 +66,13 @@ async function connect(rootUri: string): Promise<MessageConnection> {
         }
     })
     connection.listen()
-    await new Promise<Event>(resolve => socket.addEventListener('open', resolve, { once: true }))
+    const event = await new Promise<Event>(resolve => {
+        socket.addEventListener('open', resolve, { once: true })
+        socket.addEventListener('error', resolve, { once: true })
+    })
+    if (event.type === 'error') {
+        throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
+    }
     const initializeParams: InitializeParams = {
         processId: 0,
         rootUri,
