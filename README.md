@@ -246,3 +246,26 @@ and mount it into the container:
 
 Dependencies on private npm packages is currently supported by mounting an `.npmrc` into the container that contains the registry token.
 For dependencies on private git repositories, mount an SSH key into `~/.ssh`.
+
+## Contributing
+
+You need NodeJS >=10 and yarn installed.
+
+```
+# Install dependencies
+yarn
+# Build the extension and the server
+yarn run build
+```
+
+To debug the server, build, then run it locally with `yarn start-server` and point the extension to it through Sourcegraph settings:
+
+```json
+"typescript.serverUrl": "ws://localhost:8080"
+```
+
+To also debug the extension, serve the extension from localhost with `yarn serve-ext` and configure Sourcegraph to fetch the bundle from localhost:
+
+```json
+// TODO
+```
