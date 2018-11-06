@@ -11,6 +11,7 @@ import {
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import decompress from 'decompress'
 import glob from 'globby'
+import * as http from 'http'
 import * as https from 'https'
 // @ts-ignore
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
@@ -58,17 +59,20 @@ if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
     })
 }
 
-let httpsServer: https.Server | undefined
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080
+
+let httpServer: http.Server | https.Server
 if (process.env.TLS_CERT && process.env.TLS_KEY) {
     logger.log('TLS encryption enabled')
-    httpsServer = https.createServer({
+    httpServer = https.createServer({
         cert: process.env.TLS_CERT,
         key: process.env.TLS_KEY,
     })
+} else {
+    httpServer = http.createServer()
 }
 
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080
-const webSocketServer = new Server({ port, server: httpsServer })
+const webSocketServer = new Server({ server: httpServer })
 
 webSocketServer.on('connection', async connection => {
     logger.log('New WebSocket connection')
@@ -279,4 +283,6 @@ webSocketServer.on('connection', async connection => {
     languageServerConnection.forward(webSocketConnection)
 })
 
-logger.log(`WebSocket server listening on port ${port}`)
+httpServer.listen(port, () => {
+    logger.log(`WebSocket server listening on port ${port}`)
+})
