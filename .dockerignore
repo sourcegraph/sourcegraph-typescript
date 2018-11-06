@@ -3,3 +3,11 @@ extension/
 server/src/
 dist/
 .cache/
+README.md
+.editorconfig
+.gitignore
+package.json
+yarn.lock
+prettier.config.js
+tsconfig.json
+tslint.json
