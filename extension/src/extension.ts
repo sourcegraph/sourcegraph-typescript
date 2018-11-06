@@ -41,9 +41,17 @@ async function connect(rootUri: string): Promise<MessageConnection> {
         )
     }
     const socket = new WebSocket(serverUrl)
+    socket.addEventListener(
+        'close',
+        event => {
+            console.log('WebSocket connection to TypeScript server closed')
+        },
+        { once: true }
+    )
+    const rpcWebSocket = toSocket(socket)
     const connection = createMessageConnection(
-        new WebSocketMessageReader(toSocket(socket)),
-        new WebSocketMessageWriter(toSocket(socket)),
+        new WebSocketMessageReader(rpcWebSocket),
+        new WebSocketMessageWriter(rpcWebSocket),
         console
     )
     connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
