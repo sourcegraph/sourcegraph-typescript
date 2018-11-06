@@ -109,31 +109,33 @@ Support for other OpenTracing implementations can easily added here.
 To improve performance of dependency installation, the server can be configured to use a mounted SSD at a given directory by setting the `CACHE_DIR` environment variable. The instructions for how to mount a SSD depend on your deployment environment.
 
 1. Add a volume for the mount path of the SSD:
-    ```diff
-      spec:
-    + volumes:
-    +   - hostPath:
-    +       path: /path/to/mounted/ssd
-    +     name: cache-ssd
-    ```
-    For example, Google Cloud Platform mounts the first SSD disk to `/mnt/disks/ssd0`.
+
+   ```diff
+     spec:
+   + volumes:
+   +   - hostPath:
+   +       path: /path/to/mounted/ssd
+   +     name: cache-ssd
+   ```
+
+   For example, Google Cloud Platform mounts the first SSD disk to `/mnt/disks/ssd0`.
 
 2. Add a volume mount to the container spec:
 
-    ```diff
-      image: sourcegraph/lang-typescript
-    + volumeMounts:
-    +   - mountPath: /mnt/cache
-    +     name: cache-ssd
-    ```
+   ```diff
+     image: sourcegraph/lang-typescript
+   + volumeMounts:
+   +   - mountPath: /mnt/cache
+   +     name: cache-ssd
+   ```
 
 3. Tell the language server to use the mount as the root for temporary directories:
 
-    ```diff
-      env:
-    +   - name: CACHE_DIR
-    +     value: /mnt/cache
-    ```
+   ```diff
+     env:
+   +   - name: CACHE_DIR
+   +     value: /mnt/cache
+   ```
 
 #### Improving performance with an npm registry proxy
 
@@ -251,7 +253,7 @@ For dependencies on private git repositories, mount an SSH key into `~/.ssh`.
 
 You need NodeJS >=10 and yarn installed.
 
-```
+```sh
 # Install dependencies
 yarn
 # Build the extension and the server
@@ -264,8 +266,11 @@ To debug the server, build, then run it locally with `yarn start-server` and poi
 "typescript.serverUrl": "ws://localhost:8080"
 ```
 
-To also debug the extension, serve the extension from localhost with `yarn serve-ext` and configure Sourcegraph to fetch the bundle from localhost:
+To also debug the extension, serve the extension from localhost with `yarn serve-ext` and publish it pointing to localhost with
 
-```json
-// TODO
+```sh
+src ext publish --url=http://localhost:1234/extension.js
 ```
+
+NOTE: This can only be done if you are the publisher of this extension and will override this for all users.
+This will change in the future.
