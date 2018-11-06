@@ -4,6 +4,9 @@
   "description": "Provides code intelligence for TypeScript",
   "private": true,
   "publisher": "felixfbecker",
+  "engines": {
+    "node": ">=11.1.0"
+  },
   "activationEvents": [
     "*"
   ],
@@ -63,6 +66,7 @@
     "typescript": "^3.1.4"
   },
   "dependencies": {
+    "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "decompress": "^4.2.0",
     "globby": "^8.0.1",
     "javascript-typescript-langserver": "^2.11.1",
@@ -76,8 +80,8 @@
     "uuid": "^3.3.2",
     "vscode-languageserver-protocol": "^3.13.0",
     "vscode-languageserver-types": "^3.13.0",
-    "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "whatwg-url": "^7.0.0",
-    "ws": "^6.1.0"
+    "ws": "^6.1.0",
+    "yarn": "^1.12.1"
   }
 }
