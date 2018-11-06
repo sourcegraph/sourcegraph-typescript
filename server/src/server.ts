@@ -109,8 +109,7 @@ webSocketServer.on('connection', async connection => {
     let yarnCacheFolder: string
     const toDispose: (() => void | Promise<void>)[] = []
     toDispose.push(() => languageServerConnection.dispose())
-    connection.on('close', async (code, reason) => {
-        logger.log('WebSocket closed', { code, reason })
+    async function disposeAll(): Promise<void> {
         for (const dispose of toDispose) {
             try {
                 await dispose()
@@ -118,7 +117,18 @@ webSocketServer.on('connection', async connection => {
                 logger.error('Error disposing', err)
             }
         }
+    }
+    connection.on('close', async (code, reason) => {
+        logger.log('WebSocket closed', { code, reason })
+        await disposeAll()
     })
+    for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
+        process.once(signal, async () => {
+            logger.log(`Received ${signal}, cleaning up`)
+            await disposeAll()
+            process.exit(0)
+        })
+    }
 
     const transformZipToFileUri = (zipUri: URL): URL => {
         const fileUri = new URL(fileRootUri.href)
@@ -160,7 +170,10 @@ webSocketServer.on('connection', async connection => {
                     (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
                 )
                 await fs.mkdir(tempDir)
-                toDispose.push(() => rmfr(tempDir))
+                toDispose.push(async () => {
+                    logger.log('Deleting temp dir ', tempDir)
+                    await rmfr(tempDir)
+                })
                 extractPath = path.join(tempDir, 'repo')
                 yarnCacheFolder = path.join(tempDir, 'cache')
                 yarnGlobalFolder = path.join(tempDir, 'global')
@@ -186,20 +199,22 @@ webSocketServer.on('connection', async connection => {
                 })
 
                 // Find package.jsons to install
-                const packageJsons = await tracePromise('Find package.jsons', span, span =>
+                const packageJsonPaths = await tracePromise('Find package.jsons', span, span =>
                     glob('**/package.json', { cwd: extractPath })
                 )
-                logger.log('package.jsons found:', packageJsons)
+                logger.log('package.jsons found:', packageJsonPaths)
 
                 // Install dependencies
+                // TODO filter dependencies to only the ones that have a types field or start with @types/
                 await tracePromise('Install dependencies', span, async span => {
                     await Promise.all(
-                        packageJsons.map(
-                            packageJson =>
+                        packageJsonPaths.map(
+                            packageJsonPath =>
                                 new Promise<void>((resolve, reject) => {
+                                    const cwd = path.join(extractPath, path.dirname(packageJsonPath))
                                     const yarnProcess = install(
                                         {
-                                            cwd: path.join(extractPath, packageJson),
+                                            cwd,
                                             globalFolder: yarnGlobalFolder,
                                             cacheFolder: yarnCacheFolder,
                                             logger,
@@ -208,7 +223,10 @@ webSocketServer.on('connection', async connection => {
                                     )
                                     yarnProcess.on('success', resolve)
                                     yarnProcess.on('error', reject)
-                                    toDispose.push(() => yarnProcess.kill())
+                                    toDispose.unshift(() => {
+                                        logger.log('Killing yarn process in ', cwd)
+                                        yarnProcess.kill()
+                                    })
                                 })
                         )
                     )
@@ -240,7 +258,6 @@ webSocketServer.on('connection', async connection => {
 
             logger.error('Error handling message', message, err)
             if (isRequestMessage(message)) {
-                console.log('is request message')
                 const errResponse = {
                     jsonrpc: '2.0',
                     id: message.id,
