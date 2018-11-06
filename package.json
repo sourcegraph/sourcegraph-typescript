@@ -38,7 +38,7 @@
     "tslint": "tslint -p extension/tsconfig.json && tslint -p server/tsconfig.json",
     "build": "npm run build-ext && npm run build-server",
     "build-server": "tsc -p ./server/tsconfig.json",
-    "build-ext": "parcel build --experimental-scope-hoisting --out-file extension.js extension/src/extension.ts",
+    "build-ext": "parcel build --out-file extension.js extension/src/extension.ts",
     "serve-ext": "parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
     "typecheck-ext": "tsc -p ./extension/tsconfig.json",
     "sourcegraph:prepublish": "npm run build-ext"
