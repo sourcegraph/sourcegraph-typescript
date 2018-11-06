@@ -28,7 +28,10 @@ import { Server } from 'ws'
 import { tracePromise } from './tracing'
 import { install } from './yarn'
 
+const logger = console
+
 const CACHE_DIR = process.env.CACHE_DIR || tmpdir()
+logger.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
 /**
  * Rewrites all `uri` properties in an object, recursively
@@ -45,17 +48,19 @@ function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
     }
 }
 
-const logger = console
-const tracer: Tracer = process.env.LIGHTSTEP_ACCESS_TOKEN
-    ? new LightstepTracer({
-          access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
-          component_name: 'lang-typescript',
-          verbosity: 0,
-      })
-    : new Tracer()
+let tracer = new Tracer()
+if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
+    logger.log('LightStep tracing enabled')
+    tracer = new LightstepTracer({
+        access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
+        component_name: 'lang-typescript',
+        verbosity: 0,
+    })
+}
 
 let httpsServer: https.Server | undefined
 if (process.env.TLS_CERT && process.env.TLS_KEY) {
+    logger.log('TLS encryption enabled')
     httpsServer = https.createServer({
         cert: process.env.TLS_CERT,
         key: process.env.TLS_KEY,
