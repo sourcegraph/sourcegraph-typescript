@@ -69,18 +69,19 @@ async function connect(rootUri: string): Promise<MessageConnection> {
         socket.addEventListener('open', resolve, { once: true })
         socket.addEventListener('error', resolve, { once: true })
     })
-    console.log('WebSocket connection to TypeScript server opened')
     if (event.type === 'error') {
         throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
     }
+    console.log('WebSocket connection to TypeScript server opened')
     const initializeParams: InitializeParams = {
         processId: 0,
         rootUri,
         workspaceFolders: [{ name: '', uri: rootUri }],
         capabilities: {},
     }
+    console.log('Initializing TypeScript server...')
     const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
-    console.log('initialize result', initResult)
+    console.log('TypeScript server initialized', initResult)
     return connection
 }
 
