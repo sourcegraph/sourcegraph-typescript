@@ -1,3 +1,5 @@
+import 'source-map-support/register'
+
 import {
     isNotificationMessage,
     isRequestMessage,
@@ -19,7 +21,7 @@ import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
 import rmfr from 'rmfr'
-import 'source-map-support/register'
+import { fileURLToPath } from 'url'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
@@ -135,6 +137,11 @@ webSocketServer.on('connection', async connection => {
                 if (!params.rootUri) {
                     throw new Error('No rootUri given as initialize parameter')
                 }
+                if (params.workspaceFolders && params.workspaceFolders.length > 1) {
+                    throw new Error(
+                        'More than one workspace folder given. The TypeScript server only supports a single workspace folder.'
+                    )
+                }
                 zipRootUri = new URL(params.rootUri)
                 if (!zipRootUri.pathname.endsWith('.zip')) {
                     throw new Error('rootUri must end with .zip')
@@ -206,8 +213,8 @@ webSocketServer.on('connection', async connection => {
                 fileRootUri = new URL('file:')
                 fileRootUri.pathname = extractPath.replace(/\\/g, '/')
                 params.rootUri = fileRootUri.href
-                params.rootPath = undefined
-                params.workspaceFolders = null
+                params.rootPath = fileURLToPath(fileRootUri)
+                params.workspaceFolders = [{ name: '', uri: fileRootUri.href }]
             }
             if (isRequestMessage(message) || isNotificationMessage(message)) {
                 rewriteUris(message.params, transformZipToFileUri)
