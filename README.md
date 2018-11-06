@@ -108,8 +108,6 @@ Support for other OpenTracing implementations can easily added here.
 
 To improve performance of dependency installation, the server can be configured to use a mounted SSD at a given directory by setting the `CACHE_DIR` environment variable. The instructions for how to mount a SSD depend on your deployment environment.
 
-##### Example for Kubernetes:
-
 1. Add a volume for the mount path of the SSD:
     ```diff
       spec:
