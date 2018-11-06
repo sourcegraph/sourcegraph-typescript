@@ -134,10 +134,15 @@ function convertHover(hover: Hover | null): sourcegraph.Hover | null {
 export function activate(): void {
     sourcegraph.languages.registerHoverProvider([{ pattern: '**/*.ts' }], {
         provideHover: async (textDocument, position) => {
+            // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
+            const textDocumentUri = new URL(textDocument.uri)
+            if (!/\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)) {
+                // Not a TypeScript file
+                return undefined
+            }
             const rootUri = resolveRootUri(textDocument.uri)
             const serverTextDocumentUri = new URL(rootUri)
-            // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
-            serverTextDocumentUri.hash = new URL(textDocument.uri).hash
+            serverTextDocumentUri.hash = textDocumentUri.hash
             const connection = await getOrCreateConnection(textDocument.uri)
             const hoverResult = await connection.sendRequest(HoverRequest.type, {
                 textDocument: { uri: serverTextDocumentUri.href },
