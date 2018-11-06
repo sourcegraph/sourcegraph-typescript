@@ -157,7 +157,7 @@ webSocketServer.on('connection', async connection => {
 
                 // Fetch zip and extract into temp folder
                 const archivePath = path.join(tempDir, 'archive.zip')
-                tracePromise('Fetch source archive', span, async span => {
+                await tracePromise('Fetch source archive', span, async span => {
                     span.setTag('url', zipRootUri.href)
                     await new Promise<void>((resolve, reject) => {
                         request(zipRootUri.href)
@@ -167,7 +167,7 @@ webSocketServer.on('connection', async connection => {
                             .on('error', reject)
                     })
                 })
-                tracePromise('Extract source archive', span, async span => {
+                await tracePromise('Extract source archive', span, async span => {
                     await decompress(archivePath, extractPath, {
                         strip: 1,
                     })
