@@ -1,3 +1,12 @@
+import {
+    isNotificationMessage,
+    isRequestMessage,
+    isResponseMessage,
+    IWebSocket,
+    WebSocketMessageReader,
+    WebSocketMessageWriter,
+} from '@sourcegraph/vscode-ws-jsonrpc'
+import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import decompress from 'decompress'
 import glob from 'globby'
 import * as https from 'https'
@@ -13,15 +22,6 @@ import rmfr from 'rmfr'
 import 'source-map-support/register'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
-import {
-    isNotificationMessage,
-    isRequestMessage,
-    isResponseMessage,
-    IWebSocket,
-    WebSocketMessageReader,
-    WebSocketMessageWriter,
-} from 'vscode-ws-jsonrpc'
-import * as rpcServer from 'vscode-ws-jsonrpc/lib/server'
 import { Server } from 'ws'
 import { tracePromise } from './tracing'
 import { install } from './yarn'

@@ -1,3 +1,10 @@
+import {
+    createMessageConnection,
+    MessageConnection,
+    toSocket,
+    WebSocketMessageReader,
+    WebSocketMessageWriter,
+} from '@sourcegraph/vscode-ws-jsonrpc'
 import * as sourcegraph from 'sourcegraph'
 import {
     Hover,
@@ -7,13 +14,6 @@ import {
     LogMessageNotification,
     MarkupContent,
 } from 'vscode-languageserver-protocol'
-import {
-    createMessageConnection,
-    MessageConnection,
-    toSocket,
-    WebSocketMessageReader,
-    WebSocketMessageWriter,
-} from 'vscode-ws-jsonrpc'
 
 // Polyfill
 // @ts-ignore

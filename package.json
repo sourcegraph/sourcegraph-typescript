@@ -76,7 +76,7 @@
     "uuid": "^3.3.2",
     "vscode-languageserver-protocol": "^3.13.0",
     "vscode-languageserver-types": "^3.13.0",
-    "vscode-ws-jsonrpc": "0.0.3",
+    "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "whatwg-url": "^7.0.0",
     "ws": "^6.1.0"
   }
