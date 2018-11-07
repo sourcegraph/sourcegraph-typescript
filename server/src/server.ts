@@ -4,7 +4,6 @@ import {
     createMessageConnection,
     isNotificationMessage,
     isRequestMessage,
-    isResponseMessage,
     IWebSocket,
     WebSocketMessageReader,
     WebSocketMessageWriter,
@@ -160,6 +159,9 @@ webSocketServer.on('connection', async connection => {
             if (isRequestMessage(message) || isNotificationMessage(message)) {
                 span = tracer.startSpan('Handle ' + message.method)
             }
+            if (zipRootUri) {
+                span.setTag('rootUri', zipRootUri.href)
+            }
             if (isRequestMessage(message) && message.method === 'initialize') {
                 const params: InitializeParams = message.params
                 if (!params.rootUri) {
@@ -171,6 +173,7 @@ webSocketServer.on('connection', async connection => {
                     )
                 }
                 zipRootUri = new URL(params.rootUri)
+                span.setTag('rootUri', zipRootUri.href)
                 if (!zipRootUri.pathname.endsWith('.zip')) {
                     throw new Error('rootUri must end with .zip')
                 }
