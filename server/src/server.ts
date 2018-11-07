@@ -116,23 +116,12 @@ webSocketServer.on('connection', async connection => {
     /** The logger for this connection, loggin to the user's browser console */
     const logger: Logger = new LSPLogger(webSocketMessageConnection)
 
-    // const languageServerConnection = rpcServer.createServerProcess('TypeScript language', 'node', [
-    //     path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
-    //     '--stdio',
-    //     // Use local tsserver instead of the tsserver of the repo for security reasons
-    //     '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
-    //     '--log-level=4',
-    // ])
     const languageServerConnection = rpcServer.createServerProcess('TypeScript language', 'node', [
-        path.resolve(
-            __dirname,
-            '..',
-            '..',
-            'node_modules',
-            'javascript-typescript-langserver',
-            'lib',
-            'language-server-stdio.js'
-        ),
+        path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
+        '--stdio',
+        // Use local tsserver instead of the tsserver of the repo for security reasons
+        '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+        // '--log-level=4',
     ])
 
     let zipRootUri: URL
