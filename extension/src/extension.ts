@@ -1,8 +1,8 @@
 // Polyfill
-import { URL, URLSearchParams } from 'whatwg-url'
+import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 // @ts-ignore
-Object.assign(URL, self.URL)
-Object.assign(self, { URL, URLSearchParams })
+Object.assign(_URL, self.URL)
+Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
 import {
     createMessageConnection,
@@ -13,33 +13,19 @@ import {
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as sourcegraph from 'sourcegraph'
 import {
+    DefinitionRequest,
     DidOpenTextDocumentNotification,
     DidOpenTextDocumentParams,
-    Hover,
     HoverRequest,
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
-    MarkupContent,
 } from 'vscode-languageserver-protocol'
+import { convertDefinition, convertHover, resolveRootUri, toServerTextDocumentUri } from './lsp-conversion'
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
-function resolveRootUri(textDocumentUri: URL): string {
-    // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
-    // TODO this should point to the public Sourcegraph "raw" API, with an access token.
-    // This only works for public GitHub repos!
-    const rootUri =
-        'https://' +
-        textDocumentUri.hostname +
-        textDocumentUri.pathname +
-        '/archive/' +
-        textDocumentUri.search.substr(1) +
-        '.zip'
-    return rootUri
-}
-
-async function connect(rootUri: string): Promise<MessageConnection> {
+async function connect(rootUri: URL): Promise<MessageConnection> {
     const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
     if (typeof serverUrl !== 'string') {
         throw new Error(
@@ -83,8 +69,8 @@ async function connect(rootUri: string): Promise<MessageConnection> {
     console.log('WebSocket connection to TypeScript server opened')
     const initializeParams: InitializeParams = {
         processId: 0,
-        rootUri,
-        workspaceFolders: [{ name: '', uri: rootUri }],
+        rootUri: rootUri.href,
+        workspaceFolders: [{ name: '', uri: rootUri.href }],
         capabilities: {},
     }
     console.log('Initializing TypeScript server...')
@@ -95,49 +81,17 @@ async function connect(rootUri: string): Promise<MessageConnection> {
 
 async function getOrCreateConnection(textDocumentUri: URL): Promise<MessageConnection> {
     const rootUri = resolveRootUri(textDocumentUri)
-    let connectionPromise = connectionsByRootUri.get(rootUri)
+    let connectionPromise = connectionsByRootUri.get(rootUri.href)
     if (!connectionPromise) {
         connectionPromise = connect(rootUri)
-        connectionsByRootUri.set(rootUri, connectionPromise)
+        connectionsByRootUri.set(rootUri.href, connectionPromise)
     }
     const connection = await connectionPromise
     connection.onClose(() => {
         console.log('WebSocket connection to TypeScript server closed')
-        connectionsByRootUri.delete(rootUri)
+        connectionsByRootUri.delete(rootUri.href)
     })
     return connection
-}
-
-function convertHover(hover: Hover | null): sourcegraph.Hover | null {
-    if (!hover) {
-        return null
-    }
-    const contents = Array.isArray(hover.contents) ? hover.contents : [hover.contents]
-    return {
-        range:
-            hover.range &&
-            new sourcegraph.Range(
-                hover.range.start.line,
-                hover.range.start.character,
-                hover.range.end.line,
-                hover.range.end.character
-            ),
-        contents: {
-            kind: sourcegraph.MarkupKind.Markdown,
-            value: contents
-                .map(content => {
-                    if (MarkupContent.is(content)) {
-                        // Assume it's markdown. To be correct, markdown would need to be escaped for non-markdown kinds.
-                        return content.value
-                    }
-                    if (typeof content === 'string') {
-                        return content
-                    }
-                    return '```' + content.language + '\n' + content.value + '\n```'
-                })
-                .join('\n\n---\n\n'),
-        },
-    }
 }
 
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
@@ -173,24 +127,40 @@ export function activate(): void {
         }
     })
 
+    // Example of a Sourcegraph textdocument URI:
+    // git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
+
     // Hover
     sourcegraph.languages.registerHoverProvider([{ pattern: '**/*.*' }], {
         provideHover: async (textDocument, position) => {
-            // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
             const textDocumentUri = new URL(textDocument.uri)
             if (!isTypeScriptFile(textDocumentUri)) {
-                // Not a TypeScript file
                 return undefined
             }
-            const rootUri = resolveRootUri(textDocumentUri)
-            const serverTextDocumentUri = new URL(rootUri)
-            serverTextDocumentUri.hash = textDocumentUri.hash
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
             const connection = await getOrCreateConnection(textDocumentUri)
             const hoverResult = await connection.sendRequest(HoverRequest.type, {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
             })
             return convertHover(hoverResult)
+        },
+    })
+
+    // Definition
+    sourcegraph.languages.registerDefinitionProvider([{ pattern: '**/*.*' }], {
+        provideDefinition: async (textDocument, position) => {
+            const textDocumentUri = new URL(textDocument.uri)
+            if (!isTypeScriptFile(textDocumentUri)) {
+                return undefined
+            }
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
+            const connection = await getOrCreateConnection(textDocumentUri)
+            const definitionResult = await connection.sendRequest(DefinitionRequest.type, {
+                textDocument: { uri: serverTextDocumentUri.href },
+                position,
+            })
+            return convertDefinition(definitionResult)
         },
     })
 }

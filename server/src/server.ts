@@ -23,7 +23,7 @@ import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
 import rmfr from 'rmfr'
-import { pathToFileURL } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
@@ -159,8 +159,9 @@ webSocketServer.on('connection', async connection => {
         return fileUri
     }
     const transformFileToZipUri = (fileUri: URL): URL => {
+        const filePath = fileURLToPath(fileUri)
         const zipUri = new URL(zipRootUri.href)
-        zipUri.hash = path.relative(fileUri.pathname.replace(/\//g, path.sep), extractPath).replace(/\\/g, '/')
+        zipUri.hash = path.relative(extractPath, filePath).replace(/\\/g, '/')
         return zipUri
     }
 
@@ -257,16 +258,8 @@ webSocketServer.on('connection', async connection => {
                 params.rootPath = extractPath
                 params.workspaceFolders = [{ name: '', uri: fileRootUri.href }]
             }
-            if (isRequestMessage(message) || isNotificationMessage(message)) {
-                rewriteUris(message.params, transformZipToFileUri)
-            } else if (isResponseMessage(message)) {
-                if (message.result) {
-                    rewriteUris(message.result, transformFileToZipUri)
-                }
-                if (message.error) {
-                    rewriteUris(message.error.data, transformFileToZipUri)
-                }
-            }
+
+            rewriteUris(message, transformZipToFileUri)
 
             // Forward message to language server
             languageServerConnection.writer.write(message)
@@ -296,7 +289,11 @@ webSocketServer.on('connection', async connection => {
             // console.log('Trace', traceUrl)
         }
     })
-    languageServerConnection.forward(webSocketConnection)
+
+    languageServerConnection.forward(webSocketConnection, message => {
+        rewriteUris(message, transformFileToZipUri)
+        return message
+    })
 })
 
 httpServer.listen(port, () => {
