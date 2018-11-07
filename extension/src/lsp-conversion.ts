@@ -65,8 +65,12 @@ export function convertHover(hover: Hover | null): sourcegraph.Hover | null {
                     if (typeof content === 'string') {
                         return content
                     }
+                    if (!content.value) {
+                        return ''
+                    }
                     return '```' + content.language + '\n' + content.value + '\n```'
                 })
+                .filter(str => !!str.trim())
                 .join('\n\n---\n\n'),
         },
     }
