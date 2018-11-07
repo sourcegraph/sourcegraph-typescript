@@ -13,6 +13,8 @@ import {
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as sourcegraph from 'sourcegraph'
 import {
+    DidOpenTextDocumentNotification,
+    DidOpenTextDocumentParams,
     Hover,
     HoverRequest,
     InitializeParams,
@@ -23,13 +25,17 @@ import {
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
-function resolveRootUri(textDocumentUri: string): string {
+function resolveRootUri(textDocumentUri: URL): string {
     // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
-    const parsedUri = new URL(textDocumentUri)
     // TODO this should point to the public Sourcegraph "raw" API, with an access token.
     // This only works for public GitHub repos!
     const rootUri =
-        'https://' + parsedUri.hostname + parsedUri.pathname + '/archive/' + parsedUri.search.substr(1) + '.zip'
+        'https://' +
+        textDocumentUri.hostname +
+        textDocumentUri.pathname +
+        '/archive/' +
+        textDocumentUri.search.substr(1) +
+        '.zip'
     return rootUri
 }
 
@@ -87,7 +93,7 @@ async function connect(rootUri: string): Promise<MessageConnection> {
     return connection
 }
 
-async function getOrCreateConnection(textDocumentUri: string): Promise<MessageConnection> {
+async function getOrCreateConnection(textDocumentUri: URL): Promise<MessageConnection> {
     const rootUri = resolveRootUri(textDocumentUri)
     let connectionPromise = connectionsByRootUri.get(rootUri)
     if (!connectionPromise) {
@@ -134,19 +140,52 @@ function convertHover(hover: Hover | null): sourcegraph.Hover | null {
     }
 }
 
+const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
+
 export function activate(): void {
-    sourcegraph.languages.registerHoverProvider([{ pattern: '**/*.ts' }], {
+    /** Map from textDocument URI to version (monotonically increasing positive integers) */
+    const textDocumentVersions = new Map<string, number>()
+
+    // Forward didOpen notifications
+    sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
+        try {
+            const textDocumentUri = new URL(textDocument.uri)
+            if (!isTypeScriptFile(textDocumentUri)) {
+                return
+            }
+
+            // Increment version
+            const textDocumentVersion = (textDocumentVersions.get(textDocumentUri.href) || 0) + 1
+            textDocumentVersions.set(textDocumentUri.href, textDocumentVersion)
+
+            const connection = await getOrCreateConnection(textDocumentUri)
+            const didOpenParams: DidOpenTextDocumentParams = {
+                textDocument: {
+                    uri: textDocumentUri.href,
+                    languageId: textDocument.languageId,
+                    text: textDocument.text,
+                    version: textDocumentVersion,
+                },
+            }
+            connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+        } catch (err) {
+            console.error('Error handling didOpenTextDocument event', err)
+        }
+    })
+
+    // Hover
+    sourcegraph.languages.registerHoverProvider([{ pattern: '**/*.*' }], {
         provideHover: async (textDocument, position) => {
             // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
             const textDocumentUri = new URL(textDocument.uri)
-            if (!/\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)) {
+            if (!isTypeScriptFile(textDocumentUri)) {
                 // Not a TypeScript file
                 return undefined
             }
-            const rootUri = resolveRootUri(textDocument.uri)
+            const rootUri = resolveRootUri(textDocumentUri)
             const serverTextDocumentUri = new URL(rootUri)
             serverTextDocumentUri.hash = textDocumentUri.hash
-            const connection = await getOrCreateConnection(textDocument.uri)
+            const connection = await getOrCreateConnection(textDocumentUri)
             const hoverResult = await connection.sendRequest(HoverRequest.type, {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
