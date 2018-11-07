@@ -17,11 +17,13 @@ import {
     DidOpenTextDocumentNotification,
     DidOpenTextDocumentParams,
     HoverRequest,
+    ImplementationRequest,
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
     ReferenceParams,
     ReferencesRequest,
+    TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { convertHover, convertLocations, resolveRootUri, toServerTextDocumentUri } from './lsp-conversion'
 
@@ -184,6 +186,24 @@ export function activate(): void {
             }
             const referencesResult = await connection.sendRequest(ReferencesRequest.type, referenceParams)
             return convertLocations(referencesResult)
+        },
+    })
+
+    // Implementations
+    sourcegraph.languages.registerImplementationProvider([{ pattern: '**/*.*' }], {
+        provideImplementation: async (textDocument, position) => {
+            const textDocumentUri = new URL(textDocument.uri)
+            if (!isTypeScriptFile(textDocumentUri)) {
+                return undefined
+            }
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
+            const connection = await getOrCreateConnection(textDocumentUri)
+            const implementationParams: TextDocumentPositionParams = {
+                textDocument: { uri: serverTextDocumentUri.href },
+                position,
+            }
+            const implementationResult = await connection.sendRequest(ImplementationRequest.type, implementationParams)
+            return convertLocations(implementationResult)
         },
     })
 }
