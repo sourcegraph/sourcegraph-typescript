@@ -93,13 +93,11 @@ TLS is optional but recommended for production deployments. It is used if `TLS_K
 #### Enabling OpenTracing
 
 The server can report spans through OpenTracing to diagnose issues.
-If the environment variables `LIGHTSTEP_PROJECT` and `LIGHTSTEP_ACCESS_TOKEN` are set, the server will send tracing data to the given LightStep instance.
+If the environment variable `LIGHTSTEP_ACCESS_TOKEN` is set, the server will send tracing data to the given LightStep instance.
 Support for other OpenTracing implementations can easily added here.
 
 ```diff
   env:
-+   - name: LIGHTSTEP_PROJECT
-+     value: my_project
 +   - name: LIGHTSTEP_ACCESS_TOKEN
 +     value: abcdefg
 ```
