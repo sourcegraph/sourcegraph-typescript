@@ -22,7 +22,7 @@ import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
 import rmfr from 'rmfr'
-import { fileURLToPath } from 'url'
+import { pathToFileURL } from 'url'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
@@ -244,10 +244,9 @@ webSocketServer.on('connection', async connection => {
                 })
 
                 // Rewrite HTTP zip root URI to a file URI pointing to the checkout dir
-                fileRootUri = new URL('file:')
-                fileRootUri.pathname = extractPath.replace(/\\/g, '/')
+                fileRootUri = pathToFileURL(extractPath)
                 params.rootUri = fileRootUri.href
-                params.rootPath = fileURLToPath(fileRootUri)
+                params.rootPath = extractPath
                 params.workspaceFolders = [{ name: '', uri: fileRootUri.href }]
             }
             if (isRequestMessage(message) || isNotificationMessage(message)) {
