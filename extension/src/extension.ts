@@ -48,20 +48,21 @@ async function connect(rootUri: string): Promise<MessageConnection> {
         console
     )
     connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
-        const prefix = 'TypeScript server:'
+        // Blue background for the "TypeScript server" prefix
+        const args = ['%cTypeScript server%c %s', 'background-color: blue; color: white', '', message]
         switch (type) {
             case 1:
-                console.error(prefix, message)
+                console.error(...args)
                 break
             case 2:
-                console.warn(prefix, message)
+                console.warn(...args)
                 break
             case 3:
-                console.info(prefix, message)
+                console.info(...args)
                 break
             case 4:
             default:
-                console.log(prefix, message)
+                console.log(...args)
                 break
         }
     })
