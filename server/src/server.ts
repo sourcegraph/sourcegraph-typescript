@@ -26,6 +26,7 @@ import { fileURLToPath } from 'url'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
+import { filterDependencies } from './dependencies'
 import { tracePromise } from './tracing'
 import { install } from './yarn'
 
@@ -55,7 +56,6 @@ if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
     tracer = new LightstepTracer({
         access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
         component_name: 'lang-typescript',
-        verbosity: 0,
     })
 }
 
@@ -131,8 +131,9 @@ webSocketServer.on('connection', async connection => {
     let fileRootUri: URL
     let tempDir: string
     let extractPath: string
-    let yarnGlobalFolder: string
-    let yarnCacheFolder: string
+    // yarn folders
+    let globalFolder: string
+    let cacheFolder: string
 
     const connectionCleanupFns: CleanupFn[] = []
     const cleanupConnection = () => cleanupAll(connectionCleanupFns)
@@ -189,9 +190,9 @@ webSocketServer.on('connection', async connection => {
                     await rmfr(tempDir)
                 })
                 extractPath = path.join(tempDir, 'repo')
-                yarnCacheFolder = path.join(tempDir, 'cache')
-                yarnGlobalFolder = path.join(tempDir, 'global')
-                await Promise.all([fs.mkdir(extractPath), fs.mkdir(yarnCacheFolder), fs.mkdir(yarnGlobalFolder)])
+                cacheFolder = path.join(tempDir, 'cache')
+                globalFolder = path.join(tempDir, 'global')
+                await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolder), fs.mkdir(globalFolder)])
                 console.log('Fetching zip from', zipRootUri.href)
 
                 // Fetch zip and extract into temp folder
@@ -219,22 +220,15 @@ webSocketServer.on('connection', async connection => {
                 logger.log('package.jsons found:', packageJsonPaths)
 
                 // Install dependencies
-                // TODO filter dependencies to only the ones that have a types field or start with @types/
                 await tracePromise('Install dependencies', span, async span => {
                     await Promise.all(
-                        packageJsonPaths.map(
-                            packageJsonPath =>
-                                new Promise<void>((resolve, reject) => {
-                                    const cwd = path.join(extractPath, path.dirname(packageJsonPath))
-                                    const yarnProcess = install(
-                                        {
-                                            cwd,
-                                            globalFolder: yarnGlobalFolder,
-                                            cacheFolder: yarnCacheFolder,
-                                            logger,
-                                        },
-                                        span
-                                    )
+                        packageJsonPaths.map(async relPackageJsonPath => {
+                            try {
+                                const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
+                                await filterDependencies(absPackageJsonPath, logger, span)
+                                await new Promise<void>((resolve, reject) => {
+                                    const cwd = path.join(extractPath, path.dirname(relPackageJsonPath))
+                                    const yarnProcess = install({ cwd, globalFolder, cacheFolder, logger }, span)
                                     yarnProcess.on('success', resolve)
                                     yarnProcess.on('error', reject)
                                     connectionCleanupFns.unshift(() => {
@@ -242,7 +236,10 @@ webSocketServer.on('connection', async connection => {
                                         yarnProcess.kill()
                                     })
                                 })
-                        )
+                            } catch (err) {
+                                logger.error(`Installation for ${relPackageJsonPath} failed`, err)
+                            }
+                        })
                     )
                 })
 
@@ -288,6 +285,8 @@ webSocketServer.on('connection', async connection => {
             }
         } finally {
             span.finish()
+            // const traceUrl = (span as any).generateTraceURL()
+            // console.log('Trace', traceUrl)
         }
     })
     languageServerConnection.forward(webSocketConnection)
