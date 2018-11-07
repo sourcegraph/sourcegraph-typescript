@@ -1,6 +1,7 @@
 import 'source-map-support/register'
 
 import {
+    createMessageConnection,
     isNotificationMessage,
     isRequestMessage,
     isResponseMessage,
@@ -27,13 +28,12 @@ import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
 import { filterDependencies } from './dependencies'
+import { Logger, LSPLogger } from './logging'
 import { tracePromise } from './tracing'
 import { install } from './yarn'
 
-const logger = console
-
 const CACHE_DIR = process.env.CACHE_DIR || tmpdir()
-logger.log(`Using CACHE_DIR ${CACHE_DIR}`)
+console.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
 /**
  * Rewrites all `uri` properties in an object, recursively
@@ -52,7 +52,7 @@ function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
 
 let tracer = new Tracer()
 if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
-    logger.log('LightStep tracing enabled')
+    console.log('LightStep tracing enabled')
     tracer = new LightstepTracer({
         access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
         component_name: 'lang-typescript',
@@ -63,7 +63,7 @@ const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080
 
 let httpServer: http.Server | https.Server
 if (process.env.TLS_CERT && process.env.TLS_KEY) {
-    logger.log('TLS encryption enabled')
+    console.log('TLS encryption enabled')
     httpServer = https.createServer({
         cert: process.env.TLS_CERT,
         key: process.env.TLS_KEY,
@@ -78,7 +78,7 @@ async function cleanupAll(cleanupFns: Iterable<CleanupFn>): Promise<void> {
         try {
             await cleanup()
         } catch (err) {
-            logger.error('Error cleaning up', err)
+            console.error('Error cleaning up', err)
         }
     }
 }
@@ -88,7 +88,7 @@ const globalCleanupFns = new Set<CleanupFn>()
 // Cleanup when receiving signals
 for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
     process.once(signal, async () => {
-        logger.log(`Received ${signal}, cleaning up`)
+        console.log(`Received ${signal}, cleaning up`)
         await cleanupAll(globalCleanupFns)
         process.exit(0)
     })
@@ -97,7 +97,7 @@ for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
 const webSocketServer = new Server({ server: httpServer })
 
 webSocketServer.on('connection', async connection => {
-    logger.log('New WebSocket connection')
+    console.log('New WebSocket connection')
     const webSocket: IWebSocket = {
         onMessage: handler => connection.on('message', handler),
         onClose: handler => connection.on('close', handler),
@@ -108,6 +108,14 @@ webSocketServer.on('connection', async connection => {
     const webSocketReader = new WebSocketMessageReader(webSocket)
     const webSocketWriter = new WebSocketMessageWriter(webSocket)
     const webSocketConnection = rpcServer.createConnection(webSocketReader, webSocketWriter, () => webSocket.dispose())
+    const webSocketMessageConnection = createMessageConnection(
+        webSocketConnection.reader,
+        webSocketConnection.writer,
+        console
+    )
+    /** The logger for this connection, loggin to the user's browser console */
+    const logger: Logger = new LSPLogger(webSocketMessageConnection)
+
     // const languageServerConnection = rpcServer.createServerProcess('TypeScript language', 'node', [
     //     path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
     //     '--stdio',
@@ -140,7 +148,7 @@ webSocketServer.on('connection', async connection => {
     globalCleanupFns.add(cleanupConnection)
     connectionCleanupFns.push(() => languageServerConnection.dispose())
     connection.on('close', async (code, reason) => {
-        logger.log('WebSocket closed', { code, reason })
+        console.log('WebSocket closed', { code, reason })
         await cleanupAll(connectionCleanupFns)
         globalCleanupFns.delete(cleanupConnection)
     })
@@ -292,5 +300,5 @@ webSocketServer.on('connection', async connection => {
 })
 
 httpServer.listen(port, () => {
-    logger.log(`WebSocket server listening on port ${port}`)
+    console.log(`WebSocket server listening on port ${port}`)
 })
