@@ -41,13 +41,6 @@ async function connect(rootUri: string): Promise<MessageConnection> {
         )
     }
     const socket = new WebSocket(serverUrl)
-    socket.addEventListener(
-        'close',
-        event => {
-            console.log('WebSocket connection to TypeScript server closed')
-        },
-        { once: true }
-    )
     const rpcWebSocket = toSocket(socket)
     const connection = createMessageConnection(
         new WebSocketMessageReader(rpcWebSocket),
@@ -102,6 +95,7 @@ async function getOrCreateConnection(textDocumentUri: string): Promise<MessageCo
     }
     const connection = await connectionPromise
     connection.onClose(() => {
+        console.log('WebSocket connection to TypeScript server closed')
         connectionsByRootUri.delete(rootUri)
     })
     return connection
