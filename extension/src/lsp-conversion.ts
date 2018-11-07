@@ -1,5 +1,5 @@
 import * as sourcegraph from 'sourcegraph'
-import { Definition, Hover, MarkupContent, Range } from 'vscode-languageserver-types'
+import { Hover, Location, MarkupContent, Range } from 'vscode-languageserver-types'
 
 export function resolveRootUri(textDocumentUri: URL): URL {
     // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
@@ -72,11 +72,11 @@ export function convertHover(hover: Hover | null): sourcegraph.Hover | null {
     }
 }
 
-export function convertDefinition(definition: Definition): sourcegraph.Definition {
-    if (!definition) {
+export function convertLocations(locationOrLocations: Location | Location[] | null): sourcegraph.Location[] | null {
+    if (!locationOrLocations) {
         return null
     }
-    const locations = Array.isArray(definition) ? definition : [definition]
+    const locations = Array.isArray(locationOrLocations) ? locationOrLocations : [locationOrLocations]
     return locations.map(location => ({
         uri: sourcegraph.URI.parse(toSourcegraphTextDocumentUri(new URL(location.uri)).href),
         range: convertRange(location.range),

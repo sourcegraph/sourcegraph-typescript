@@ -20,8 +20,10 @@ import {
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
+    ReferenceParams,
+    ReferencesRequest,
 } from 'vscode-languageserver-protocol'
-import { convertDefinition, convertHover, resolveRootUri, toServerTextDocumentUri } from './lsp-conversion'
+import { convertHover, convertLocations, resolveRootUri, toServerTextDocumentUri } from './lsp-conversion'
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
@@ -160,7 +162,28 @@ export function activate(): void {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
             })
-            return convertDefinition(definitionResult)
+            return convertLocations(definitionResult)
+        },
+    })
+
+    // References
+    sourcegraph.languages.registerReferenceProvider([{ pattern: '**/*.*' }], {
+        provideReferences: async (textDocument, position) => {
+            const textDocumentUri = new URL(textDocument.uri)
+            if (!isTypeScriptFile(textDocumentUri)) {
+                return undefined
+            }
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
+            const connection = await getOrCreateConnection(textDocumentUri)
+            const referenceParams: ReferenceParams = {
+                textDocument: { uri: serverTextDocumentUri.href },
+                position,
+                context: {
+                    includeDeclaration: false,
+                },
+            }
+            const referencesResult = await connection.sendRequest(ReferencesRequest.type, referenceParams)
+            return convertLocations(referencesResult)
         },
     })
 }
