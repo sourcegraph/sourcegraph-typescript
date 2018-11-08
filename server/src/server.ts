@@ -249,16 +249,19 @@ webSocketServer.on('connection', async connection => {
                     await Promise.all(
                         packageJsonPaths.map(async relPackageJsonPath => {
                             try {
-                                const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
-                                await filterDependencies(absPackageJsonPath, logger, span)
-                                await new Promise<void>((resolve, reject) => {
-                                    const cwd = path.join(extractPath, path.dirname(relPackageJsonPath))
-                                    const yarnProcess = install({ cwd, globalFolder, cacheFolder, logger }, span)
-                                    yarnProcess.on('success', resolve)
-                                    yarnProcess.on('error', reject)
-                                    connectionCleanupFns.unshift(() => {
-                                        logger.log('Killing yarn process in ', cwd)
-                                        yarnProcess.kill()
+                                await tracePromise('Install dependencies for package', span, async span => {
+                                    span.setTag('packageJsonPath', relPackageJsonPath)
+                                    const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
+                                    await filterDependencies(absPackageJsonPath, logger, span)
+                                    await new Promise<void>((resolve, reject) => {
+                                        const cwd = path.join(extractPath, path.dirname(relPackageJsonPath))
+                                        const yarnProcess = install({ cwd, globalFolder, cacheFolder, logger }, span)
+                                        yarnProcess.on('success', resolve)
+                                        yarnProcess.on('error', reject)
+                                        connectionCleanupFns.unshift(() => {
+                                            logger.log('Killing yarn process in ', cwd)
+                                            yarnProcess.kill()
+                                        })
                                     })
                                 })
                             } catch (err) {
