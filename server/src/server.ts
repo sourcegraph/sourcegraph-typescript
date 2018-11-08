@@ -4,6 +4,7 @@ import {
     createMessageConnection,
     isNotificationMessage,
     isRequestMessage,
+    isResponseMessage,
     IWebSocket,
     WebSocketMessageReader,
     WebSocketMessageWriter,
@@ -13,10 +14,10 @@ import decompress from 'decompress'
 import glob from 'globby'
 import * as http from 'http'
 import * as https from 'https'
-// @ts-ignore
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
-import * as fs from 'mz/fs'
+import LightstepSpan from 'lightstep-tracer/lib/imp/span_imp'
 import { createWriteStream } from 'mz/fs'
+import * as fs from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
@@ -153,15 +154,31 @@ webSocketServer.on('connection', async connection => {
         return zipUri
     }
 
+    /** OpenTracing spans for pending requests by message ID */
+    const requestSpans = new Map<string | number, Span>()
+
     webSocketReader.listen(async message => {
         let span = new Span()
         try {
+            // If a request or notification, start a span
             if (isRequestMessage(message) || isNotificationMessage(message)) {
                 span = tracer.startSpan('Handle ' + message.method)
+                // Log the trace URL for this request in the client
+                // if (span instanceof LightstepSpan) {
+                //     const traceUrl = span.generateTraceURL()
+                //     logger.log(`Trace ${message.method} ${traceUrl}`)
+                // }
+                span.setTag('method', message.method)
+                if (isRequestMessage(message)) {
+                    span.setTag('id', message.id)
+                    requestSpans.set(message.id, span)
+                }
             }
             if (zipRootUri) {
                 span.setTag('rootUri', zipRootUri.href)
             }
+
+            // Intercept initialize
             if (isRequestMessage(message) && message.method === 'initialize') {
                 const params: InitializeParams = message.params
                 if (!params.rootUri) {
@@ -281,14 +298,25 @@ webSocketServer.on('connection', async connection => {
                 }
                 webSocketConnection.writer.write(errResponse)
             }
-        } finally {
-            span.finish()
-            // const traceUrl = (span as any).generateTraceURL()
-            // console.log('Trace', traceUrl)
         }
     })
 
     languageServerConnection.forward(webSocketConnection, message => {
+        // If a response, finish the span
+        if (isResponseMessage(message) && message.id !== null) {
+            const span = requestSpans.get(message.id)
+            if (span) {
+                // const meta = {}
+                // span.tracer().inject(span, FORMAT_TEXT_MAP, meta)
+                // ;(message as any).meta = meta
+                if (span instanceof LightstepSpan) {
+                    // Add trace URL to message for easy access in the WebSocket frame inspector
+                    ;(message as any)._trace = span.generateTraceURL()
+                }
+                span.finish()
+                requestSpans.delete(message.id)
+            }
+        }
         rewriteUris(message, transformFileToZipUri)
         return message
     })
