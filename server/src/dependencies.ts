@@ -8,17 +8,15 @@ import { tracePromise } from './tracing'
 /**
  * Checks if a dependency from a package.json should be installed or not by checking whether it contains TypeScript typings.
  */
-async function shouldInstall(name: string, range: string): Promise<boolean> {
-    // Keep all @types/ packages
-    if (name.startsWith('@types/')) {
-        return true
-    }
-    // Keep other packages only if they have a types or typings field
-    const dependencyPackageJson: any = await fetchPackageJson(name, {
-        version: semver.validRange(range) || 'latest',
-        fullMetadata: true,
+function hasTypes(name: string, range: string, span: Span): Promise<boolean> {
+    return tracePromise('Fetch package metadata', span, async span => {
+        span.setTag('name', name)
+        const version = semver.validRange(range) || 'latest'
+        span.setTag('version', version)
+        const dependencyPackageJson: any = await fetchPackageJson(name, { version, fullMetadata: true })
+        // Keep packages only if they have a types or typings field
+        return !!dependencyPackageJson.typings || !!dependencyPackageJson.types
     })
-    return !!dependencyPackageJson.typings || !!dependencyPackageJson.types
 }
 
 /**
@@ -42,7 +40,7 @@ export async function filterDependencies(packageJsonPath: string, logger: Logger
                 await Promise.all(
                     Object.entries(dependencies).map(async ([name, range]) => {
                         try {
-                            if (await shouldInstall(name, range)) {
+                            if (name.startsWith('@types/') || (await hasTypes(name, range, span))) {
                                 included.push(name)
                             } else {
                                 excluded.push(name)
