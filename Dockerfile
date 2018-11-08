@@ -17,3 +17,4 @@ COPY ./ /srv
 WORKDIR /srv/server
 EXPOSE 80 443 8080
 CMD ["node", "--max_old_space_size=4096", "./dist/server.js"]
+USER node

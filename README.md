@@ -38,11 +38,9 @@ spec:
         - name: lang-typescript
           image: sourcegraph/lang-typescript
           ports:
-            - containerPort: 443
+            - containerPort: 8080
               name: wss
           env:
-            - name: PORT
-              value: 443
             # TLS certificate and key to secure the WebSocket connection (optional)
             - name: TLS_CERT
               value: ... your TLS certificate ...
@@ -81,6 +79,7 @@ spec:
   ports:
     - name: wss
       port: 443
+      targetPort: wss
   selector:
     app: lang-typescript
   type: LoadBalancer
@@ -230,16 +229,18 @@ metadata:
 and mount it into the container:
 
 ```diff
+  name: lang-typescript
 + volumeMounts:
 +  - mountPath: /yarn-config
 +    name: yarn-config
 ```
 
 ```diff
-+ volumes:
-+   - configMap:
+  spec:
++   volumes:
++     - configMap:
++         name: yarn-config
 +       name: yarn-config
-+     name: yarn-config
 ```
 
 #### Support for dependencies on private packages and git repositories
