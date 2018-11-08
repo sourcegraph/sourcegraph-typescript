@@ -16,8 +16,9 @@ import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import LightstepSpan from 'lightstep-tracer/lib/imp/span_imp'
-import { createWriteStream } from 'mz/fs'
+import mkdirp from 'mkdirp-promise'
 import * as fs from 'mz/fs'
+import { createWriteStream } from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
@@ -202,7 +203,7 @@ webSocketServer.on('connection', async connection => {
                     CACHE_DIR,
                     (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
                 )
-                await fs.mkdir(tempDir)
+                await mkdirp(tempDir)
                 connectionCleanupFns.push(async () => {
                     logger.log('Deleting temp dir ', tempDir)
                     await rmfr(tempDir)
