@@ -283,7 +283,7 @@ webSocketServer.on('connection', async connection => {
             span.setTag('error', true)
             span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
 
-            logger.error('Error handling message', message, err)
+            logger.error('Error handling message\n', message, '\n', err)
             if (isRequestMessage(message)) {
                 const errResponse = {
                     jsonrpc: '2.0',
