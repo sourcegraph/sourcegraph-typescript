@@ -130,8 +130,8 @@ webSocketServer.on('connection', async connection => {
     let tempDir: string
     let extractPath: string
     // yarn folders
-    let globalFolder: string
-    let cacheFolder: string
+    let globalFolderRoot: string
+    let cacheFolderRoot: string
 
     const connectionCleanupFns: CleanupFn[] = []
     const cleanupConnection = () => cleanupAll(connectionCleanupFns)
@@ -209,9 +209,9 @@ webSocketServer.on('connection', async connection => {
                     await rmfr(tempDir)
                 })
                 extractPath = path.join(tempDir, 'repo')
-                cacheFolder = path.join(tempDir, 'cache')
-                globalFolder = path.join(tempDir, 'global')
-                await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolder), fs.mkdir(globalFolder)])
+                cacheFolderRoot = path.join(tempDir, 'cache')
+                globalFolderRoot = path.join(tempDir, 'global')
+                await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolderRoot), fs.mkdir(globalFolderRoot)])
 
                 // Fetch zip and extract into temp folder
                 logger.log('Fetching zip from', zipRootUri.href)
@@ -253,8 +253,16 @@ webSocketServer.on('connection', async connection => {
                                     span.setTag('packageJsonPath', relPackageJsonPath)
                                     const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
                                     await filterDependencies(absPackageJsonPath, logger, span)
+
+                                    // It's important that each concurrent yarn process has their own global and cache folders
+                                    const relPackageJsonDirName = path.dirname(relPackageJsonPath)
+                                    const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
+                                    const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
+                                    const cwd = path.join(extractPath, relPackageJsonDirName)
+
+                                    await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
+
                                     await new Promise<void>((resolve, reject) => {
-                                        const cwd = path.join(extractPath, path.dirname(relPackageJsonPath))
                                         const yarnProcess = install({ cwd, globalFolder, cacheFolder, logger }, span)
                                         yarnProcess.on('success', resolve)
                                         yarnProcess.on('error', reject)
