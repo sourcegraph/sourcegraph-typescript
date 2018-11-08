@@ -194,19 +194,25 @@ webSocketServer.on('connection', async connection => {
                 cacheFolder = path.join(tempDir, 'cache')
                 globalFolder = path.join(tempDir, 'global')
                 await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolder), fs.mkdir(globalFolder)])
-                console.log('Fetching zip from', zipRootUri.href)
 
                 // Fetch zip and extract into temp folder
+                logger.log('Fetching zip from', zipRootUri.href)
                 const archivePath = path.join(tempDir, 'archive.zip')
                 await tracePromise('Fetch source archive', span, async span => {
                     span.setTag('url', zipRootUri.href)
+                    let bytes = 0
                     await new Promise<void>((resolve, reject) => {
-                        request(zipRootUri.href)
-                            .on('error', reject)
+                        const response = request(zipRootUri.href)
+                        response
+                            .once('error', reject)
+                            .on('data', (chunk: Buffer) => {
+                                bytes += chunk.byteLength
+                            })
                             .pipe(createWriteStream(archivePath))
-                            .on('finish', resolve)
-                            .on('error', reject)
+                            .once('finish', resolve)
+                            .once('error', reject)
                     })
+                    span.setTag('bytes', bytes)
                 })
                 await tracePromise('Extract source archive', span, async span => {
                     await decompress(archivePath, extractPath, {
