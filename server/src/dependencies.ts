@@ -56,6 +56,8 @@ export async function filterDependencies(packageJsonPath: string, logger: Logger
         )
         logger.log('Excluding dependencies', excluded.join(', '))
         logger.log('Keeping dependencies', included.join(', '))
+        span.setTag('excluded', excluded.length)
+        span.setTag('included', included.length)
         await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2))
     })
 }
