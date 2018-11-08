@@ -1,5 +1,9 @@
 import 'source-map-support/register'
 
+// Polyfill
+import { AbortController } from 'abort-controller'
+Object.assign(global, { AbortController })
+
 import {
     createMessageConnection,
     isNotificationMessage,
@@ -16,9 +20,10 @@ import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import LightstepSpan from 'lightstep-tracer/lib/imp/span_imp'
+import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import * as fs from 'mz/fs'
 import { createWriteStream } from 'mz/fs'
+import * as fs from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
@@ -28,6 +33,7 @@ import { fileURLToPath, pathToFileURL } from 'url'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
+import { createAbortError, isAbortError, onAbort, throwIfAborted } from './abort'
 import { filterDependencies } from './dependencies'
 import { Logger, LSPLogger } from './logging'
 import { tracePromise } from './tracing'
@@ -133,10 +139,10 @@ webSocketServer.on('connection', async connection => {
     let globalFolderRoot: string
     let cacheFolderRoot: string
 
-    const connectionCleanupFns: CleanupFn[] = []
+    const connectionCleanupFns = new Set<CleanupFn>()
     const cleanupConnection = () => cleanupAll(connectionCleanupFns)
     globalCleanupFns.add(cleanupConnection)
-    connectionCleanupFns.push(() => languageServerConnection.dispose())
+    connectionCleanupFns.add(() => languageServerConnection.dispose())
     connection.on('close', async (code, reason) => {
         console.log('WebSocket closed', { code, reason })
         await cleanupAll(connectionCleanupFns)
@@ -157,8 +163,17 @@ webSocketServer.on('connection', async connection => {
 
     /** OpenTracing spans for pending requests by message ID */
     const requestSpans = new Map<string | number, Span>()
+    const requestAbortFns = new Map<string | number, () => void>()
 
     webSocketReader.listen(async message => {
+        let signal: AbortSignal
+        {
+            const abortController = new AbortController()
+            signal = abortController.signal
+            // Make sure that all request handling is cancelled if the connection is closed by the client
+            const messageCleanupFn = () => abortController.abort()
+            connectionCleanupFns.add(messageCleanupFn)
+        }
         let span = new Span()
         try {
             // If a request or notification, start a span
@@ -204,7 +219,7 @@ webSocketServer.on('connection', async connection => {
                     (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
                 )
                 await mkdirp(tempDir)
-                connectionCleanupFns.push(async () => {
+                connectionCleanupFns.add(async () => {
                     logger.log('Deleting temp dir ', tempDir)
                     await rmfr(tempDir)
                 })
@@ -217,28 +232,38 @@ webSocketServer.on('connection', async connection => {
                 logger.log('Fetching zip from', zipRootUri.href)
                 const archivePath = path.join(tempDir, 'archive.zip')
                 await tracePromise('Fetch source archive', span, async span => {
-                    span.setTag('url', zipRootUri.href)
-                    let bytes = 0
-                    await new Promise<void>((resolve, reject) => {
-                        const response = request(zipRootUri.href)
-                        response
-                            .once('error', reject)
-                            .on('data', (chunk: Buffer) => {
-                                bytes += chunk.byteLength
+                    let removeAbortListener = noop
+                    try {
+                        span.setTag('url', zipRootUri.href)
+                        let bytes = 0
+                        await new Promise<void>((resolve, reject) => {
+                            const response = request(zipRootUri.href)
+                            response
+                                .once('error', reject)
+                                .on('data', (chunk: Buffer) => {
+                                    bytes += chunk.byteLength
+                                })
+                                .pipe(createWriteStream(archivePath))
+                                .once('finish', resolve)
+                                .once('error', reject)
+                            removeAbortListener = onAbort(signal, () => {
+                                response.abort()
+                                reject(createAbortError())
                             })
-                            .pipe(createWriteStream(archivePath))
-                            .once('finish', resolve)
-                            .once('error', reject)
-                    })
-                    span.setTag('bytes', bytes)
+                        })
+                        span.setTag('bytes', bytes)
+                    } finally {
+                        removeAbortListener()
+                    }
                 })
+                // Extract archive
+                throwIfAborted(signal)
                 await tracePromise('Extract source archive', span, async span => {
-                    await decompress(archivePath, extractPath, {
-                        strip: 1,
-                    })
+                    await decompress(archivePath, extractPath, { strip: 1 })
                 })
 
                 // Find package.jsons to install
+                throwIfAborted(signal)
                 const packageJsonPaths = await tracePromise('Find package.jsons', span, span =>
                     glob('**/package.json', { cwd: extractPath })
                 )
@@ -252,7 +277,7 @@ webSocketServer.on('connection', async connection => {
                                 await tracePromise('Install dependencies for package', span, async span => {
                                     span.setTag('packageJsonPath', relPackageJsonPath)
                                     const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
-                                    await filterDependencies(absPackageJsonPath, logger, span)
+                                    await filterDependencies(absPackageJsonPath, { logger, span, signal })
 
                                     // It's important that each concurrent yarn process has their own global and cache folders
                                     const relPackageJsonDirName = path.dirname(relPackageJsonPath)
@@ -262,15 +287,7 @@ webSocketServer.on('connection', async connection => {
 
                                     await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
 
-                                    await new Promise<void>((resolve, reject) => {
-                                        const yarnProcess = install({ cwd, globalFolder, cacheFolder, logger }, span)
-                                        yarnProcess.on('success', resolve)
-                                        yarnProcess.on('error', reject)
-                                        connectionCleanupFns.unshift(() => {
-                                            logger.log('Killing yarn process in ', cwd)
-                                            yarnProcess.kill()
-                                        })
-                                    })
+                                    await install({ cwd, globalFolder, cacheFolder, logger, span, signal })
                                 })
                             } catch (err) {
                                 logger.error(`Installation for ${relPackageJsonPath} failed`, err)
@@ -290,18 +307,33 @@ webSocketServer.on('connection', async connection => {
 
             // Forward message to language server
             languageServerConnection.writer.write(message)
+
+            // Cancel any request handling
+            if (isNotificationMessage(message) && message.method === '$/cancelRequest') {
+                const requestAbortFn = requestAbortFns.get(message.params.id)
+                if (requestAbortFn) {
+                    requestAbortFn()
+                }
+            }
         } catch (err) {
             span.setTag('error', true)
             span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
 
-            logger.error('Error handling message\n', message, '\n', err)
+            if (!isAbortError(err)) {
+                logger.error('Error handling message\n', message, '\n', err)
+            }
             if (isRequestMessage(message)) {
+                const code = isAbortError(err)
+                    ? ErrorCodes.RequestCancelled
+                    : typeof err.code === 'number'
+                        ? err.code
+                        : ErrorCodes.UnknownErrorCode
                 const errResponse = {
                     jsonrpc: '2.0',
                     id: message.id,
                     error: {
                         message: err.message,
-                        code: typeof err.code === 'number' ? err.code : ErrorCodes.UnknownErrorCode,
+                        code,
                         data: {
                             stack: err.stack,
                             ...err,
@@ -314,8 +346,8 @@ webSocketServer.on('connection', async connection => {
     })
 
     languageServerConnection.forward(webSocketConnection, message => {
-        // If a response, finish the span
         if (isResponseMessage(message) && message.id !== null) {
+            // If there is a span for the request, finish it
             const span = requestSpans.get(message.id)
             if (span) {
                 // const meta = {}
@@ -327,6 +359,13 @@ webSocketServer.on('connection', async connection => {
                 }
                 span.finish()
                 requestSpans.delete(message.id)
+            }
+            // The request is finished, so it cannot be aborted anymore
+            const requestAbortFn = requestAbortFns.get(message.id)
+            if (requestAbortFn) {
+                // The request no longer needs to be aborted when the connection closes
+                connectionCleanupFns.delete(requestAbortFn)
+                requestAbortFns.delete(message.id)
             }
         }
         rewriteUris(message, transformFileToZipUri)

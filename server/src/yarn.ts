@@ -1,8 +1,11 @@
 import { ChildProcess, spawn } from 'child_process'
+import { noop } from 'lodash'
 import { Span } from 'opentracing'
 import * as path from 'path'
 import { Readable } from 'stream'
+import { createAbortError, onAbort, throwIfAborted } from './abort'
 import { Logger, NoopLogger } from './logging'
+import { tracePromise } from './tracing'
 
 /**
  * Emitted value for a `step` event
@@ -40,7 +43,7 @@ export interface YarnProcess extends ChildProcess {
     once(event: string | symbol, listener: (...args: any[]) => void): this
 }
 
-export interface InstallOptions {
+export interface YarnSpawnOptions {
     /** The folder to run yarn in */
     cwd: string
 
@@ -55,6 +58,9 @@ export interface InstallOptions {
 
     /** Logger to use */
     logger?: Logger
+
+    /** OpenTracing parent span */
+    span?: Span
 }
 
 /**
@@ -63,11 +69,12 @@ export interface InstallOptions {
  * An exit code of 0 causes a `success` event to be emitted, any other an `error` event
  *
  * @param options
- * @param childOf OpenTracing parent span for tracing
  */
-export function install(options: InstallOptions, childOf = new Span()): YarnProcess {
-    const logger = options.logger || new NoopLogger()
-    const span = childOf.tracer().startSpan('yarn install', { childOf })
+export function spawnYarn({
+    span = new Span(),
+    logger = new NoopLogger(),
+    ...options
+}: YarnInstallOptions): YarnProcess {
     const args = [
         path.resolve(__dirname, '..', '..', 'node_modules', 'yarn', 'lib', 'cli.js'),
         '--ignore-scripts', // Don't run package.json scripts
@@ -150,11 +157,39 @@ export function install(options: InstallOptions, childOf = new Span()): YarnProc
         logger.log(`${step.current}/${step.total} ${step.message}`)
     })
 
-    // Trace errors
-    yarn.on('error', err => {
-        span.setTag('error', true)
-        span.log({ event: 'error', 'error.object': err, message: err.message, stack: err.stack })
-    })
-
     return yarn
+}
+
+interface YarnInstallOptions extends YarnSpawnOptions {
+    signal: AbortSignal
+}
+
+/**
+ * Wrapper around `spawnYarn()` returning a Promise and accepting an AbortSignal.
+ */
+export async function install({
+    logger = new NoopLogger(),
+    span = new Span(),
+    signal,
+    ...spawnOptions
+}: YarnInstallOptions): Promise<void> {
+    await tracePromise('yarn install', span, async span => {
+        throwIfAborted(signal)
+        let removeAbortListener = noop
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const yarnProcess = spawnYarn({ ...spawnOptions, signal, logger })
+                yarnProcess.on('success', resolve)
+                yarnProcess.on('error', reject)
+                const abortListener = () => {
+                    logger.log('Killing yarn process in ', spawnOptions.cwd)
+                    yarnProcess.kill()
+                    reject(createAbortError())
+                }
+                removeAbortListener = onAbort(signal, abortListener)
+            })
+        } finally {
+            removeAbortListener()
+        }
+    })
 }

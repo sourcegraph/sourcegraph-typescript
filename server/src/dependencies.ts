@@ -2,6 +2,7 @@ import * as fs from 'mz/fs'
 import { Span } from 'opentracing'
 import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
+import { throwIfAborted } from './abort'
 import { Logger } from './logging'
 import { tracePromise } from './tracing'
 
@@ -24,7 +25,10 @@ function hasTypes(name: string, range: string, span: Span): Promise<boolean> {
  *
  * @param packageJsonPath File path to a package.json
  */
-export async function filterDependencies(packageJsonPath: string, logger: Logger, span: Span): Promise<void> {
+export async function filterDependencies(
+    packageJsonPath: string,
+    { logger, span, signal }: { logger: Logger; span: Span; signal: AbortSignal }
+): Promise<void> {
     await tracePromise('Filter dependencies', span, async span => {
         span.setTag('packageJsonPath', packageJsonPath)
         logger.log('Filtering package.json at ', packageJsonPath)
@@ -39,6 +43,7 @@ export async function filterDependencies(packageJsonPath: string, logger: Logger
                 }
                 await Promise.all(
                     Object.entries(dependencies).map(async ([name, range]) => {
+                        throwIfAborted(signal)
                         try {
                             if (name.startsWith('@types/') || (await hasTypes(name, range, span))) {
                                 included.push(name)
