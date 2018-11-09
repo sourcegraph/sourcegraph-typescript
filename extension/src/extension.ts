@@ -119,7 +119,7 @@ export function activate(): void {
             const connection = await getOrCreateConnection(textDocumentUri)
             const didOpenParams: DidOpenTextDocumentParams = {
                 textDocument: {
-                    uri: textDocumentUri.href,
+                    uri: toServerTextDocumentUri(textDocumentUri).href,
                     languageId: textDocument.languageId,
                     text: textDocument.text,
                     version: textDocumentVersion,
