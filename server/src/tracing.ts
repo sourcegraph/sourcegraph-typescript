@@ -1,4 +1,5 @@
 import { Span } from 'opentracing'
+import { ERROR } from 'opentracing/lib/ext/tags'
 
 /**
  * Traces a synchronous function by passing it a new child span.
@@ -14,8 +15,8 @@ export function traceSync<T>(operationName: string, childOf: Span, operation: (s
     try {
         return operation(span)
     } catch (err) {
-        span.setTag('error', true)
-        span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+        span.setTag(ERROR, true)
+        logErrorEvent(span, err)
         throw err
     } finally {
         span.finish()
@@ -40,8 +41,8 @@ export async function tracePromise<T>(
     try {
         return await operation(span)
     } catch (err) {
-        span.setTag('error', true)
-        span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+        span.setTag(ERROR, true)
+        logErrorEvent(span, err)
         throw err
     } finally {
         span.finish()
@@ -49,5 +50,5 @@ export async function tracePromise<T>(
 }
 
 export function logErrorEvent(span: Span, err: Error): void {
-    span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+    span.log({ event: ERROR, 'error.object': err, stack: err.stack, message: err.message })
 }
