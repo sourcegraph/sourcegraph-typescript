@@ -1,45 +1,41 @@
 import * as sourcegraph from 'sourcegraph'
 import { Hover, Location, MarkupContent, Range } from 'vscode-languageserver-types'
 
+/**
+ * @param textDocumentUri The Sourcegraph text document URI, e.g. `git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts`
+ * @returns The root URI for the server, e.g. `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/`. Always has a trailing slash.
+ */
 export function resolveRootUri(textDocumentUri: URL): URL {
-    // example: git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
-    // TODO this should point to the public Sourcegraph "raw" API, with an access token.
-    // This only works for public GitHub repos!
-    const rootUri =
-        'https://' +
-        textDocumentUri.hostname +
-        textDocumentUri.pathname +
-        '/archive/' +
-        textDocumentUri.search.substr(1) +
-        '.zip'
-    return new URL(rootUri)
+    const rootUri = new URL(sourcegraph.internal.sourcegraphURL.toString())
+    // rootUri.username = accessToken
+    rootUri.pathname =
+        textDocumentUri.host + textDocumentUri.pathname + '@' + textDocumentUri.search.substr(1) + '/-/raw/'
+    return rootUri
 }
 
 /**
  * @param textDocumentUri The Sourcegraph text document URI like git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
- * @returns The text document URI for the server, using http:// and pointing to the raw API
+ * @returns The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
  */
 export function toServerTextDocumentUri(textDocumentUri: URL): URL {
     const rootUri = resolveRootUri(textDocumentUri)
-    const serverTextDocumentUri = new URL(rootUri.href)
-    serverTextDocumentUri.hash = textDocumentUri.hash
+    const serverTextDocumentUri = new URL(textDocumentUri.hash.substr(1), rootUri.href)
     return serverTextDocumentUri
 }
 
 /**
- * @param serverTextDocumentUri The text document URI for the server, e.g. https://github.com/sourcegraph/extensions-client-common/archive/80389224bd48e1e696d5fa11b3ec6fba341c695b.zip#src/schema/graphqlschema.ts
+ * @param serverTextDocumentUri The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
  * @returns The Sourcegraph text document URI, e.g. git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
  */
 function toSourcegraphTextDocumentUri(serverTextDocumentUri: URL): URL {
-    const match = serverTextDocumentUri.pathname.match(/\/([\w-]+)\/([\w-]+)\/archive\/(\w+)\.zip/)
+    const match = serverTextDocumentUri.pathname.match(/^\/(.+)@(\w+)\/-\/raw\/(.*)$/)
     if (!match) {
         throw new Error('Invalid URI ' + serverTextDocumentUri.href)
     }
-    const [, owner, repoName, rev] = match
-    const sourcegraphUri = new URL(`git://${serverTextDocumentUri.host}/${owner}/${repoName}`)
-    sourcegraphUri.hostname = serverTextDocumentUri.hostname
+    const [, repoName, rev, filePath] = match
+    const sourcegraphUri = new URL(`git://${repoName}`)
     sourcegraphUri.search = rev
-    sourcegraphUri.hash = serverTextDocumentUri.hash
+    sourcegraphUri.hash = filePath
     return sourcegraphUri
 }
 

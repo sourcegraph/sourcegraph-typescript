@@ -86,6 +86,7 @@
     "sourcegraph": "^18.4.1",
     "strip-json-comments": "^2.0.1",
     "typescript-language-server": "^0.3.6",
+    "url-relative": "^1.0.0",
     "uuid": "^3.3.2",
     "vscode-languageserver-protocol": "^3.13.0",
     "vscode-languageserver-types": "^3.13.0",
