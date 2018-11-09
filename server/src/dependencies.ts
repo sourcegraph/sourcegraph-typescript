@@ -4,7 +4,7 @@ import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
 import { throwIfAborted } from './abort'
 import { Logger } from './logging'
-import { tracePromise } from './tracing'
+import { logErrorEvent, tracePromise } from './tracing'
 
 /**
  * Checks if a dependency from a package.json should be installed or not by checking whether it contains TypeScript typings.
@@ -53,7 +53,7 @@ export async function filterDependencies(
                             }
                         } catch (err) {
                             logger.error(`Error inspecting dependency ${name}@${range} in ${packageJsonPath}`, err)
-                            span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+                            logErrorEvent(span, err)
                         }
                     })
                 )

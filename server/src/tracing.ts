@@ -47,3 +47,7 @@ export async function tracePromise<T>(
         span.finish()
     }
 }
+
+export function logErrorEvent(span: Span, err: Error): void {
+    span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+}

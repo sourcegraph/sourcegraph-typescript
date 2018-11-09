@@ -25,10 +25,12 @@ import mkdirp from 'mkdirp-promise'
 import { createWriteStream } from 'mz/fs'
 import * as fs from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
+import { ERROR } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
 import rmfr from 'rmfr'
+import stripJsonComments from 'strip-json-comments'
 import { fileURLToPath, pathToFileURL } from 'url'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
@@ -36,7 +38,7 @@ import { Server } from 'ws'
 import { createAbortError, isAbortError, onAbort, throwIfAborted } from './abort'
 import { filterDependencies } from './dependencies'
 import { Logger, LSPLogger } from './logging'
-import { tracePromise } from './tracing'
+import { logErrorEvent, tracePromise } from './tracing'
 import { install } from './yarn'
 
 const CACHE_DIR = process.env.CACHE_DIR || tmpdir()
@@ -296,6 +298,33 @@ webSocketServer.on('connection', async connection => {
                     )
                 })
 
+                // Sanitize tsconfig.json files
+                throwIfAborted(signal)
+                await tracePromise('Sanitize tsconfig.jsons', span, async span => {
+                    const tsconfigPaths = await glob('**/tsconfig.json', { cwd: extractPath })
+                    logger.log('tsconfig.jsons found:', tsconfigPaths)
+                    span.setTag('count', tsconfigPaths.length)
+                    await Promise.all(
+                        tsconfigPaths.map(async relTsconfigPath => {
+                            throwIfAborted(signal)
+                            try {
+                                const absTsconfigPath = path.join(extractPath, relTsconfigPath)
+                                const tsconfig = JSON.parse(
+                                    stripJsonComments(await fs.readFile(absTsconfigPath, 'utf-8'))
+                                )
+                                if (tsconfig && tsconfig.compilerOptions && tsconfig.compilerOptions.plugins) {
+                                    // Remove plugins for security reasons (they get loaded from node_modules)
+                                    tsconfig.compilerOptions.plugins = undefined
+                                    await fs.writeFile(absTsconfigPath, JSON.stringify(tsconfig))
+                                }
+                            } catch (err) {
+                                logger.error('Error sanitizing tsconfig.json', relTsconfigPath, err)
+                                logErrorEvent(span, err)
+                            }
+                        })
+                    )
+                })
+
                 // Rewrite HTTP zip root URI to a file URI pointing to the checkout dir
                 fileRootUri = pathToFileURL(extractPath)
                 params.rootUri = fileRootUri.href
@@ -316,8 +345,8 @@ webSocketServer.on('connection', async connection => {
                 }
             }
         } catch (err) {
-            span.setTag('error', true)
-            span.log({ event: 'error', 'error.object': err, stack: err.stack, message: err.message })
+            span.setTag(ERROR, true)
+            logErrorEvent(span, err)
 
             if (!isAbortError(err)) {
                 logger.error('Error handling message\n', message, '\n', err)
