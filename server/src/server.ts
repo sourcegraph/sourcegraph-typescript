@@ -171,6 +171,11 @@ webSocketServer.on('connection', async connection => {
         }
         const relative = relativeUrl(httpRootUri.href, httpUri.href)
         const fileUri = new URL(relative, fileRootUri.href)
+        // Security check to prevent access from one connection into
+        // other files on the container or other connection's directories
+        if (!fileUri.href.startsWith(fileRootUri.href)) {
+            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
+        }
         return fileUri
     }
     const transformFileToHttpUri = (fileUri: URL): URL => {
