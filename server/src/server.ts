@@ -24,7 +24,7 @@ import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
 import { createWriteStream } from 'mz/fs'
 import * as fs from 'mz/fs'
-import { Span, Tracer } from 'opentracing'
+import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { ERROR } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import * as path from 'path'
@@ -244,12 +244,12 @@ webSocketServer.on('connection', async connection => {
                         span.setTag('url', httpRootUri.href)
                         let bytes = 0
                         await new Promise<void>((resolve, reject) => {
-                            const archiveRequest = request(httpRootUri.href, {
-                                headers: {
-                                    Accept: 'application/zip',
-                                    'User-Agent': 'TypeScript language server',
-                                },
-                            })
+                            const headers = {
+                                Accept: 'application/zip',
+                                'User-Agent': 'TypeScript language server',
+                            }
+                            span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
+                            const archiveRequest = request(httpRootUri.href, { headers })
                             archiveRequest
                                 .once('error', reject)
                                 .once('response', ({ statusCode, statusMessage }) => {
