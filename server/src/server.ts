@@ -49,9 +49,18 @@ console.log(`Using CACHE_DIR ${CACHE_DIR}`)
  * Rewrites all `uri` properties in an object, recursively
  */
 function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
+    // Scalar
     if (typeof obj !== 'object' || obj === null) {
         return
     }
+    // Array
+    if (Array.isArray(obj)) {
+        for (const element of obj) {
+            rewriteUris(element, transform)
+        }
+        return
+    }
+    // Object
     if ('uri' in obj) {
         obj.uri = transform(new URL(obj.uri)).href
     }

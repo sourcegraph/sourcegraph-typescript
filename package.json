@@ -22,6 +22,10 @@
           "description": "The WebSocket language server to connect to",
           "type": "string",
           "format": "url"
+        },
+        "typescript.accessToken": {
+          "description": "The access token for the language server to use to fetch files from the Sourcegraph API. The extension will create this token and save it in your settings automatically.",
+          "type": "string"
         }
       }
     }
@@ -85,6 +89,7 @@
     "source-map-support": "^0.5.9",
     "sourcegraph": "^18.4.1",
     "strip-json-comments": "^2.0.1",
+    "tagged-template-noop": "^2.1.0",
     "typescript-language-server": "^0.3.6",
     "url-relative": "^1.0.0",
     "uuid": "^3.3.2",
