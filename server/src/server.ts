@@ -162,7 +162,7 @@ webSocketServer.on('connection', async connection => {
     })
 
     /**
-     * @param httpUri Example: `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
+     * @param httpUri Example: `https://accesstoken@sourcegraph.com/.api/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
      */
     const transformHttpToFileUri = (httpUri: URL): URL => {
         // https://github.com/suarasaur/url-relative/issues/3

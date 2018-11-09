@@ -2,19 +2,19 @@ import * as sourcegraph from 'sourcegraph'
 
 /**
  * @param textDocumentUri The Sourcegraph text document URI, e.g. `git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts`
- * @returns The root URI for the server, e.g. `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/`. Always has a trailing slash.
+ * @returns The root URI for the server, e.g. `https://accesstoken@sourcegraph.com/.api/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/`. Always has a trailing slash.
  */
 export function resolveServerRootUri(textDocumentUri: URL): URL {
     const rootUri = new URL(sourcegraph.internal.sourcegraphURL.toString())
     // rootUri.username = accessToken
     rootUri.pathname =
-        textDocumentUri.host + textDocumentUri.pathname + '@' + textDocumentUri.search.substr(1) + '/-/raw/'
+        '/.api/' + textDocumentUri.host + textDocumentUri.pathname + '@' + textDocumentUri.search.substr(1) + '/-/raw/'
     return rootUri
 }
 
 /**
  * @param textDocumentUri The Sourcegraph text document URI like git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
- * @returns The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
+ * @returns The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/.api/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
  */
 export function toServerTextDocumentUri(textDocumentUri: URL): URL {
     const rootUri = resolveServerRootUri(textDocumentUri)
@@ -23,11 +23,11 @@ export function toServerTextDocumentUri(textDocumentUri: URL): URL {
 }
 
 /**
- * @param serverTextDocumentUri The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
+ * @param serverTextDocumentUri The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/.api/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
  * @returns The Sourcegraph text document URI, e.g. git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
  */
 export function toSourcegraphTextDocumentUri(serverTextDocumentUri: URL): URL {
-    const match = serverTextDocumentUri.pathname.match(/^\/(.+)@(\w+)\/-\/raw\/(.*)$/)
+    const match = serverTextDocumentUri.pathname.match(/^\/\.api\/(.+)@(\w+)\/-\/raw\/(.*)$/)
     if (!match) {
         throw new Error('Invalid URI ' + serverTextDocumentUri.href)
     }
