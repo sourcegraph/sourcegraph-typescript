@@ -356,7 +356,6 @@ webSocketServer.on('connection', async connection => {
     /** Sends a request to the server, rewriting URIs in the parameters and result. */
     async function callServer<P, R>(type: RequestType<P, R>, params: P, token: CancellationToken): Promise<R> {
         rewriteUris(params, transformHttpToFileUri)
-        logger.log('Forwarding to server', type.method, params)
         const result = await serverMessageConnection.sendRequest(type, params, token)
         rewriteUris(result, transformFileToHttpUri)
         return result
