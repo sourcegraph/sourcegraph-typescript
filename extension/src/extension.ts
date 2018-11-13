@@ -102,7 +102,7 @@ async function getOrCreateConnection(rootUri: URL): Promise<MessageConnection> {
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
 
 export async function activate(): Promise<void> {
-    await new Promise<void>(resolve => setTimeout(resolve, 1))
+    await new Promise<void>(resolve => setTimeout(resolve, 10))
 
     const accessToken = await getOrCreateAccessToken()
 
