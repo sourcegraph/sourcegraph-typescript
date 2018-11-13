@@ -72,7 +72,7 @@ async function connect(rootUri: URL): Promise<MessageConnection> {
     if (event.type === 'error') {
         throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
     }
-    console.log('WebSocket connection to TypeScript server opened')
+    console.log(`WebSocket connection to TypeScript server at ${serverUrl} opened`)
     const initializeParams: InitializeParams = {
         processId: 0,
         rootUri: rootUri.href,
