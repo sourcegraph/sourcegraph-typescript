@@ -8179,10 +8179,10 @@ source-map@^0.5.0, source-map@^0.5.3, source-map@^0.5.6:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.5.7.tgz#8a039d2d1021d22d1ea14c80d8ea468ba2ef3fcc"
   integrity sha1-igOdLRAh0i0eoUyA2OpGi6LvP8w=
 
-sourcegraph@^18.4.1:
-  version "18.4.1"
-  resolved "https://registry.yarnpkg.com/sourcegraph/-/sourcegraph-18.4.1.tgz#0821836b5e27b1fdc196b507f27e7fbb6cd228a3"
-  integrity sha512-uhLisxIAeQljoZweZ1g2mlLinE8pZ6+NmVNJeSAN9+FoYIK6HlZRc40zFq+MqWbWlgGH8jraGCZXyNVJ05L1ig==
+sourcegraph@^18.4.2:
+  version "18.4.2"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-18.4.2.tgz#617fb6a6cad0d95bd0994917f50ec9b65e5439ae"
+  integrity sha512-XI5RMd9e/rn5qxS2xSGjDsJHMk7ESeAP1ivRNwcv3el6kjlBEs68zDjHRQEgvWatDjxq0lqpiKUf8KETIXXuRA==
   dependencies:
     minimatch "^3.0.4"
     rxjs "^6.3.2"
