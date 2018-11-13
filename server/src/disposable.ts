@@ -29,13 +29,13 @@ export function disposeAll(disposables: Iterable<Disposable>, logger: Logger = c
 /**
  * Disposes all provided Disposables, sequentially, in order.
  * Disposal is best-effort, meaning if any Disposable fails to dispose, the error is logged and the function proceeds to the next one.
- * An AsyncDisposable is given 10 seconds to dispose, otherwise the function proceeds to the next disposable.
+ * An AsyncDisposable is given 20 seconds to dispose, otherwise the function proceeds to the next disposable.
  *
  * @throws never
  */
 export async function disposeAllAsync(
     disposables: Iterable<Disposable | AsyncDisposable>,
-    logger: Logger = console
+    { logger = console, timeout = 20000 }: { logger?: Logger; timeout?: number } = {}
 ): Promise<void> {
     for (const disposable of disposables) {
         try {
@@ -43,7 +43,10 @@ export async function disposeAllAsync(
                 await Promise.race([
                     disposable.disposeAsync(),
                     new Promise<void>((_, reject) =>
-                        setTimeout(() => reject(new Error('AsyncDisposable did not dispose within 10 seconds')), 10000)
+                        setTimeout(
+                            () => reject(new Error(`AsyncDisposable did not dispose within ${timeout}ms`)),
+                            timeout
+                        )
                     ),
                 ])
             } else {
