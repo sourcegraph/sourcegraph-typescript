@@ -16,11 +16,11 @@ import glob from 'globby'
 import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
-import { noop } from 'lodash'
+import { cloneDeep, noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { createWriteStream } from 'mz/fs'
 import * as fs from 'mz/fs'
-import { FORMAT_HTTP_HEADERS, Tracer } from 'opentracing'
+import { createWriteStream, realpathSync } from 'mz/fs'
+import { FORMAT_HTTP_HEADERS, Tracer, Span } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import RelateUrl from 'relateurl'
@@ -31,12 +31,14 @@ import { pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
     CancellationToken,
+    Definition,
     DefinitionRequest,
     DidOpenTextDocumentNotification,
     HoverRequest,
     ImplementationRequest,
     InitializeRequest,
     ReferencesRequest,
+    TextDocumentPositionParams,
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
@@ -47,6 +49,7 @@ import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync } from './disp
 import { Logger, LSPLogger } from './logging'
 import { logErrorEvent, tracePromise } from './tracing'
 import { install } from './yarn'
+import { sanitizeTsConfigs } from './tsconfig'
 
 const RELATE_URL_OPTIONS: RelateUrl.Options = {
     output: RelateUrl.PATH_RELATIVE,
@@ -54,7 +57,7 @@ const RELATE_URL_OPTIONS: RelateUrl.Options = {
     defaultPorts: {},
 }
 
-const CACHE_DIR = process.env.CACHE_DIR || tmpdir()
+const CACHE_DIR = process.env.CACHE_DIR || realpathSync(tmpdir())
 console.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
 /**
@@ -174,6 +177,8 @@ webSocketServer.on('connection', async connection => {
     // yarn folders
     let globalFolderRoot: string
     let cacheFolderRoot: string
+    let dependencyInstallationPromise: Promise<void>
+    let dependencyInstallationDone = false
 
     const serverMessageConnection = createMessageConnection(
         languageServerConnection.reader,
@@ -202,6 +207,12 @@ webSocketServer.on('connection', async connection => {
     const transformFileToHttpUri = (fileUri: URL): URL => {
         const relative = RelateUrl.relate(fileRootUri.href, fileUri.href, RELATE_URL_OPTIONS)
         const httpUri = new URL(relative, httpRootUri.href)
+        if (!httpUri.href.startsWith(httpRootUri.href)) {
+            // Should never happen, since these are outgoing URIs
+            // This check may need to be removed in the future for xrepo codeintel
+            // For now, it's a sanity check against bugs (e.g. not realpath()ing the temp dir)
+            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
+        }
         return httpUri
     }
 
@@ -293,87 +304,122 @@ webSocketServer.on('connection', async connection => {
         )
         logger.log('package.jsons found:', packageJsonPaths)
 
-        // Install dependencies
-        await tracePromise('Install dependencies', span, async span => {
-            await Promise.all(
-                packageJsonPaths.map(async relPackageJsonPath => {
-                    try {
-                        await tracePromise('Install dependencies for package', span, async span => {
-                            span.setTag('packageJsonPath', relPackageJsonPath)
-                            const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
-                            await filterDependencies(absPackageJsonPath, { logger, span, token })
-
-                            // It's important that each concurrent yarn process has their own global and cache folders
-                            const relPackageJsonDirName = path.dirname(relPackageJsonPath)
-                            const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
-                            const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
-                            const cwd = path.join(extractPath, relPackageJsonDirName)
-
-                            await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
-
-                            await install({ cwd, globalFolder, cacheFolder, logger, span, token })
-                        })
-                    } catch (err) {
-                        logger.error(`Installation for ${relPackageJsonPath} failed`, err)
-                    }
-                })
-            )
-        })
-
         // Sanitize tsconfig.json files
-        throwIfCancelled(token)
-        await tracePromise('Sanitize tsconfig.jsons', span, async span => {
-            const tsconfigPaths = await glob('**/tsconfig.json', { cwd: extractPath })
-            logger.log('tsconfig.jsons found:', tsconfigPaths)
-            span.setTag('count', tsconfigPaths.length)
-            await Promise.all(
-                tsconfigPaths.map(async relTsconfigPath => {
-                    throwIfCancelled(token)
-                    try {
-                        const absTsconfigPath = path.join(extractPath, relTsconfigPath)
-                        const tsconfig = JSON.parse(stripJsonComments(await fs.readFile(absTsconfigPath, 'utf-8')))
-                        if (tsconfig && tsconfig.compilerOptions && tsconfig.compilerOptions.plugins) {
-                            // Remove plugins for security reasons (they get loaded from node_modules)
-                            tsconfig.compilerOptions.plugins = undefined
-                            await fs.writeFile(absTsconfigPath, JSON.stringify(tsconfig))
+        await sanitizeTsConfigs({ cwd: extractPath, logger, span, token })
+
+        // Install dependencies in the background
+        dependencyInstallationPromise = (async () => {
+            await tracePromise('Install dependencies', span, async span => {
+                await Promise.all(
+                    packageJsonPaths.map(async relPackageJsonPath => {
+                        try {
+                            await tracePromise('Install dependencies for package', span, async span => {
+                                span.setTag('packageJsonPath', relPackageJsonPath)
+                                const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
+                                await filterDependencies(absPackageJsonPath, { logger, span, token })
+
+                                // It's important that each concurrent yarn process has their own global and cache folders
+                                const relPackageJsonDirName = path.dirname(relPackageJsonPath)
+                                const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
+                                const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
+                                const cwd = path.join(extractPath, relPackageJsonDirName)
+
+                                await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
+
+                                await install({ cwd, globalFolder, cacheFolder, logger, span, token })
+
+                                await sanitizeTsConfigs({ cwd: path.join(cwd, 'node_modules'), logger, span, token })
+                            })
+                        } catch (err) {
+                            logger.error(`Installation for ${relPackageJsonPath} failed`, err)
                         }
-                    } catch (err) {
-                        logger.error('Error sanitizing tsconfig.json', relTsconfigPath, err)
-                        logErrorEvent(span, err)
-                    }
-                })
-            )
-        })
+                    })
+                )
+                dependencyInstallationDone = true
+            })
+        })()
 
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
         // URIs are rewritten by rewriteUris below, but it doesn't touch rootPath
-        params.rootPath = extractPath
+        params = { ...params, rootPath: extractPath }
 
         return await callServer(InitializeRequest.type, params, token)
     })
 
     /** Sends a request to the server, rewriting URIs in the parameters and result. */
     async function callServer<P, R>(type: RequestType<P, R>, params: P, token: CancellationToken): Promise<R> {
+        params = cloneDeep(params)
         rewriteUris(params, transformHttpToFileUri)
         const result = await serverMessageConnection.sendRequest(type, params, token)
         rewriteUris(result, transformFileToHttpUri)
         return result
     }
 
-    /** Forwards all requests of a certain method to the server, rewriting URIs. */
-    function forwardRequests<P, R>(type: RequestType<P, R>): void {
-        dispatcher.setRequestHandler(type, (params, token) => callServer(type, params, token))
+    /**
+     * Forwards all requests of a certain method to the server, rewriting URIs.
+     * It blocks on dependency installation if the function in the second parameter returns true.
+     */
+    function forwardRequests<P, R>(
+        type: RequestType<P, R>,
+        shouldWaitForDependencies: (params: P, result: R) => boolean = () => false
+    ): void {
+        dispatcher.setRequestHandler(type, async (params, token) => {
+            const result = await callServer(type, params, token)
+            if (shouldWaitForDependencies(params, result)) {
+                await dependencyInstallationPromise
+                return await callServer(type, params, token)
+            }
+            return result
+        })
     }
 
-    forwardRequests(HoverRequest.type)
-    forwardRequests(DefinitionRequest.type)
-    forwardRequests(ReferencesRequest.type)
-    forwardRequests(ImplementationRequest.type)
-    forwardRequests(TypeDefinitionRequest.type)
+    dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
+        const hover = await callServer(HoverRequest.type, params, token)
+        const contents = !hover ? [] : Array.isArray(hover.contents) ? hover.contents : [hover.contents]
+        const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
+        // Check if the type is `any` or the import is shown as the declaration
+        if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
+            await dependencyInstallationPromise
+            const hover = await callServer(HoverRequest.type, params, token)
+            return hover
+        }
+        if (!dependencyInstallationDone) {
+            contents.push(
+                'ℹ️ _Dependency installation is still in progress. The information shown might be missing type information._'
+            )
+        }
+        return { ...hover, contents }
+    })
+
+    /** Checks if a location result is not satisfactory and should be retried after dependency installation finished */
+    const shouldLocationsWaitForDependencies = (params: TextDocumentPositionParams, locations: Definition) => {
+        if (!locations) {
+            return true
+        }
+        const locationsArray = Array.isArray(locations) ? locations : [locations]
+        if (locationsArray.length === 0) {
+            return true
+        }
+        // Check if the only definition/reference found is the line that was requested
+        if (
+            locationsArray.length === 1 &&
+            locationsArray[0].uri === params.textDocument.uri &&
+            locationsArray[0].range.start.line === params.position.line
+        ) {
+            return true
+        }
+        // TODO check if location is at import statement
+        return false
+    }
+    forwardRequests(DefinitionRequest.type, shouldLocationsWaitForDependencies)
+    forwardRequests(TypeDefinitionRequest.type, shouldLocationsWaitForDependencies)
+    forwardRequests(ReferencesRequest.type, shouldLocationsWaitForDependencies)
+    forwardRequests(ImplementationRequest.type, shouldLocationsWaitForDependencies)
 
     /** Sends a notification to the server, rewriting URIs in the parameters and result. */
     function notifyServer<P, R>(type: NotificationType<P>, params: P): void {
+        params = cloneDeep(params)
         rewriteUris(params, transformHttpToFileUri)
         serverMessageConnection.sendNotification(type, params)
     }
