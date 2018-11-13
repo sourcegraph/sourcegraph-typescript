@@ -24,14 +24,15 @@ import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
 import { createWriteStream } from 'mz/fs'
 import * as fs from 'mz/fs'
-import { Span, Tracer } from 'opentracing'
+import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { ERROR } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import request from 'request'
 import rmfr from 'rmfr'
 import stripJsonComments from 'strip-json-comments'
-import { fileURLToPath, pathToFileURL } from 'url'
+import { pathToFileURL } from 'url'
+import relativeUrl from 'url-relative'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
@@ -48,9 +49,18 @@ console.log(`Using CACHE_DIR ${CACHE_DIR}`)
  * Rewrites all `uri` properties in an object, recursively
  */
 function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
+    // Scalar
     if (typeof obj !== 'object' || obj === null) {
         return
     }
+    // Array
+    if (Array.isArray(obj)) {
+        for (const element of obj) {
+            rewriteUris(element, transform)
+        }
+        return
+    }
+    // Object
     if ('uri' in obj) {
         obj.uri = transform(new URL(obj.uri)).href
     }
@@ -133,7 +143,7 @@ webSocketServer.on('connection', async connection => {
         // '--log-level=4',
     ])
 
-    let zipRootUri: URL
+    let httpRootUri: URL
     let fileRootUri: URL
     let tempDir: string
     let extractPath: string
@@ -151,16 +161,31 @@ webSocketServer.on('connection', async connection => {
         globalCleanupFns.delete(cleanupConnection)
     })
 
-    const transformZipToFileUri = (zipUri: URL): URL => {
-        const fileUri = new URL(fileRootUri.href)
-        fileUri.pathname = path.posix.join(fileRootUri.pathname, zipUri.hash.substr(1))
+    /**
+     * @param httpUri Example: `https://accesstoken@sourcegraph.com/.api/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
+     */
+    const transformHttpToFileUri = (httpUri: URL): URL => {
+        // https://github.com/suarasaur/url-relative/issues/3
+        if (httpUri.href === httpRootUri.href) {
+            return fileRootUri
+        }
+        const relative = relativeUrl(httpRootUri.href, httpUri.href)
+        const fileUri = new URL(relative, fileRootUri.href)
+        // Security check to prevent access from one connection into
+        // other files on the container or other connection's directories
+        if (!fileUri.href.startsWith(fileRootUri.href)) {
+            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
+        }
         return fileUri
     }
-    const transformFileToZipUri = (fileUri: URL): URL => {
-        const filePath = fileURLToPath(fileUri)
-        const zipUri = new URL(zipRootUri.href)
-        zipUri.hash = path.relative(extractPath, filePath).replace(/\\/g, '/')
-        return zipUri
+    const transformFileToHttpUri = (fileUri: URL): URL => {
+        // https://github.com/suarasaur/url-relative/issues/3
+        if (fileUri.href === fileRootUri.href) {
+            return httpRootUri
+        }
+        const relative = relativeUrl(fileRootUri.href, fileUri.href)
+        const httpUri = new URL(relative, httpRootUri.href)
+        return httpUri
     }
 
     /** OpenTracing spans for pending requests by message ID */
@@ -192,8 +217,8 @@ webSocketServer.on('connection', async connection => {
                     requestSpans.set(message.id, span)
                 }
             }
-            if (zipRootUri) {
-                span.setTag('rootUri', zipRootUri.href)
+            if (httpRootUri) {
+                span.setTag('rootUri', httpRootUri.href)
             }
 
             // Intercept initialize
@@ -207,19 +232,13 @@ webSocketServer.on('connection', async connection => {
                         'More than one workspace folder given. The TypeScript server only supports a single workspace folder.'
                     )
                 }
-                zipRootUri = new URL(params.rootUri)
-                span.setTag('rootUri', zipRootUri.href)
-                if (!zipRootUri.pathname.endsWith('.zip')) {
-                    throw new Error('rootUri must end with .zip')
-                }
-                if (zipRootUri.protocol !== 'http:' && zipRootUri.protocol !== 'https:') {
-                    throw new Error('Protocol must be http or https')
+                httpRootUri = new URL(params.rootUri)
+                span.setTag('rootUri', httpRootUri.href)
+                if (httpRootUri.protocol !== 'http:' && httpRootUri.protocol !== 'https:') {
+                    throw new Error('rootUri protocol must be http or https, got ' + httpRootUri)
                 }
                 // Create temp folders
-                tempDir = path.join(
-                    CACHE_DIR,
-                    (zipRootUri.hostname + zipRootUri.pathname).replace(/\//g, '_') + '_' + uuid.v1()
-                )
+                tempDir = path.join(CACHE_DIR, uuid.v1())
                 await mkdirp(tempDir)
                 connectionCleanupFns.add(async () => {
                     logger.log('Deleting temp dir ', tempDir)
@@ -231,17 +250,32 @@ webSocketServer.on('connection', async connection => {
                 await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolderRoot), fs.mkdir(globalFolderRoot)])
 
                 // Fetch zip and extract into temp folder
-                logger.log('Fetching zip from', zipRootUri.href)
+                logger.log('Fetching zip from', httpRootUri.href)
                 const archivePath = path.join(tempDir, 'archive.zip')
                 await tracePromise('Fetch source archive', span, async span => {
                     let removeAbortListener = noop
                     try {
-                        span.setTag('url', zipRootUri.href)
+                        span.setTag('url', httpRootUri.href)
                         let bytes = 0
                         await new Promise<void>((resolve, reject) => {
-                            const response = request(zipRootUri.href)
-                            response
+                            const headers = {
+                                Accept: 'application/zip',
+                                'User-Agent': 'TypeScript language server',
+                            }
+                            span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
+                            const archiveRequest = request(httpRootUri.href, { headers })
+                            archiveRequest
                                 .once('error', reject)
+                                .once('response', ({ statusCode, statusMessage }) => {
+                                    if (statusCode >= 400) {
+                                        archiveRequest.abort()
+                                        reject(
+                                            new Error(
+                                                `Archive fetch of ${httpRootUri} failed with ${statusCode} ${statusMessage}`
+                                            )
+                                        )
+                                    }
+                                })
                                 .on('data', (chunk: Buffer) => {
                                     bytes += chunk.byteLength
                                 })
@@ -249,7 +283,7 @@ webSocketServer.on('connection', async connection => {
                                 .once('finish', resolve)
                                 .once('error', reject)
                             removeAbortListener = onAbort(signal, () => {
-                                response.abort()
+                                archiveRequest.abort()
                                 reject(createAbortError())
                             })
                         })
@@ -258,10 +292,12 @@ webSocketServer.on('connection', async connection => {
                         removeAbortListener()
                     }
                 })
+
                 // Extract archive
                 throwIfAborted(signal)
+                logger.log('Extracting archive to ' + extractPath)
                 await tracePromise('Extract source archive', span, async span => {
-                    await decompress(archivePath, extractPath, { strip: 1 })
+                    await decompress(archivePath, extractPath)
                 })
 
                 // Find package.jsons to install
@@ -325,14 +361,13 @@ webSocketServer.on('connection', async connection => {
                     )
                 })
 
-                // Rewrite HTTP zip root URI to a file URI pointing to the checkout dir
-                fileRootUri = pathToFileURL(extractPath)
-                params.rootUri = fileRootUri.href
+                // The trailing slash is important for resolving URL relatively to it
+                fileRootUri = pathToFileURL(extractPath + '/')
+                // URIs are rewritten by rewriteUris below, but it doesn't touch rootPath
                 params.rootPath = extractPath
-                params.workspaceFolders = [{ name: '', uri: fileRootUri.href }]
             }
 
-            rewriteUris(message, transformZipToFileUri)
+            rewriteUris(message, transformHttpToFileUri)
 
             // Forward message to language server
             languageServerConnection.writer.write(message)
@@ -397,7 +432,7 @@ webSocketServer.on('connection', async connection => {
                 requestAbortFns.delete(message.id)
             }
         }
-        rewriteUris(message, transformFileToZipUri)
+        rewriteUris(message, transformFileToHttpUri)
         return message
     })
 })

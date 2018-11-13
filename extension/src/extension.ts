@@ -25,7 +25,9 @@ import {
     ReferencesRequest,
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
-import { convertHover, convertLocations, resolveRootUri, toServerTextDocumentUri } from './lsp-conversion'
+import { getOrCreateAccessToken } from './auth'
+import { convertHover, convertLocations } from './lsp-conversion'
+import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
@@ -83,8 +85,7 @@ async function connect(rootUri: URL): Promise<MessageConnection> {
     return connection
 }
 
-async function getOrCreateConnection(textDocumentUri: URL): Promise<MessageConnection> {
-    const rootUri = resolveRootUri(textDocumentUri)
+async function getOrCreateConnection(rootUri: URL): Promise<MessageConnection> {
     let connectionPromise = connectionsByRootUri.get(rootUri.href)
     if (!connectionPromise) {
         connectionPromise = connect(rootUri)
@@ -100,12 +101,23 @@ async function getOrCreateConnection(textDocumentUri: URL): Promise<MessageConne
 
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
 
-export function activate(): void {
+export async function activate(): Promise<void> {
+    await new Promise<void>(resolve => setTimeout(resolve, 1))
+
     /** Map from textDocument URI to version (monotonically increasing positive integers) */
     const textDocumentVersions = new Map<string, number>()
 
+    const accessToken = await getOrCreateAccessToken()
+
+    /** Adds the access token to the given server raw HTTP API URI */
+    function authenticateUri(uri: URL): URL {
+        const authenticatedUri = new URL(uri.href)
+        authenticatedUri.username = accessToken
+        return authenticatedUri
+    }
+
     // Forward didOpen notifications
-    sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
+    const sendDidOpen = async (textDocument: sourcegraph.TextDocument) => {
         try {
             const textDocumentUri = new URL(textDocument.uri)
             if (!isTypeScriptFile(textDocumentUri)) {
@@ -116,10 +128,12 @@ export function activate(): void {
             const textDocumentVersion = (textDocumentVersions.get(textDocumentUri.href) || 0) + 1
             textDocumentVersions.set(textDocumentUri.href, textDocumentVersion)
 
-            const connection = await getOrCreateConnection(textDocumentUri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri)
             const didOpenParams: DidOpenTextDocumentParams = {
                 textDocument: {
-                    uri: toServerTextDocumentUri(textDocumentUri).href,
+                    uri: serverTextDocumentUri.href,
                     languageId: textDocument.languageId,
                     text: textDocument.text,
                     version: textDocumentVersion,
@@ -129,7 +143,9 @@ export function activate(): void {
         } catch (err) {
             console.error('Error handling didOpenTextDocument event', err)
         }
-    })
+    }
+    sourcegraph.workspace.onDidOpenTextDocument.subscribe(sendDidOpen)
+    await Promise.all(sourcegraph.workspace.textDocuments.map(sendDidOpen))
 
     // Example of a Sourcegraph textdocument URI:
     // git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
@@ -141,12 +157,14 @@ export function activate(): void {
             if (!isTypeScriptFile(textDocumentUri)) {
                 return undefined
             }
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
-            const connection = await getOrCreateConnection(textDocumentUri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri)
             const hoverResult = await connection.sendRequest(HoverRequest.type, {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
             })
+            rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
             return convertHover(hoverResult)
         },
     })
@@ -158,12 +176,14 @@ export function activate(): void {
             if (!isTypeScriptFile(textDocumentUri)) {
                 return undefined
             }
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
-            const connection = await getOrCreateConnection(textDocumentUri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri)
             const definitionResult = await connection.sendRequest(DefinitionRequest.type, {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
             })
+            rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
             return convertLocations(definitionResult)
         },
     })
@@ -175,8 +195,9 @@ export function activate(): void {
             if (!isTypeScriptFile(textDocumentUri)) {
                 return undefined
             }
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
-            const connection = await getOrCreateConnection(textDocumentUri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri)
             const referenceParams: ReferenceParams = {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
@@ -185,6 +206,7 @@ export function activate(): void {
                 },
             }
             const referencesResult = await connection.sendRequest(ReferencesRequest.type, referenceParams)
+            rewriteUris(referencesResult, toSourcegraphTextDocumentUri)
             return convertLocations(referencesResult)
         },
     })
@@ -196,13 +218,15 @@ export function activate(): void {
             if (!isTypeScriptFile(textDocumentUri)) {
                 return undefined
             }
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri)
-            const connection = await getOrCreateConnection(textDocumentUri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri)
             const implementationParams: TextDocumentPositionParams = {
                 textDocument: { uri: serverTextDocumentUri.href },
                 position,
             }
             const implementationResult = await connection.sendRequest(ImplementationRequest.type, implementationParams)
+            rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
             return convertLocations(implementationResult)
         },
     })
