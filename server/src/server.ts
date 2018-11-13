@@ -28,11 +28,11 @@ import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { ERROR } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import * as path from 'path'
+import RelateUrl from 'relateurl'
 import request from 'request'
 import rmfr from 'rmfr'
 import stripJsonComments from 'strip-json-comments'
 import { pathToFileURL } from 'url'
-import relativeUrl from 'url-relative'
 import uuid = require('uuid')
 import { ErrorCodes, InitializeParams } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
@@ -41,6 +41,12 @@ import { filterDependencies } from './dependencies'
 import { Logger, LSPLogger } from './logging'
 import { logErrorEvent, tracePromise } from './tracing'
 import { install } from './yarn'
+
+const RELATE_URL_OPTIONS: RelateUrl.Options = {
+    output: RelateUrl.PATH_RELATIVE,
+    removeRootTrailingSlash: false,
+    defaultPorts: {},
+}
 
 const CACHE_DIR = process.env.CACHE_DIR || tmpdir()
 console.log(`Using CACHE_DIR ${CACHE_DIR}`)
@@ -165,11 +171,7 @@ webSocketServer.on('connection', async connection => {
      * @param httpUri Example: `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
      */
     const transformHttpToFileUri = (httpUri: URL): URL => {
-        // https://github.com/suarasaur/url-relative/issues/3
-        if (httpUri.href === httpRootUri.href) {
-            return fileRootUri
-        }
-        const relative = relativeUrl(httpRootUri.href, httpUri.href)
+        const relative = RelateUrl.relate(httpRootUri.href, httpUri.href, RELATE_URL_OPTIONS)
         const fileUri = new URL(relative, fileRootUri.href)
         // Security check to prevent access from one connection into
         // other files on the container or other connection's directories
@@ -179,11 +181,7 @@ webSocketServer.on('connection', async connection => {
         return fileUri
     }
     const transformFileToHttpUri = (fileUri: URL): URL => {
-        // https://github.com/suarasaur/url-relative/issues/3
-        if (fileUri.href === fileRootUri.href) {
-            return httpRootUri
-        }
-        const relative = relativeUrl(fileRootUri.href, fileUri.href)
+        const relative = RelateUrl.relate(fileRootUri.href, fileUri.href, RELATE_URL_OPTIONS)
         const httpUri = new URL(relative, httpRootUri.href)
         return httpUri
     }
