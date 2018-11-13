@@ -2,7 +2,8 @@ import * as fs from 'mz/fs'
 import { Span } from 'opentracing'
 import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
-import { throwIfAborted } from './abort'
+import { CancellationToken } from 'vscode-jsonrpc'
+import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
 import { logErrorEvent, tracePromise } from './tracing'
 
@@ -27,7 +28,7 @@ function hasTypes(name: string, range: string, span: Span): Promise<boolean> {
  */
 export async function filterDependencies(
     packageJsonPath: string,
-    { logger, span, signal }: { logger: Logger; span: Span; signal: AbortSignal }
+    { logger, span, token }: { logger: Logger; span: Span; token: CancellationToken }
 ): Promise<void> {
     await tracePromise('Filter dependencies', span, async span => {
         span.setTag('packageJsonPath', packageJsonPath)
@@ -43,7 +44,7 @@ export async function filterDependencies(
                 }
                 await Promise.all(
                     Object.entries(dependencies).map(async ([name, range]) => {
-                        throwIfAborted(signal)
+                        throwIfCancelled(token)
                         try {
                             if (name.startsWith('@types/') || (await hasTypes(name, range, span))) {
                                 included.push(name)

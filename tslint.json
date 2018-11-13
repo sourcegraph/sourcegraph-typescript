@@ -1,6 +1,7 @@
 {
   "rules": {
-    "await-promise": [true, "Thenable"]
+    "await-promise": [true, "Thenable"],
+    "rxjs-no-wholesale": false
   },
   "extends": ["@sourcegraph/tslint-config"]
 }

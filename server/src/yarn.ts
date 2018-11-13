@@ -1,9 +1,10 @@
 import { ChildProcess, spawn } from 'child_process'
-import { noop } from 'lodash'
 import { Span } from 'opentracing'
 import * as path from 'path'
 import { Readable } from 'stream'
-import { createAbortError, onAbort, throwIfAborted } from './abort'
+import { CancellationToken, Disposable } from 'vscode-jsonrpc'
+import { createAbortError, throwIfCancelled } from './cancellation'
+import { disposeAll } from './disposable'
 import { Logger, NoopLogger } from './logging'
 import { tracePromise } from './tracing'
 
@@ -97,7 +98,6 @@ export function spawnYarn({
     if (options.verbose) {
         args.push('--verbose')
     }
-    logger.log(`Spawning in ${options.cwd} node ${args.join(' ')}`)
     const yarn: YarnProcess = spawn(process.execPath, args, { cwd: options.cwd })
 
     /** Emitted error messages by yarn */
@@ -161,35 +161,36 @@ export function spawnYarn({
 }
 
 interface YarnInstallOptions extends YarnSpawnOptions {
-    signal: AbortSignal
+    token: CancellationToken
 }
 
 /**
- * Wrapper around `spawnYarn()` returning a Promise and accepting an AbortSignal.
+ * Wrapper around `spawnYarn()` returning a Promise and accepting an CancellationToken.
  */
 export async function install({
     logger = new NoopLogger(),
     span = new Span(),
-    signal,
+    token,
     ...spawnOptions
 }: YarnInstallOptions): Promise<void> {
     await tracePromise('yarn install', span, async span => {
-        throwIfAborted(signal)
-        let removeAbortListener = noop
+        throwIfCancelled(token)
+        const using: Disposable[] = []
         try {
             await new Promise<void>((resolve, reject) => {
-                const yarnProcess = spawnYarn({ ...spawnOptions, signal, logger })
+                const yarnProcess = spawnYarn({ ...spawnOptions, token, logger })
                 yarnProcess.on('success', resolve)
                 yarnProcess.on('error', reject)
-                const abortListener = () => {
-                    logger.log('Killing yarn process in ', spawnOptions.cwd)
-                    yarnProcess.kill()
-                    reject(createAbortError())
-                }
-                removeAbortListener = onAbort(signal, abortListener)
+                using.push(
+                    token.onCancellationRequested(() => {
+                        logger.log('Killing yarn process in ', spawnOptions.cwd)
+                        yarnProcess.kill()
+                        reject(createAbortError())
+                    })
+                )
             })
         } finally {
-            removeAbortListener()
+            disposeAll(using)
         }
     })
 }

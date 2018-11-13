@@ -88,6 +88,7 @@
     "relateurl": "^0.2.7",
     "request": "^2.88.0",
     "rmfr": "^2.0.0",
+    "rxjs": "^6.3.3",
     "source-map-support": "^0.5.9",
     "sourcegraph": "^18.4.2",
     "strip-json-comments": "^2.0.1",
