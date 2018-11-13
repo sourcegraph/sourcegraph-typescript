@@ -1,3 +1,4 @@
+import LightstepSpan from 'lightstep-tracer/lib/imp/span_imp'
 import { Span, Tracer } from 'opentracing'
 import { ERROR } from 'opentracing/lib/ext/tags'
 import { Observable, Subject } from 'rxjs'
@@ -62,11 +63,12 @@ export function createDispatcher(
             const handler = handlers.get(message.method)
             if (handler) {
                 const span = tracer.startSpan('Handle ' + message.method)
+                let lightstepTraceUrl: string | undefined
                 // Log the trace URL for this request in the client
-                // if (span instanceof LightstepSpan) {
-                //     const traceUrl = span.generateTraceURL()
-                //     logger.log(`Trace ${message.method} ${traceUrl}`)
-                // }
+                if (span instanceof LightstepSpan) {
+                    lightstepTraceUrl = span.generateTraceURL()
+                    logger.log(`Trace ${message.method} ${lightstepTraceUrl}`)
+                }
                 span.setTag('method', message.method)
                 if (isRequestMessage(message)) {
                     span.setTag('id', message.id)
@@ -80,6 +82,9 @@ export function createDispatcher(
                         jsonrpc: '2.0',
                         id: message.id,
                         result,
+                    }
+                    if (lightstepTraceUrl) {
+                        ;(response as any)._trace = lightstepTraceUrl
                     }
                     client.writer.write(response)
                 } catch (err) {
