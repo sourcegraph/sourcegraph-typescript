@@ -104,9 +104,6 @@ const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.te
 export async function activate(): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 1))
 
-    /** Map from textDocument URI to version (monotonically increasing positive integers) */
-    const textDocumentVersions = new Map<string, number>()
-
     const accessToken = await getOrCreateAccessToken()
 
     /** Adds the access token to the given server raw HTTP API URI */
@@ -124,10 +121,6 @@ export async function activate(): Promise<void> {
                 return
             }
 
-            // Increment version
-            const textDocumentVersion = (textDocumentVersions.get(textDocumentUri.href) || 0) + 1
-            textDocumentVersions.set(textDocumentUri.href, textDocumentVersion)
-
             const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
             const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
             const connection = await getOrCreateConnection(serverRootUri)
@@ -136,7 +129,7 @@ export async function activate(): Promise<void> {
                     uri: serverTextDocumentUri.href,
                     languageId: textDocument.languageId,
                     text: textDocument.text,
-                    version: textDocumentVersion,
+                    version: 1,
                 },
             }
             connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
