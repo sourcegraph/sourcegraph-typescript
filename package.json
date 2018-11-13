@@ -72,7 +72,7 @@
     "prettier": "^1.14.3",
     "semantic-release": "^15.10.6",
     "tslint": "^5.11.0",
-    "typescript": "^3.1.4"
+    "typescript": "^3.2.0-dev.20181113"
   },
   "dependencies": {
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
