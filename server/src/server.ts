@@ -119,8 +119,11 @@ for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
 
 const webSocketServer = new Server({ server: httpServer })
 
+let openConnections = 0
+
 webSocketServer.on('connection', async connection => {
-    console.log('New WebSocket connection')
+    openConnections++
+    console.log(`New WebSocket connection, ${openConnections} open`)
 
     /** Functions to run when this connection is closed (or the server shuts down) */
     const connectionDisposables = new Set<AsyncDisposable | Disposable>()
@@ -131,7 +134,8 @@ webSocketServer.on('connection', async connection => {
         globalDisposables.add(connectionDisposable)
         connectionDisposables.add({ dispose: () => globalDisposables.delete(connectionDisposable) })
         const closeListener = async () => {
-            console.log('WebSocket closed')
+            openConnections--
+            console.log(`WebSocket closed, ${openConnections} open`)
             await connectionDisposable.disposeAsync()
         }
         connection.on('close', closeListener)
@@ -159,11 +163,15 @@ webSocketServer.on('connection', async connection => {
     /** The logger for this connection, loggin to the user's browser console */
     const logger: Logger = new LSPLogger(webSocketMessageConnection)
 
-    const languageServerConnection = rpcServer.createServerProcess('TypeScript language', 'node', [
+    const languageServerConnection = rpcServer.createServerProcess('TypeScript language', process.execPath, [
         path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
         '--stdio',
         // Use local tsserver instead of the tsserver of the repo for security reasons
         '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+        // '--tsserver-log-file',
+        // path.resolve(__dirname, '..', '..', 'tsserver.log'),
+        // '--tsserver-log-verbosity',
+        // 'verbose',
         // '--log-level=4',
     ])
     connectionDisposables.add(languageServerConnection)
