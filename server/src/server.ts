@@ -18,9 +18,9 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { cloneDeep, noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { createWriteStream, realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
-import { FORMAT_HTTP_HEADERS, Tracer } from 'opentracing'
+import { createWriteStream, realpathSync } from 'mz/fs'
+import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import RelateUrl from 'relateurl'
@@ -176,7 +176,9 @@ webSocketServer.on('connection', async connection => {
     // yarn folders
     let globalFolderRoot: string
     let cacheFolderRoot: string
-    let dependencyInstallationPromise: Promise<void>
+    /** Map from URI for directory of package.json to Promise for its installation */
+    const dependencyInstallationPromises = new Map<string, Promise<void>>()
+    /** Whether all dependency installation is done */
     let dependencyInstallationDone = false
 
     const serverMessageConnection = createMessageConnection(
@@ -307,36 +309,40 @@ webSocketServer.on('connection', async connection => {
         await sanitizeTsConfigs({ cwd: extractPath, logger, span, token })
 
         // Install dependencies in the background
-        dependencyInstallationPromise = (async () => {
-            await tracePromise('Install dependencies', span, async span => {
-                await Promise.all(
-                    packageJsonPaths.map(async relPackageJsonPath => {
+        // tslint:disable-next-line no-floating-promises
+        tracePromise('Install dependencies', span, async span => {
+            await Promise.all(
+                packageJsonPaths.map(async relPackageJsonPath => {
+                    const installationPromise = tracePromise('Install dependencies for package', span, async span => {
                         try {
-                            await tracePromise('Install dependencies for package', span, async span => {
-                                span.setTag('packageJsonPath', relPackageJsonPath)
-                                const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
-                                await filterDependencies(absPackageJsonPath, { logger, span, token })
+                            span.setTag('packageJsonPath', relPackageJsonPath)
+                            const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
+                            await filterDependencies(absPackageJsonPath, { logger, span, token })
 
-                                // It's important that each concurrent yarn process has their own global and cache folders
-                                const relPackageJsonDirName = path.dirname(relPackageJsonPath)
-                                const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
-                                const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
-                                const cwd = path.join(extractPath, relPackageJsonDirName)
+                            // It's important that each concurrent yarn process has their own global and cache folders
+                            const relPackageJsonDirName = path.dirname(relPackageJsonPath)
+                            const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
+                            const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
+                            const cwd = path.join(extractPath, relPackageJsonDirName)
 
-                                await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
+                            await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
 
-                                await install({ cwd, globalFolder, cacheFolder, logger, span, token })
+                            await install({ cwd, globalFolder, cacheFolder, logger, span, token })
 
-                                await sanitizeTsConfigs({ cwd: path.join(cwd, 'node_modules'), logger, span, token })
-                            })
+                            await sanitizeTsConfigs({ cwd: path.join(cwd, 'node_modules'), logger, span, token })
                         } catch (err) {
                             logger.error(`Installation for ${relPackageJsonPath} failed`, err)
                         }
                     })
-                )
-                dependencyInstallationDone = true
-            })
-        })()
+                    // Save Promise so requests can wait for the installation to finish
+                    dependencyInstallationPromises.set(
+                        new URL(path.dirname(relPackageJsonPath) + '/', httpRootUri.href).href,
+                        installationPromise
+                    )
+                })
+            )
+            dependencyInstallationDone = true
+        })
 
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
@@ -348,6 +354,7 @@ webSocketServer.on('connection', async connection => {
 
     /** Sends a request to the server, rewriting URIs in the parameters and result. */
     async function callServer<P, R>(type: RequestType<P, R>, params: P, token: CancellationToken): Promise<R> {
+        throwIfCancelled(token)
         params = cloneDeep(params)
         rewriteUris(params, transformHttpToFileUri)
         const result = await serverMessageConnection.sendRequest(type, params, token)
@@ -356,17 +363,37 @@ webSocketServer.on('connection', async connection => {
     }
 
     /**
+     * Waits for the installation of all package.jsons in parent directories of the given text document.
+     */
+    async function waitForDependencies(
+        textDocumentUri: URL,
+        { span, token }: { span: Span; token: CancellationToken }
+    ): Promise<void> {
+        throwIfCancelled(token)
+        await tracePromise('Wait for dependency installation', span, async span => {
+            span.setTag('textDocument', textDocumentUri.href)
+            const installations = [...dependencyInstallationPromises].filter(([packageJsonDirUri]) =>
+                textDocumentUri.href.startsWith(packageJsonDirUri)
+            )
+            const packageJsonLocations = installations.map(([uri]) => uri)
+            span.setTag('packageJsonLocations', packageJsonLocations)
+            logger.log('Waiting for dependency installations of package.json locations:', packageJsonLocations)
+            await Promise.all(installations.map(([, promise]) => promise))
+        })
+    }
+
+    /**
      * Forwards all requests of a certain method to the server, rewriting URIs.
      * It blocks on dependency installation if the function in the second parameter returns true.
      */
-    function forwardRequests<P, R>(
+    function forwardRequests<P extends TextDocumentPositionParams, R>(
         type: RequestType<P, R>,
         shouldWaitForDependencies: (params: P, result: R) => boolean = () => false
     ): void {
-        dispatcher.setRequestHandler(type, async (params, token) => {
+        dispatcher.setRequestHandler(type, async (params, token, span) => {
             const result = await callServer(type, params, token)
             if (shouldWaitForDependencies(params, result)) {
-                await dependencyInstallationPromise
+                await waitForDependencies(new URL(params.textDocument.uri), { span, token })
                 return await callServer(type, params, token)
             }
             return result
@@ -379,9 +406,8 @@ webSocketServer.on('connection', async connection => {
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
-            await dependencyInstallationPromise
-            const hover = await callServer(HoverRequest.type, params, token)
-            return hover
+            await waitForDependencies(new URL(params.textDocument.uri), { span, token })
+            return await callServer(HoverRequest.type, params, token)
         }
         if (!dependencyInstallationDone) {
             contents.push(
