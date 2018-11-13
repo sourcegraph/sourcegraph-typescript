@@ -339,6 +339,7 @@ webSocketServer.on('connection', async connection => {
                         new URL(path.dirname(relPackageJsonPath) + '/', httpRootUri.href).href,
                         installationPromise
                     )
+                    await installationPromise
                 })
             )
             dependencyInstallationDone = true
