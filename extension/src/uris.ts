@@ -17,6 +17,9 @@ export function resolveServerRootUri(textDocumentUri: URL): URL {
  * @returns The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
  */
 export function toServerTextDocumentUri(textDocumentUri: URL): URL {
+    if (textDocumentUri.protocol !== 'git:') {
+        throw new Error('Not a Sourcegraph git:// URI: ' + textDocumentUri)
+    }
     const rootUri = resolveServerRootUri(textDocumentUri)
     const serverTextDocumentUri = new URL(textDocumentUri.hash.substr(1), rootUri.href)
     return serverTextDocumentUri
@@ -29,7 +32,7 @@ export function toServerTextDocumentUri(textDocumentUri: URL): URL {
 export function toSourcegraphTextDocumentUri(serverTextDocumentUri: URL): URL {
     const match = serverTextDocumentUri.pathname.match(/^\/(.+)@(\w+)\/-\/raw\/(.*)$/)
     if (!match) {
-        throw new Error('Invalid URI ' + serverTextDocumentUri.href)
+        throw new Error('Not a Sourcegraph raw API URL: ' + serverTextDocumentUri)
     }
     const [, repoName, rev, filePath] = match
     const sourcegraphUri = new URL(`git://${repoName}`)
