@@ -5,8 +5,8 @@ steps:
   # Run tests
   - command: |-
       yarn --ignore-engines
-      yarn run lint
       yarn run prettier
+      yarn run tslint
       yarn run typecheck-ext
       yarn run build
     label: ':typescript:'
