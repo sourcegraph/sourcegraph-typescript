@@ -11,6 +11,8 @@ import {
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
+import { createProcessStreamConnection } from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
+import { spawn } from 'child_process'
 import decompress from 'decompress'
 import glob from 'globby'
 import * as http from 'http'
@@ -23,6 +25,7 @@ import { createWriteStream, realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
+import * as prometheus from 'prom-client'
 import RelateUrl from 'relateurl'
 import request from 'request'
 import rmfr from 'rmfr'
@@ -49,9 +52,6 @@ import { Logger, LSPLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { install } from './yarn'
-import * as prometheus from 'prom-client'
-import { spawn } from 'child_process'
-import { createProcessStreamConnection } from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 
 const RELATE_URL_OPTIONS: RelateUrl.Options = {
     output: RelateUrl.PATH_RELATIVE,
