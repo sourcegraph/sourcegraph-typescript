@@ -1,11 +1,11 @@
 import glob from 'globby'
+import JSON5 from 'json5'
 import { readFile, writeFile } from 'mz/fs'
 import { Span } from 'opentracing'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
 import { logErrorEvent, tracePromise } from './tracing'
-import JSON5 from 'json5'
 
 export async function sanitizeTsConfigs({
     cwd,
