@@ -125,7 +125,7 @@ const openConnectionsMetric = new prometheus.Gauge({
     help: 'Open WebSocket connections to the TypeScript server',
 })
 let openConnections = 0
-prometheus.collectDefaultMetrics({ prefix: 'typescript_' })
+prometheus.collectDefaultMetrics()
 
 webSocketServer.on('connection', async connection => {
     openConnectionsMetric.inc()
