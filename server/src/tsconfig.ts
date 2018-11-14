@@ -1,11 +1,11 @@
 import glob from 'globby'
 import { readFile, writeFile } from 'mz/fs'
 import { Span } from 'opentracing'
-import stripJsonComments from 'strip-json-comments'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
 import { logErrorEvent, tracePromise } from './tracing'
+import JSON5 from 'json5'
 
 export async function sanitizeTsConfigs({
     cwd,
@@ -28,8 +28,8 @@ export async function sanitizeTsConfigs({
                 throwIfCancelled(token)
                 let json: string | undefined
                 try {
-                    json = stripJsonComments(await readFile(tsConfigPath, 'utf-8'))
-                    const tsconfig = JSON.parse(json)
+                    json = await readFile(tsConfigPath, 'utf-8')
+                    const tsconfig = JSON5.parse(json)
                     if (tsconfig && tsconfig.compilerOptions && tsconfig.compilerOptions.plugins) {
                         // Remove plugins for security reasons (they get loaded from node_modules)
                         tsconfig.compilerOptions.plugins = undefined
