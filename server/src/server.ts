@@ -50,6 +50,8 @@ import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { install } from './yarn'
 import * as prometheus from 'prom-client'
+import { spawn } from 'child_process'
+import { createProcessStreamConnection } from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 
 const RELATE_URL_OPTIONS: RelateUrl.Options = {
     output: RelateUrl.PATH_RELATIVE,
@@ -171,17 +173,31 @@ webSocketServer.on('connection', async connection => {
     /** The logger for this connection, loggin to the user's browser console */
     const logger: Logger = new LSPLogger(webSocketMessageConnection)
 
-    const languageServerConnection = rpcServer.createServerProcess('TypeScript language', process.execPath, [
-        path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
-        '--stdio',
-        // Use local tsserver instead of the tsserver of the repo for security reasons
-        '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
-        // '--tsserver-log-file',
-        // path.resolve(__dirname, '..', '..', 'tsserver.log'),
-        // '--tsserver-log-verbosity',
-        // 'verbose',
-        // '--log-level=4',
-    ])
+    const serverProcess = spawn(
+        process.execPath,
+        [
+            path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
+            '--stdio',
+            // Use local tsserver instead of the tsserver of the repo for security reasons
+            '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+            // '--tsserver-log-file',
+            // path.resolve(__dirname, '..', '..', 'tsserver.log'),
+            '--log-level=4',
+        ],
+        {
+            env: {
+                ...process.env,
+                TSS_LOG: '-level verbose -traceToConsole true -logToFile false',
+            },
+        }
+    )
+    serverProcess.on('error', err => {
+        logger.error('Launching language server failed', err)
+        connection.close()
+    })
+    serverProcess.stderr.on('data', data => logger.log(`Language server: ${data}`))
+    connectionDisposables.add({ dispose: () => serverProcess.kill() })
+    const languageServerConnection = createProcessStreamConnection(serverProcess)
     connectionDisposables.add(languageServerConnection)
 
     // Connection state set on initialize
