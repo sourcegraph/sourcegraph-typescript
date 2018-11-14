@@ -1,0 +1,21 @@
+env:
+  FORCE_COLOR: '1'
+
+steps:
+  # Run tests
+  - command: |-
+      yarn
+      yarn run lint
+      yarn run prettier
+      yarn run typecheck-ext
+      yarn run build
+    label: ':typescript:'
+
+  - wait
+
+  # Build & deploy Docker image
+  - command: ./deploy.sh
+    branches: master
+    label: ':rocket:'
+    concurrency: 1
+    concurrency_group: deploy

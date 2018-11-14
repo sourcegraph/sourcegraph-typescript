@@ -39,6 +39,7 @@
     "last 1 Safari versions"
   ],
   "scripts": {
+    "prettier": "prettier --list-different --write \"**/{*.{js?(on),ts,md,yml},.*.yml}\"",
     "tslint": "tslint -p extension/tsconfig.json && tslint -p server/tsconfig.json",
     "build": "npm run build-ext && npm run build-server",
     "build-server": "tsc -p ./server/tsconfig.json",
