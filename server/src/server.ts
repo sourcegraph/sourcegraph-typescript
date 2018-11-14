@@ -49,6 +49,7 @@ import { Logger, LSPLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { install } from './yarn'
+import * as prometheus from 'prom-client'
 
 const RELATE_URL_OPTIONS: RelateUrl.Options = {
     output: RelateUrl.PATH_RELATIVE,
@@ -119,9 +120,15 @@ for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
 
 const webSocketServer = new Server({ server: httpServer })
 
+const openConnectionsMetric = new prometheus.Gauge({
+    name: 'typescript_open_websocket_connections',
+    help: 'Open WebSocket connections to the TypeScript server',
+})
 let openConnections = 0
+prometheus.collectDefaultMetrics({ prefix: 'typescript_' })
 
 webSocketServer.on('connection', async connection => {
+    openConnectionsMetric.inc()
     openConnections++
     console.log(`New WebSocket connection, ${openConnections} open`)
 
@@ -135,6 +142,7 @@ webSocketServer.on('connection', async connection => {
         connectionDisposables.add({ dispose: () => globalDisposables.delete(connectionDisposable) })
         const closeListener = async () => {
             openConnections--
+            openConnectionsMetric.dec()
             console.log(`WebSocket closed, ${openConnections} open`)
             await connectionDisposable.disposeAsync()
         }
@@ -468,4 +476,16 @@ webSocketServer.on('connection', async connection => {
 
 httpServer.listen(port, () => {
     console.log(`WebSocket server listening on port ${port}`)
+})
+
+// Prometheus metrics
+const metricsPort = process.env.METRICS_PORT || 6060
+const metricsServer = http.createServer((req, res) => {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.end(prometheus.register.metrics())
+})
+metricsServer.on('error', err => console.error('Metrics server error', err)) // don't crash on metrics
+metricsServer.listen(metricsPort, () => {
+    console.log(`Prometheus metrics on port ${metricsPort}`)
 })

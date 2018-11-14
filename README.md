@@ -101,6 +101,10 @@ Support for other OpenTracing implementations can easily added here.
 +     value: abcdefg
 ```
 
+#### Enabling Prometheus metrics
+
+The server exposes metrics on port 6060 that can be scraped by Prometheus.
+
 #### Improving performance with an SSD
 
 To improve performance of dependency installation, the server can be configured to use a mounted SSD at a given directory by setting the `CACHE_DIR` environment variable. The instructions for how to mount a SSD depend on your deployment environment.

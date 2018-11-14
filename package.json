@@ -85,6 +85,7 @@
     "mz": "^2.7.0",
     "opentracing": "^0.14.3",
     "package-json": "^5.0.0",
+    "prom-client": "^11.2.0",
     "relateurl": "^0.2.7",
     "request": "^2.88.0",
     "rmfr": "^2.0.0",
