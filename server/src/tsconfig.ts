@@ -26,17 +26,17 @@ export async function sanitizeTsConfigs({
         await Promise.all(
             tsconfigPaths.map(async tsConfigPath => {
                 throwIfCancelled(token)
-                let content: string | undefined
+                let json: string | undefined
                 try {
-                    content = await readFile(tsConfigPath, 'utf-8')
-                    const tsconfig = JSON.parse(stripJsonComments(content))
+                    json = stripJsonComments(await readFile(tsConfigPath, 'utf-8'))
+                    const tsconfig = JSON.parse(json)
                     if (tsconfig && tsconfig.compilerOptions && tsconfig.compilerOptions.plugins) {
                         // Remove plugins for security reasons (they get loaded from node_modules)
                         tsconfig.compilerOptions.plugins = undefined
                         await writeFile(tsConfigPath, JSON.stringify(tsconfig))
                     }
                 } catch (err) {
-                    logger.error('Error sanitizing tsconfig.json at', tsConfigPath, content, err)
+                    logger.error('Error sanitizing tsconfig.json at', tsConfigPath, json, err)
                     logErrorEvent(span, err)
                 }
             })
