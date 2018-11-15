@@ -1037,6 +1037,11 @@
   resolved "https://registry.npmjs.org/@types/semver/-/semver-5.5.0.tgz#146c2a29ee7d3bae4bf2fcb274636e264c813c45"
   integrity sha512-41qEJgBH/TWgo5NFSvBCJ1qkoi3Q6ONSF2avrHq1LVEZfYpdHmj0y9SuTK+u9ZhG1sYQKBL1AWXKyLWP4RaUoQ==
 
+"@types/tail@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.npmjs.org/@types/tail/-/tail-1.2.0.tgz#f8b81bacf950fae81172d5473fd08c9bfc043fda"
+  integrity sha512-K9sbawuDHPH2l1pE2IRJ1CS6K1OsdbM4ob+j3Q0s6gh/HDhsoJNFnPa5+8gbi18c1P1dz0kT+hLfg5EdLzFQOg==
+
 "@types/tough-cookie@*":
   version "2.3.4"
   resolved "https://registry.npmjs.org/@types/tough-cookie/-/tough-cookie-2.3.4.tgz#821878b81bfab971b93a265a561d54ea61f9059f"
@@ -8575,6 +8580,11 @@ tagged-template-noop@^2.1.0:
   version "2.1.0"
   resolved "https://registry.npmjs.org/tagged-template-noop/-/tagged-template-noop-2.1.0.tgz#3501d67fd75612ab40e6040056ea881d1161c4f5"
   integrity sha512-VOPA7ZucOLvew9xq+AwABXil7AHQZa3G7T3QOQoUveNIl3EwNsMN79JHn8v7zgpM1Pd8R36MrntUvaWqLqjg1w==
+
+tail@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.npmjs.org/tail/-/tail-2.0.1.tgz#f4cd9d514512e77d0eb2aaacd5520d578fe20271"
+  integrity sha512-9vPPjlv63kuIHLKVR7T65ey3CeukjcWA3f/JnfPyFd1KPSqWMh3qWyz2M5T7osAYQNYlaYtddovJ/X27tL0w1w==
 
 tar-stream@^1.5.2:
   version "1.6.2"
