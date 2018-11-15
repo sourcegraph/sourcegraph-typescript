@@ -7,6 +7,7 @@ Object.assign(global, { AbortController })
 import {
     createMessageConnection,
     IWebSocket,
+    MessageConnection,
     WebSocketMessageReader,
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
@@ -29,6 +30,7 @@ import * as prometheus from 'prom-client'
 import RelateUrl from 'relateurl'
 import request from 'request'
 import rmfr from 'rmfr'
+import { Tail } from 'tail'
 import { pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
@@ -177,37 +179,11 @@ webSocketServer.on('connection', connection => {
         new LSPLogger(webSocketMessageConnection),
     ])
 
-    const serverProcess = spawn(
-        process.execPath,
-        [
-            path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
-            '--stdio',
-            // Use local tsserver instead of the tsserver of the repo for security reasons
-            '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
-            // '--tsserver-log-file',
-            // path.resolve(__dirname, '..', '..', 'tsserver.log'),
-            '--log-level=4',
-        ],
-        {
-            env: {
-                ...process.env,
-                TSS_LOG: '-level verbose -traceToConsole true -logToFile false',
-            },
-        }
-    )
-    serverProcess.on('error', err => {
-        logger.error('Launching language server failed', err)
-        connection.close()
-    })
-    serverProcess.stderr.on('data', data => logger.log(`Language server: ${data}`))
-    connectionDisposables.add({ dispose: () => serverProcess.kill() })
-    const languageServerConnection = createProcessStreamConnection(serverProcess)
-    connectionDisposables.add(languageServerConnection)
-
     // Connection state set on initialize
+    let serverMessageConnection: MessageConnection
+    let tempDir: string
     let httpRootUri: URL
     let fileRootUri: URL
-    let tempDir: string
     let extractPath: string
     // yarn folders
     let globalFolderRoot: string
@@ -216,14 +192,6 @@ webSocketServer.on('connection', connection => {
     const dependencyInstallationPromises = new Map<string, Promise<void>>()
     /** Whether all dependency installation is done */
     let dependencyInstallationDone = false
-
-    const serverMessageConnection = createMessageConnection(
-        languageServerConnection.reader,
-        languageServerConnection.writer,
-        logger
-    )
-    connectionDisposables.add(serverMessageConnection)
-    serverMessageConnection.listen()
 
     const dispatcher = createDispatcher(webSocketConnection, { tracer, logger })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
@@ -280,6 +248,47 @@ webSocketServer.on('connection', connection => {
         cacheFolderRoot = path.join(tempDir, 'cache')
         globalFolderRoot = path.join(tempDir, 'global')
         await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolderRoot), fs.mkdir(globalFolderRoot)])
+
+        // Prepare tsserver log file
+        // Set up a tail -f on the tsserver logfile and forward the logs to the logger
+        const tsserverLogFile = path.resolve(tempDir, 'tsserver.log')
+        // const tsserverLogFile = path.resolve(__dirname, '..', '..', 'tsserver.log')
+        await fs.writeFile(tsserverLogFile, '') // File needs to exist or else Tail will error
+        const tsserverLogger = new PrefixedLogger(logger, 'tsserver')
+        const tsserverTail = new Tail(tsserverLogFile, { follow: true, fromBeginning: true })
+        connectionDisposables.add({ dispose: () => tsserverTail.unwatch() })
+        tsserverTail.on('line', line => tsserverLogger.log(line + ''))
+        tsserverTail.on('error', err => logger.error('Error tailing tsserver logs', err))
+
+        // Spawn language server
+        const serverProcess = spawn(process.execPath, [
+            path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
+            '--log-level=4',
+            '--stdio',
+            // Use local tsserver instead of the tsserver of the repo for security reasons
+            '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+            '--tsserver-log-file',
+            tsserverLogFile,
+            '--tsserver-log-verbosity',
+            'normal',
+        ])
+        connectionDisposables.add({ dispose: () => serverProcess.kill() })
+        serverProcess.on('error', err => {
+            logger.error('Launching language server failed', err)
+            connection.close()
+        })
+        // Log language server STDERR output
+        const languageServerLogger = new PrefixedLogger(logger, 'langserver')
+        serverProcess.stderr.on('data', chunk => languageServerLogger.log(chunk + ''))
+        const languageServerConnection = createProcessStreamConnection(serverProcess)
+        connectionDisposables.add(languageServerConnection)
+        serverMessageConnection = createMessageConnection(
+            languageServerConnection.reader,
+            languageServerConnection.writer,
+            logger
+        )
+        connectionDisposables.add(serverMessageConnection)
+        serverMessageConnection.listen()
 
         // Fetch zip and extract into temp folder
         logger.log('Fetching zip from', httpRootUri.href)
@@ -378,6 +387,7 @@ webSocketServer.on('connection', connection => {
                     await installationPromise
                 })
             )
+            logger.log('Dependency installation done')
             dependencyInstallationDone = true
         })
 
@@ -507,5 +517,5 @@ const metricsServer = http.createServer((req, res) => {
 })
 metricsServer.on('error', err => console.error('Metrics server error', err)) // don't crash on metrics
 metricsServer.listen(metricsPort, () => {
-    console.log(`Prometheus metrics on port ${metricsPort}`)
+    console.log(`Prometheus metrics on http://localhost:${metricsPort}`)
 })
