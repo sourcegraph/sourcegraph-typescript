@@ -448,7 +448,7 @@ webSocketServer.on('connection', connection => {
         }
         if (!dependencyInstallationDone) {
             contents.push(
-                'ℹ️ _Dependency installation is still in progress. The information shown might be missing type information._'
+                '_Dependency installation is still in progress. The information shown might be missing type information._'
             )
         }
         return { ...hover, contents }
