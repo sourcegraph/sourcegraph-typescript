@@ -1,3 +1,4 @@
+.git/
 extension/
 .vscode/
 server/src/
@@ -11,3 +12,6 @@ yarn.lock
 prettier.config.js
 tsconfig.json
 tslint.json
+kubernetes/
+*.pem
+*.log
