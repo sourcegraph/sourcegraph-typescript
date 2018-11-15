@@ -178,6 +178,7 @@ webSocketServer.on('connection', connection => {
         new PrefixedLogger(console, `conn ${connectionId}`),
         new LSPLogger(webSocketMessageConnection),
     ])
+    logger.log(`Connection ID ${connectionId}`)
 
     // Connection state set on initialize
     let serverMessageConnection: MessageConnection
