@@ -38,6 +38,13 @@ interface Dispatcher {
     dispose(): void
 }
 
+const requestDurationMetric = new prometheus.Histogram({
+    name: 'jsonrpc_request_duration_seconds',
+    help: 'The JSON RPC request latencies in seconds',
+    labelNames: ['success', 'method'],
+    buckets: [0.1, 0.2, 0.5, 0.8, 1, 1.5, 2, 5, 10, 15, 20, 30],
+})
+
 /**
  * Alternative dispatcher to vscode-jsonrpc that supports OpenTracing and Observables
  */
@@ -48,13 +55,6 @@ export function createDispatcher(
     const cancellationTokenSources = new Map<RequestId, CancellationTokenSource>()
     const handlers = new Map<string, RequestHandler<any, any>>()
     const notifications = new Subject<NotificationMessage>()
-
-    const requestDurationMetric = new prometheus.Histogram({
-        name: 'jsonrpc_request_duration_seconds',
-        help: 'The JSON RPC request latencies in seconds',
-        labelNames: ['success', 'method'],
-        buckets: [0.1, 0.2, 0.5, 0.8, 1, 1.5, 2, 5, 10, 15, 20, 30],
-    })
 
     client.reader.listen(async message => {
         if (isNotificationMessage(message)) {
