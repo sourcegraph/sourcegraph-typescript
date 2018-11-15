@@ -9,24 +9,32 @@ export interface Logger {
     error(...values: any[]): void
 }
 
-/**
- * Logger implementation that does nothing
- */
-export class NoopLogger {
+abstract class AbstractLogger implements Logger {
+    protected abstract logType(type: keyof Logger, values: any[]): void
+
     public log(...values: any[]): void {
-        // empty
+        this.logType('log', values)
     }
 
     public info(...values: any[]): void {
-        // empty
+        this.logType('info', values)
     }
 
     public warn(...values: any[]): void {
-        // empty
+        this.logType('warn', values)
     }
 
     public error(...values: any[]): void {
-        // empty
+        this.logType('error', values)
+    }
+}
+
+/**
+ * Logger implementation that does nothing
+ */
+export class NoopLogger extends AbstractLogger {
+    protected logType(): void {
+        // noop
     }
 }
 
@@ -37,36 +45,54 @@ function format(values: any[]): string {
     return values.map(value => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))).join(' ')
 }
 
+const LSP_MESSAGE_TYPES: Record<keyof Logger, MessageType> = {
+    log: MessageType.Log,
+    info: MessageType.Info,
+    warn: MessageType.Warning,
+    error: MessageType.Error,
+}
+
 /**
  * A logger implementation that sends window/logMessage notifications to an LSP client
  */
-export class LSPLogger implements Logger {
+export class LSPLogger extends AbstractLogger {
     /**
      * @param client The client to send window/logMessage notifications to
      */
-    constructor(private client: MessageConnection) {}
+    constructor(private client: MessageConnection) {
+        super()
+    }
 
-    private logType(type: MessageType, values: any[]): void {
+    protected logType(type: keyof Logger, values: any[]): void {
         try {
-            this.client.sendNotification(LogMessageNotification.type, { type, message: format(values) })
+            this.client.sendNotification(LogMessageNotification.type, {
+                type: LSP_MESSAGE_TYPES[type],
+                message: format(values),
+            })
         } catch (err) {
             // ignore
         }
     }
+}
 
-    public log(...values: any[]): void {
-        this.logType(MessageType.Log, values)
+export class PrefixedLogger extends AbstractLogger {
+    constructor(private logger: Logger, private prefix: string) {
+        super()
     }
 
-    public info(...values: any[]): void {
-        this.logType(MessageType.Info, values)
+    protected logType(type: keyof Logger, values: any[]): void {
+        this.logger[type](`[${this.prefix}]`, ...values)
+    }
+}
+
+export class MultiLogger extends AbstractLogger {
+    constructor(private loggers: Logger[]) {
+        super()
     }
 
-    public warn(...values: any[]): void {
-        this.logType(MessageType.Warning, values)
-    }
-
-    public error(...values: any[]): void {
-        this.logType(MessageType.Error, values)
+    protected logType(type: keyof Logger, values: any[]): void {
+        for (const logger of this.loggers) {
+            logger[type](...values)
+        }
     }
 }

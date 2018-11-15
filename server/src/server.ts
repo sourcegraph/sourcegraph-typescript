@@ -48,7 +48,7 @@ import { createAbortError, throwIfCancelled } from './cancellation'
 import { filterDependencies } from './dependencies'
 import { createDispatcher, NotificationType, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync } from './disposable'
-import { Logger, LSPLogger } from './logging'
+import { Logger, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { install } from './yarn'
@@ -126,10 +126,12 @@ const openConnectionsMetric = new prometheus.Gauge({
     name: 'typescript_open_websocket_connections',
     help: 'Open WebSocket connections to the TypeScript server',
 })
-let openConnections = 0
 prometheus.collectDefaultMetrics()
+let openConnections = 0
+let connectionIds = 0
 
-webSocketServer.on('connection', async connection => {
+webSocketServer.on('connection', connection => {
+    const connectionId = connectionIds++
     openConnectionsMetric.inc()
     openConnections++
     console.log(`New WebSocket connection, ${openConnections} open`)
@@ -170,8 +172,10 @@ webSocketServer.on('connection', async connection => {
         webSocketConnection.writer,
         console
     )
-    /** The logger for this connection, loggin to the user's browser console */
-    const logger: Logger = new LSPLogger(webSocketMessageConnection)
+    const logger: Logger = new MultiLogger([
+        new PrefixedLogger(console, `conn ${connectionId}`),
+        new LSPLogger(webSocketMessageConnection),
+    ])
 
     const serverProcess = spawn(
         process.execPath,
