@@ -4,7 +4,7 @@ env:
 steps:
   # Run tests
   - command: |-
-      yarn --ignore-engines
+      yarn
       yarn run prettier
       yarn run tslint
       yarn run typecheck-ext
