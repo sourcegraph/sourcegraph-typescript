@@ -11,6 +11,7 @@ import {
     WebSocketMessageReader,
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
+import { fromPairs } from 'lodash'
 import * as sourcegraph from 'sourcegraph'
 import {
     DefinitionRequest,
@@ -78,6 +79,12 @@ async function connect(rootUri: URL): Promise<MessageConnection> {
         rootUri: rootUri.href,
         workspaceFolders: [{ name: '', uri: rootUri.href }],
         capabilities: {},
+        initializationOptions: {
+            // until workspace/configuration is allowed during initialize
+            configuration: fromPairs(
+                Object.entries(sourcegraph.configuration.get().value).filter(([key]) => key.startsWith('typescript.'))
+            ),
+        },
     }
     console.log('Initializing TypeScript server...')
     const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
