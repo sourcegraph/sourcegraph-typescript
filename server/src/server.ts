@@ -12,8 +12,7 @@ import {
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
-import { createProcessStreamConnection } from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
-import { spawn } from 'child_process'
+import { fork } from 'child_process'
 import decompress from 'decompress'
 import glob from 'globby'
 import * as http from 'http'
@@ -41,6 +40,8 @@ import {
     HoverRequest,
     ImplementationRequest,
     InitializeRequest,
+    IPCMessageReader,
+    IPCMessageWriter,
     LogMessageNotification,
     ReferencesRequest,
     TextDocumentPositionParams,
@@ -51,7 +52,7 @@ import { createAbortError, throwIfCancelled } from './cancellation'
 import { filterDependencies } from './dependencies'
 import { createDispatcher, createRequestDurationMetric, NotificationType, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
-import { Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
+import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { install } from './yarn'
@@ -134,6 +135,11 @@ prometheus.collectDefaultMetrics()
 let openConnections = 0
 let connectionIds = 0
 
+interface Configuration {
+    'typescript.langserver.log'?: false | 'log' | 'info' | 'warn' | 'error'
+    'typescript.tsserver.log'?: false | 'terse' | 'normal' | 'requestTime' | 'verbose'
+}
+
 webSocketServer.on('connection', connection => {
     const connectionId = connectionIds++
     openConnectionsMetric.inc()
@@ -184,6 +190,7 @@ webSocketServer.on('connection', connection => {
 
     // Connection state set on initialize
     let serverMessageConnection: MessageConnection
+    let configuration: Configuration = {}
     let tempDir: string
     let httpRootUri: URL
     let fileRootUri: URL
@@ -238,6 +245,12 @@ webSocketServer.on('connection', connection => {
         if (httpRootUri.protocol !== 'http:' && httpRootUri.protocol !== 'https:') {
             throw new Error('rootUri protocol must be http or https, got ' + httpRootUri)
         }
+
+        // Workaround until workspace/configuration is allowed during initialize
+        if (params.initializationOptions && params.initializationOptions.configuration) {
+            configuration = params.initializationOptions.configuration
+        }
+
         // Create temp folders
         tempDir = path.join(CACHE_DIR, uuid.v1())
         await mkdirp(tempDir)
@@ -264,17 +277,26 @@ webSocketServer.on('connection', connection => {
         tsserverTail.on('error', err => logger.error('Error tailing tsserver logs', err))
 
         // Spawn language server
-        const serverProcess = spawn(process.execPath, [
+        const serverProcess = fork(
             path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
-            '--log-level=4',
-            '--stdio',
-            // Use local tsserver instead of the tsserver of the repo for security reasons
-            '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
-            '--tsserver-log-file',
-            tsserverLogFile,
-            '--tsserver-log-verbosity',
-            'normal',
-        ])
+            [
+                ...(typeof configuration['typescript.langserver.log'] === 'string'
+                    ? ['--log-level=' + LOG_LEVEL_TO_LSP[configuration['typescript.langserver.log'] || 'log']]
+                    : []),
+                '--node-ipc',
+                // Use local tsserver instead of the tsserver of the repo for security reasons
+                '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+                ...(typeof configuration['typescript.tsserver.log'] === 'string'
+                    ? [
+                          '--tsserver-log-file',
+                          tsserverLogFile,
+                          '--tsserver-log-verbosity',
+                          configuration['typescript.tsserver.log'] || 'verbose',
+                      ]
+                    : []),
+            ],
+            { stdio: ['ipc', 'inherit'] }
+        )
         connectionDisposables.add({ dispose: () => serverProcess.kill() })
         serverProcess.on('error', err => {
             logger.error('Launching language server failed', err)
@@ -283,19 +305,19 @@ webSocketServer.on('connection', connection => {
         // Log language server STDERR output
         const languageServerLogger = new PrefixedLogger(logger, 'langserver')
         serverProcess.stderr.on('data', chunk => languageServerLogger.log(chunk + ''))
-        const languageServerConnection = createProcessStreamConnection(serverProcess)
-        connectionDisposables.add(languageServerConnection)
-        serverMessageConnection = createMessageConnection(
-            languageServerConnection.reader,
-            languageServerConnection.writer,
-            logger
-        )
+        const languageServerReader = new IPCMessageReader(serverProcess)
+        const languageServerWriter = new IPCMessageWriter(serverProcess)
+        connectionDisposables.add(languageServerWriter)
+        serverMessageConnection = createMessageConnection(languageServerReader, languageServerWriter, logger)
         connectionDisposables.add(serverMessageConnection)
         serverMessageConnection.listen()
 
         // Forward log messages from the language server to the browser
         {
-            const languageServerDispatcher = createDispatcher(languageServerConnection, { tracer, logger })
+            const languageServerDispatcher = createDispatcher(
+                { reader: languageServerReader, writer: languageServerWriter },
+                { tracer, logger }
+            )
             const languageServerLogger = new PrefixedLogger(logger, 'langserver')
             connectionDisposables.add(
                 subscriptionToDisposable(

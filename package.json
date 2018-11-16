@@ -27,6 +27,14 @@
         "typescript.accessToken": {
           "description": "The access token for the language server to use to fetch files from the Sourcegraph API. The extension will create this token and save it in your settings automatically.",
           "type": "string"
+        },
+        "typescript.langserver.log": {
+          "description": "The log level to pass to the TypeScript language server. Logs will be forwarded to the browser console with the prefix [langserver].",
+          "enum": [false, "log", "info", "warn", "error"]
+        },
+        "typescript.tsserver.log": {
+          "description": "The log level to pass to tsserver. Logs will be forwarded to the browser console with the prefix [tsserver].",
+          "enum": [false, "terse", "normal", "requestTime", "verbose"]
         }
       }
     }
