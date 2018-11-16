@@ -48,7 +48,13 @@ async function connect(rootUri: URL): Promise<MessageConnection> {
     )
     connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
         // Blue background for the "TypeScript server" prefix
-        const args = ['%cTypeScript server%c %s', 'background-color: blue; color: white', '', message]
+        const args = [
+            // console.info() doesn't get a visual distinction or filter in Chrome anymore
+            (type === 3 ? 'ℹ️' : '') + '%cTypeScript server%c %s',
+            'background-color: blue; color: white',
+            '',
+            message,
+        ]
         switch (type) {
             case 1:
                 console.error(...args)
