@@ -292,7 +292,7 @@ webSocketServer.on('connection', connection => {
         serverMessageConnection.listen()
 
         // Fetch zip and extract into temp folder
-        logger.log('Fetching zip from', httpRootUri.href)
+        logger.info('Fetching zip from', httpRootUri.href)
         const archivePath = path.join(tempDir, 'archive.zip')
         await tracePromise('Fetch source archive', span, async span => {
             const using: Disposable[] = []
@@ -391,7 +391,7 @@ webSocketServer.on('connection', connection => {
                     await installationPromise
                 })
             )
-            logger.log('Dependency installation done')
+            logger.info('Dependency installation done')
             dependencyInstallationDone = true
         })
 
