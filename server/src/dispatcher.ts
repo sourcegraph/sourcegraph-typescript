@@ -38,19 +38,34 @@ interface Dispatcher {
     dispose(): void
 }
 
-const requestDurationMetric = new prometheus.Histogram({
-    name: 'jsonrpc_request_duration_seconds',
-    help: 'The JSON RPC request latencies in seconds',
-    labelNames: ['success', 'method'],
-    buckets: [0.1, 0.2, 0.5, 0.8, 1, 1.5, 2, 5, 10, 15, 20, 30],
-})
+export const createRequestDurationMetric = () =>
+    new prometheus.Histogram({
+        name: 'jsonrpc_request_duration_seconds',
+        help: 'The JSON RPC request latencies in seconds',
+        labelNames: ['success', 'method'],
+        buckets: [0.1, 0.2, 0.5, 0.8, 1, 1.5, 2, 5, 10, 15, 20, 30],
+    })
 
 /**
  * Alternative dispatcher to vscode-jsonrpc that supports OpenTracing and Observables
  */
 export function createDispatcher(
     client: Connection,
-    { tracer, logger }: { tracer: Tracer; logger: Logger }
+    {
+        tracer,
+        logger,
+        requestDurationMetric,
+    }: {
+        tracer: Tracer
+        logger: Logger
+        /**
+         * Optional prometheus metric that request durations will be logged to.
+         * Must have labels `success` and `method`.
+         *
+         * @see createRequestDurationMetric
+         */
+        requestDurationMetric?: prometheus.Histogram
+    }
 ): Dispatcher {
     const cancellationTokenSources = new Map<RequestId, CancellationTokenSource>()
     const handlers = new Map<string, RequestHandler<any, any>>()
@@ -68,7 +83,7 @@ export function createDispatcher(
                 notifications.next(message)
             }
         } else if (isRequestMessage(message)) {
-            const stopTimer = requestDurationMetric.startTimer()
+            const stopTimer = requestDurationMetric && requestDurationMetric.startTimer()
             let success: boolean
             const span = tracer.startSpan('Handle ' + message.method)
             let lightstepTraceUrl: string | undefined
@@ -135,6 +150,8 @@ export function createDispatcher(
                     ;(response as any)._trace = lightstepTraceUrl
                 }
                 client.writer.write(response)
+            }
+            if (stopTimer) {
                 stopTimer({ success: success + '', method: message.method })
             }
         }

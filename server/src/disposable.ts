@@ -1,3 +1,4 @@
+import { Unsubscribable } from 'rxjs'
 import { Logger } from './logging'
 
 export interface Disposable {
@@ -57,3 +58,10 @@ export async function disposeAllAsync(
         }
     }
 }
+
+/**
+ * Converts an RxJS Subscription to a Disposable.
+ */
+export const subscriptionToDisposable = (subscription: Unsubscribable): Disposable => ({
+    dispose: () => subscription.unsubscribe(),
+})

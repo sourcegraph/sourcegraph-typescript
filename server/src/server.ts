@@ -41,6 +41,7 @@ import {
     HoverRequest,
     ImplementationRequest,
     InitializeRequest,
+    LogMessageNotification,
     ReferencesRequest,
     TextDocumentPositionParams,
     TypeDefinitionRequest,
@@ -48,9 +49,9 @@ import {
 import { Server } from 'ws'
 import { createAbortError, throwIfCancelled } from './cancellation'
 import { filterDependencies } from './dependencies'
-import { createDispatcher, NotificationType, RequestType } from './dispatcher'
-import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync } from './disposable'
-import { Logger, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
+import { createDispatcher, createRequestDurationMetric, NotificationType, RequestType } from './dispatcher'
+import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
+import { Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { install } from './yarn'
@@ -128,6 +129,7 @@ const openConnectionsMetric = new prometheus.Gauge({
     name: 'typescript_open_websocket_connections',
     help: 'Open WebSocket connections to the TypeScript server',
 })
+const requestDurationMetric = createRequestDurationMetric()
 prometheus.collectDefaultMetrics()
 let openConnections = 0
 let connectionIds = 0
@@ -194,7 +196,7 @@ webSocketServer.on('connection', connection => {
     /** Whether all dependency installation is done */
     let dependencyInstallationDone = false
 
-    const dispatcher = createDispatcher(webSocketConnection, { tracer, logger })
+    const dispatcher = createDispatcher(webSocketConnection, { tracer, logger, requestDurationMetric })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
 
     /**
@@ -290,6 +292,20 @@ webSocketServer.on('connection', connection => {
         )
         connectionDisposables.add(serverMessageConnection)
         serverMessageConnection.listen()
+
+        // Forward log messages from the language server to the browser
+        {
+            const languageServerDispatcher = createDispatcher(languageServerConnection, { tracer, logger })
+            const languageServerLogger = new PrefixedLogger(logger, 'langserver')
+            connectionDisposables.add(
+                subscriptionToDisposable(
+                    languageServerDispatcher.observeNotification(LogMessageNotification.type).subscribe(params => {
+                        const type = LSP_TO_LOG_LEVEL[params.type]
+                        languageServerLogger[type](params.message)
+                    })
+                )
+            )
+        }
 
         // Fetch zip and extract into temp folder
         logger.info('Fetching zip from', httpRootUri.href)
@@ -502,7 +518,7 @@ webSocketServer.on('connection', connection => {
 
     function forwardNotifications<P>(type: NotificationType<P>): void {
         const subscription = dispatcher.observeNotification(type).subscribe(params => notifyServer(type, params))
-        connectionDisposables.add({ dispose: () => subscription.unsubscribe() })
+        connectionDisposables.add(subscriptionToDisposable(subscription))
     }
 
     forwardNotifications(DidOpenTextDocumentNotification.type)

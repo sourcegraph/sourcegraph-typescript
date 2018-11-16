@@ -45,11 +45,18 @@ function format(values: any[]): string {
     return values.map(value => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))).join(' ')
 }
 
-const LSP_MESSAGE_TYPES: Record<keyof Logger, MessageType> = {
+export const LOG_LEVEL_TO_LSP: Record<keyof Logger, MessageType> = {
     log: MessageType.Log,
     info: MessageType.Info,
     warn: MessageType.Warning,
     error: MessageType.Error,
+}
+
+export const LSP_TO_LOG_LEVEL: Record<MessageType, keyof Logger> = {
+    [MessageType.Log]: 'log',
+    [MessageType.Info]: 'info',
+    [MessageType.Warning]: 'warn',
+    [MessageType.Error]: 'error',
 }
 
 /**
@@ -66,7 +73,7 @@ export class LSPLogger extends AbstractLogger {
     protected logType(type: keyof Logger, values: any[]): void {
         try {
             this.client.sendNotification(LogMessageNotification.type, {
-                type: LSP_MESSAGE_TYPES[type],
+                type: LOG_LEVEL_TO_LSP[type],
                 message: format(values),
             })
         } catch (err) {
