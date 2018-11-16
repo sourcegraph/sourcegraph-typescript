@@ -363,7 +363,10 @@ webSocketServer.on('connection', connection => {
                         try {
                             span.setTag('packageJsonPath', relPackageJsonPath)
                             const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
-                            await filterDependencies(absPackageJsonPath, { logger, span, token })
+                            const hasDeps = await filterDependencies(absPackageJsonPath, { logger, span, token })
+                            if (!hasDeps) {
+                                return
+                            }
 
                             // It's important that each concurrent yarn process has their own global and cache folders
                             const relPackageJsonDirName = path.dirname(relPackageJsonPath)

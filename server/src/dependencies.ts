@@ -25,12 +25,13 @@ function hasTypes(name: string, range: string, span: Span): Promise<boolean> {
  * Removes all dependencies from a package.json that do not contain TypeScript type declaration files.
  *
  * @param packageJsonPath File path to a package.json
+ * @return Whether the package.json contained any dependencies
  */
 export async function filterDependencies(
     packageJsonPath: string,
     { logger, span, token }: { logger: Logger; span: Span; token: CancellationToken }
-): Promise<void> {
-    await tracePromise('Filter dependencies', span, async span => {
+): Promise<boolean> {
+    return await tracePromise('Filter dependencies', span, async span => {
         span.setTag('packageJsonPath', packageJsonPath)
         logger.log('Filtering package.json at ', packageJsonPath)
         const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'))
@@ -60,10 +61,14 @@ export async function filterDependencies(
                 )
             })
         )
-        logger.log('Excluding dependencies', excluded.join(', '))
-        logger.log('Keeping dependencies', included.join(', '))
         span.setTag('excluded', excluded.length)
         span.setTag('included', included.length)
-        await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2))
+        logger.log('Excluding dependencies', excluded.join(', '))
+        logger.log('Keeping dependencies', included.join(', '))
+        // Only write if there is any change to dependencies
+        if (included.length > 0 && excluded.length > 0) {
+            await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2))
+        }
+        return included.length > 0
     })
 }
