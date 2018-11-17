@@ -32,86 +32,6 @@ import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegra
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
-async function connect(rootUri: URL): Promise<MessageConnection> {
-    const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
-    if (typeof serverUrl !== 'string') {
-        throw new Error(
-            'Setting typescript.serverUrl must be set to the WebSocket endpoint of the TypeScript language service'
-        )
-    }
-    const socket = new WebSocket(serverUrl)
-    const rpcWebSocket = toSocket(socket)
-    const connection = createMessageConnection(
-        new WebSocketMessageReader(rpcWebSocket),
-        new WebSocketMessageWriter(rpcWebSocket),
-        console
-    )
-    connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
-        // Blue background for the "TypeScript server" prefix
-        const args = [
-            // console.info() doesn't get a visual distinction or filter in Chrome anymore
-            (type === 3 ? 'ℹ️' : '') + '%cTypeScript backend%c %s',
-            'background-color: blue; color: white',
-            '',
-            message,
-        ]
-        switch (type) {
-            case 1:
-                console.error(...args)
-                break
-            case 2:
-                console.warn(...args)
-                break
-            case 3:
-                console.info(...args)
-                break
-            case 4:
-            default:
-                console.log(...args)
-                break
-        }
-    })
-    connection.listen()
-    const event = await new Promise<Event>(resolve => {
-        socket.addEventListener('open', resolve, { once: true })
-        socket.addEventListener('error', resolve, { once: true })
-    })
-    if (event.type === 'error') {
-        throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
-    }
-    console.log(`WebSocket connection to TypeScript server at ${serverUrl} opened`)
-    const initializeParams: InitializeParams = {
-        processId: 0,
-        rootUri: rootUri.href,
-        workspaceFolders: [{ name: '', uri: rootUri.href }],
-        capabilities: {},
-        initializationOptions: {
-            // until workspace/configuration is allowed during initialize
-            configuration: fromPairs(
-                Object.entries(sourcegraph.configuration.get().value).filter(([key]) => key.startsWith('typescript.'))
-            ),
-        },
-    }
-    console.log('Initializing TypeScript server...')
-    const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
-    console.log('TypeScript server initialized', initResult)
-    return connection
-}
-
-async function getOrCreateConnection(rootUri: URL): Promise<MessageConnection> {
-    let connectionPromise = connectionsByRootUri.get(rootUri.href)
-    if (!connectionPromise) {
-        connectionPromise = connect(rootUri)
-        connectionsByRootUri.set(rootUri.href, connectionPromise)
-    }
-    const connection = await connectionPromise
-    connection.onClose(() => {
-        console.log('WebSocket connection to TypeScript server closed')
-        connectionsByRootUri.delete(rootUri.href)
-    })
-    return connection
-}
-
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
 
 export async function activate(): Promise<void> {
@@ -126,8 +46,107 @@ export async function activate(): Promise<void> {
         return authenticatedUri
     }
 
+    async function connect(rootUri: URL): Promise<MessageConnection> {
+        const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
+        if (typeof serverUrl !== 'string') {
+            throw new Error(
+                'Setting typescript.serverUrl must be set to the WebSocket endpoint of the TypeScript language service'
+            )
+        }
+        const socket = new WebSocket(serverUrl)
+        const rpcWebSocket = toSocket(socket)
+        const connection = createMessageConnection(
+            new WebSocketMessageReader(rpcWebSocket),
+            new WebSocketMessageWriter(rpcWebSocket),
+            console
+        )
+        connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
+            // Blue background for the "TypeScript server" prefix
+            const args = [
+                // console.info() doesn't get a visual distinction or filter in Chrome anymore
+                (type === 3 ? 'ℹ️' : '') + '%cTypeScript backend%c %s',
+                'background-color: blue; color: white',
+                '',
+                message,
+            ]
+            switch (type) {
+                case 1:
+                    console.error(...args)
+                    break
+                case 2:
+                    console.warn(...args)
+                    break
+                case 3:
+                    console.info(...args)
+                    break
+                case 4:
+                default:
+                    console.log(...args)
+                    break
+            }
+        })
+        connection.listen()
+        const event = await new Promise<Event>(resolve => {
+            socket.addEventListener('open', resolve, { once: true })
+            socket.addEventListener('error', resolve, { once: true })
+        })
+        if (event.type === 'error') {
+            throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
+        }
+        console.log(`WebSocket connection to TypeScript server at ${serverUrl} opened`)
+        const initializeParams: InitializeParams = {
+            processId: 0,
+            rootUri: rootUri.href,
+            workspaceFolders: [{ name: '', uri: rootUri.href }],
+            capabilities: {},
+            initializationOptions: {
+                // until workspace/configuration is allowed during initialize
+                configuration: fromPairs(
+                    Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
+                        key.startsWith('typescript.')
+                    )
+                ),
+            },
+        }
+        console.log('Initializing TypeScript server...')
+        const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
+        console.log('TypeScript server initialized', initResult)
+        // Tell language server about all currently open text documents
+        await Promise.all(
+            sourcegraph.workspace.textDocuments
+                .filter(textDocument => isTypeScriptFile(new URL(textDocument.uri)))
+                .map(textDocument => {
+                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(new URL(textDocument.uri)))
+                    const didOpenParams: DidOpenTextDocumentParams = {
+                        textDocument: {
+                            uri: serverTextDocumentUri.href,
+                            languageId: textDocument.languageId,
+                            text: textDocument.text,
+                            version: 1,
+                        },
+                    }
+                    connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+                })
+        )
+        return connection
+    }
+
+    async function getOrCreateConnection(rootUri: URL): Promise<MessageConnection> {
+        let connectionPromise = connectionsByRootUri.get(rootUri.href)
+        if (!connectionPromise) {
+            connectionPromise = connect(rootUri)
+            connectionsByRootUri.set(rootUri.href, connectionPromise)
+        }
+        const connection = await connectionPromise
+        connection.onClose(() => {
+            console.log('WebSocket connection to TypeScript server closed')
+            connectionsByRootUri.delete(rootUri.href)
+        })
+        return connection
+    }
+
     // Forward didOpen notifications
-    const sendDidOpen = async (textDocument: sourcegraph.TextDocument) => {
+    sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
         try {
             const textDocumentUri = new URL(textDocument.uri)
             if (!isTypeScriptFile(textDocumentUri)) {
@@ -149,13 +168,7 @@ export async function activate(): Promise<void> {
         } catch (err) {
             console.error('Error handling didOpenTextDocument event', err)
         }
-    }
-    console.log('Currently open textDocuments', sourcegraph.workspace.textDocuments)
-    sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
-        console.log('onDidOpenTextDocument fired', textDocument)
-        await sendDidOpen(textDocument)
     })
-    await Promise.all(sourcegraph.workspace.textDocuments.map(sendDidOpen))
 
     // Example of a Sourcegraph textdocument URI:
     // git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
