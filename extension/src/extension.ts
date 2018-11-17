@@ -56,13 +56,12 @@ export async function activate(): Promise<void> {
             )
         }
         const socket = new WebSocket(serverUrl)
-        socket.addEventListener(
-            'close',
-            event => {
-                console.log('WebSocket connection to TypeScript backend closed', event)
-            },
-            { once: true }
-        )
+        socket.addEventListener('close', event => {
+            console.log('WebSocket connection to TypeScript backend closed', event)
+        })
+        socket.addEventListener('error', event => {
+            console.error('WebSocket error', event)
+        })
         const rpcWebSocket = toSocket(socket)
         const connection = createMessageConnection(
             new WebSocketMessageReader(rpcWebSocket),
