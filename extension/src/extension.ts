@@ -150,7 +150,11 @@ export async function activate(): Promise<void> {
             console.error('Error handling didOpenTextDocument event', err)
         }
     }
-    sourcegraph.workspace.onDidOpenTextDocument.subscribe(sendDidOpen)
+    console.log('Currently open textDocuments', sourcegraph.workspace.textDocuments)
+    sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
+        console.log('onDidOpenTextDocument fired', textDocument)
+        await sendDidOpen(textDocument)
+    })
     await Promise.all(sourcegraph.workspace.textDocuments.map(sendDidOpen))
 
     // Example of a Sourcegraph textdocument URI:
