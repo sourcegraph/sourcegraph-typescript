@@ -140,6 +140,13 @@ interface Configuration {
     'typescript.tsserver.log'?: false | 'terse' | 'normal' | 'requestTime' | 'verbose'
 }
 
+// Send a ping frame every 10s to keep the browser connection alive
+setInterval(() => {
+    for (const client of webSocketServer.clients) {
+        client.ping()
+    }
+}, 10000)
+
 webSocketServer.on('connection', connection => {
     const connectionId = connectionIds++
     openConnectionsMetric.inc()
