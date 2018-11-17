@@ -20,8 +20,8 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { cloneDeep, noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import * as fs from 'mz/fs'
 import { createWriteStream, realpathSync } from 'mz/fs'
+import * as fs from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
@@ -265,36 +265,31 @@ webSocketServer.on('connection', connection => {
         globalFolderRoot = path.join(tempDir, 'global')
         await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolderRoot), fs.mkdir(globalFolderRoot)])
 
-        // Prepare tsserver log file
-        // Set up a tail -f on the tsserver logfile and forward the logs to the logger
-        const tsserverLogFile = path.resolve(tempDir, 'tsserver.log')
-        // const tsserverLogFile = path.resolve(__dirname, '..', '..', 'tsserver.log')
-        await fs.writeFile(tsserverLogFile, '') // File needs to exist or else Tail will error
-        const tsserverLogger = new PrefixedLogger(logger, 'tsserver')
-        const tsserverTail = new Tail(tsserverLogFile, { follow: true, fromBeginning: true })
-        connectionDisposables.add({ dispose: () => tsserverTail.unwatch() })
-        tsserverTail.on('line', line => tsserverLogger.log(line + ''))
-        tsserverTail.on('error', err => logger.error('Error tailing tsserver logs', err))
-
+        const serverArgs: string[] = [
+            '--node-ipc',
+            // Use local tsserver instead of the tsserver of the repo for security reasons
+            '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+        ]
+        if (configuration['typescript.langserver.log']) {
+            serverArgs.push('--log-level=' + LOG_LEVEL_TO_LSP[configuration['typescript.langserver.log'] || 'log'])
+        }
+        if (configuration['typescript.tsserver.log']) {
+            // Prepare tsserver log file
+            const tsserverLogFile = path.resolve(tempDir, 'tsserver.log')
+            await fs.writeFile(tsserverLogFile, '') // File needs to exist or else Tail will error
+            const tsserverLogger = new PrefixedLogger(logger, 'tsserver')
+            // Set up a tail -f on the tsserver logfile and forward the logs to the logger
+            const tsserverTail = new Tail(tsserverLogFile, { follow: true, fromBeginning: true })
+            connectionDisposables.add({ dispose: () => tsserverTail.unwatch() })
+            tsserverTail.on('line', line => tsserverLogger.log(line + ''))
+            tsserverTail.on('error', err => logger.error('Error tailing tsserver logs', err))
+            serverArgs.push('--tsserver-log-file', tsserverLogFile)
+            serverArgs.push('--tsserver-log-verbosity', configuration['typescript.tsserver.log'] || 'verbose')
+        }
         // Spawn language server
         const serverProcess = fork(
             path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
-            [
-                ...(typeof configuration['typescript.langserver.log'] === 'string'
-                    ? ['--log-level=' + LOG_LEVEL_TO_LSP[configuration['typescript.langserver.log'] || 'log']]
-                    : []),
-                '--node-ipc',
-                // Use local tsserver instead of the tsserver of the repo for security reasons
-                '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
-                ...(typeof configuration['typescript.tsserver.log'] === 'string'
-                    ? [
-                          '--tsserver-log-file',
-                          tsserverLogFile,
-                          '--tsserver-log-verbosity',
-                          configuration['typescript.tsserver.log'] || 'verbose',
-                      ]
-                    : []),
-            ],
+            serverArgs,
             { stdio: ['ipc', 'inherit'] }
         )
         connectionDisposables.add({ dispose: () => serverProcess.kill() })
