@@ -50,7 +50,7 @@ async function connect(rootUri: URL): Promise<MessageConnection> {
         // Blue background for the "TypeScript server" prefix
         const args = [
             // console.info() doesn't get a visual distinction or filter in Chrome anymore
-            (type === 3 ? 'ℹ️' : '') + '%cTypeScript server%c %s',
+            (type === 3 ? 'ℹ️' : '') + '%cTypeScript backend%c %s',
             'background-color: blue; color: white',
             '',
             message,
