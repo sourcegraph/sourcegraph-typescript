@@ -7836,7 +7836,7 @@ rxjs-tslint-rules@^4.2.0:
     tslib "^1.8.0"
     tsutils "^3.0.0"
 
-rxjs@^6.3.2, rxjs@^6.3.3:
+rxjs@^6.3.3:
   version "6.3.3"
   resolved "https://registry.npmjs.org/rxjs/-/rxjs-6.3.3.tgz#3c6a7fa420e844a81390fb1158a9ec614f4bad55"
   integrity sha512-JTWmoY9tWCs7zvIk/CvRjhjGaOd+OVBM987mxFo+OW66cGpdKjZcpmc74ES1sB//7Kl/PAe8+wEakuhG4pcgOw==
@@ -8231,13 +8231,10 @@ source-map@^0.5.0, source-map@^0.5.3, source-map@^0.5.6:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.5.7.tgz#8a039d2d1021d22d1ea14c80d8ea468ba2ef3fcc"
   integrity sha1-igOdLRAh0i0eoUyA2OpGi6LvP8w=
 
-sourcegraph@^18.4.2:
-  version "18.4.2"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-18.4.2.tgz#617fb6a6cad0d95bd0994917f50ec9b65e5439ae"
-  integrity sha512-XI5RMd9e/rn5qxS2xSGjDsJHMk7ESeAP1ivRNwcv3el6kjlBEs68zDjHRQEgvWatDjxq0lqpiKUf8KETIXXuRA==
-  dependencies:
-    minimatch "^3.0.4"
-    rxjs "^6.3.2"
+sourcegraph@^19.0.3:
+  version "19.0.3"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-19.0.3.tgz#4bb17bb5a0a4e85f2af755b93a9d6ad62cf78131"
+  integrity sha512-2z6+PrR9sY/HRi+aXygrEj8r4JRLs3wyxSTTmlbgYIHLHvcYXCsCeMe/Ifut+NkLL4PXmQU1Sr6be4YScWRrDw==
 
 spawn-error-forwarder@~1.0.0:
   version "1.0.0"
