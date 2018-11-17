@@ -56,6 +56,13 @@ export async function activate(): Promise<void> {
             )
         }
         const socket = new WebSocket(serverUrl)
+        socket.addEventListener(
+            'close',
+            event => {
+                console.log('WebSocket connection to TypeScript backend closed', event)
+            },
+            { once: true }
+        )
         const rpcWebSocket = toSocket(socket)
         const connection = createMessageConnection(
             new WebSocketMessageReader(rpcWebSocket),
@@ -93,9 +100,9 @@ export async function activate(): Promise<void> {
             socket.addEventListener('error', resolve, { once: true })
         })
         if (event.type === 'error') {
-            throw new Error(`The WebSocket to the TypeScript server at ${serverUrl} could not not be opened`)
+            throw new Error(`The WebSocket to the TypeScript backend at ${serverUrl} could not not be opened`)
         }
-        console.log(`WebSocket connection to TypeScript server at ${serverUrl} opened`)
+        console.log(`WebSocket connection to TypeScript backend at ${serverUrl} opened`)
         const initializeParams: InitializeParams = {
             processId: 0,
             rootUri: rootUri.href,
@@ -110,9 +117,9 @@ export async function activate(): Promise<void> {
                 ),
             },
         }
-        console.log('Initializing TypeScript server...')
+        console.log('Initializing TypeScript backend...')
         const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
-        console.log('TypeScript server initialized', initResult)
+        console.log('TypeScript backend initialized', initResult)
         // Tell language server about all currently open text documents
         await Promise.all(
             sourcegraph.workspace.textDocuments
@@ -141,7 +148,6 @@ export async function activate(): Promise<void> {
         }
         const connection = await connectionPromise
         connection.onClose(() => {
-            console.log('WebSocket connection to TypeScript server closed')
             connectionsByRootUri.delete(rootUri.href)
         })
         return connection

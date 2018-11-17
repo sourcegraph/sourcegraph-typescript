@@ -154,14 +154,14 @@ webSocketServer.on('connection', connection => {
         }
         globalDisposables.add(connectionDisposable)
         connectionDisposables.add({ dispose: () => globalDisposables.delete(connectionDisposable) })
-        const closeListener = async () => {
+        const closeListener = async (code: number, reason: string) => {
             openConnections--
             openConnectionsMetric.dec()
-            console.log(`WebSocket closed, ${openConnections} open`)
+            console.log(`WebSocket closed, ${openConnections} open`, { code, reason })
             await connectionDisposable.disposeAsync()
         }
         connection.on('close', closeListener)
-        connectionDisposables.add({ dispose: () => connection.removeEventListener('close', closeListener) })
+        connectionDisposables.add({ dispose: () => connection.removeListener('close', closeListener) })
     }
 
     const webSocket: IWebSocket = {
