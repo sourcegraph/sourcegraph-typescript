@@ -9,8 +9,8 @@ async function queryGraphQL(query: string, variables: any = {}): Promise<any> {
     return data
 }
 
-let accessTokenPromise: Promise<string>
-export async function getOrCreateAccessToken(): Promise<string> {
+let accessTokenPromise: Promise<string | undefined>
+export async function getOrCreateAccessToken(): Promise<string | undefined> {
     const accessToken = sourcegraph.configuration.get().get('typescript.accessToken') as string | undefined
     if (accessToken) {
         return accessToken
@@ -22,7 +22,7 @@ export async function getOrCreateAccessToken(): Promise<string> {
     return await accessTokenPromise
 }
 
-async function createAccessToken(): Promise<string> {
+async function createAccessToken(): Promise<string | undefined> {
     const { currentUser } = await queryGraphQL(gql`
         query {
             currentUser {
@@ -30,6 +30,9 @@ async function createAccessToken(): Promise<string> {
             }
         }
     `)
+    if (!currentUser) {
+        return undefined
+    }
     const currentUserId: string = currentUser.id
     const result = await queryGraphQL(
         gql`

@@ -39,10 +39,12 @@ export async function activate(): Promise<void> {
 
     const accessToken = await getOrCreateAccessToken()
 
-    /** Adds the access token to the given server raw HTTP API URI */
+    /** Adds the access token to the given server raw HTTP API URI, if available */
     function authenticateUri(uri: URL): URL {
         const authenticatedUri = new URL(uri.href)
-        authenticatedUri.username = accessToken
+        if (accessToken) {
+            authenticatedUri.username = accessToken
+        }
         return authenticatedUri
     }
 
