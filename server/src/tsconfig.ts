@@ -21,7 +21,6 @@ export async function sanitizeTsConfigs({
     throwIfCancelled(token)
     await tracePromise('Sanitize tsconfig.jsons', span, async span => {
         const tsconfigPaths = await glob('**/tsconfig.json', { cwd, absolute: true })
-        logger.log('tsconfig.jsons found:', tsconfigPaths)
         span.setTag('count', tsconfigPaths.length)
         await Promise.all(
             tsconfigPaths.map(async tsConfigPath => {

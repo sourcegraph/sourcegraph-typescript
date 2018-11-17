@@ -20,13 +20,12 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { cloneDeep, noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { createWriteStream, realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { createWriteStream, realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import * as prometheus from 'prom-client'
-import RelateUrl from 'relateurl'
 import request from 'request'
 import rmfr from 'rmfr'
 import { Tail } from 'tail'
@@ -55,13 +54,8 @@ import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionT
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
+import { relativeUrl } from './uri'
 import { install } from './yarn'
-
-const RELATE_URL_OPTIONS: RelateUrl.Options = {
-    output: RelateUrl.PATH_RELATIVE,
-    removeRootTrailingSlash: false,
-    defaultPorts: {},
-}
 
 const CACHE_DIR = process.env.CACHE_DIR || realpathSync(tmpdir())
 console.log(`Using CACHE_DIR ${CACHE_DIR}`)
@@ -193,6 +187,7 @@ webSocketServer.on('connection', connection => {
         new PrefixedLogger(console, `conn ${connectionId}`),
         new LSPLogger(webSocketMessageConnection),
     ])
+    const connectionLogger = logger
     logger.log(`Connection ID ${connectionId}`)
 
     // Connection state set on initialize
@@ -205,10 +200,12 @@ webSocketServer.on('connection', connection => {
     // yarn folders
     let globalFolderRoot: string
     let cacheFolderRoot: string
-    /** Map from URI for directory of package.json to Promise for its installation */
+    /** HTTP URIs for directories in the workspace that contain a package.json */
+    let packageRootUris: Set<string>
+    /** Map from HTTP URI for directory of package.json to Promise for its installation */
     const dependencyInstallationPromises = new Map<string, Promise<void>>()
-    /** Whether all dependency installation is done */
-    let dependencyInstallationDone = false
+    /** HTTP URIs of directories with package.jsons in the workspace that finished installation */
+    const finishedDependencyInstallations = new Set<string>()
 
     const dispatcher = createDispatcher(webSocketConnection, { tracer, logger, requestDurationMetric })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
@@ -217,7 +214,7 @@ webSocketServer.on('connection', connection => {
      * @param httpUri Example: `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
      */
     const transformHttpToFileUri = (httpUri: URL): URL => {
-        const relative = RelateUrl.relate(httpRootUri.href, httpUri.href, RELATE_URL_OPTIONS)
+        const relative = relativeUrl(httpRootUri, httpUri)
         const fileUri = new URL(relative, fileRootUri.href)
         // Security check to prevent access from one connection into
         // other files on the container or other connection's directories
@@ -227,7 +224,7 @@ webSocketServer.on('connection', connection => {
         return fileUri
     }
     const transformFileToHttpUri = (fileUri: URL): URL => {
-        const relative = RelateUrl.relate(fileRootUri.href, fileUri.href, RELATE_URL_OPTIONS)
+        const relative = relativeUrl(fileRootUri, fileUri)
         const httpUri = new URL(relative, httpRootUri.href)
         if (!httpUri.href.startsWith(httpRootUri.href)) {
             // Should never happen, since these are outgoing URIs
@@ -390,52 +387,12 @@ webSocketServer.on('connection', connection => {
             glob('**/package.json', { cwd: extractPath })
         )
         logger.log('package.jsons found:', packageJsonPaths)
+        packageRootUris = new Set(
+            packageJsonPaths.map(packageJsonPath => new URL(path.dirname(packageJsonPath) + '/', httpRootUri.href).href)
+        )
 
         // Sanitize tsconfig.json files
         await sanitizeTsConfigs({ cwd: extractPath, logger, span, token })
-
-        // Install dependencies in the background
-        // tslint:disable-next-line no-floating-promises
-        tracePromise('Install dependencies', span, async span => {
-            const connectionLogger = logger
-            await Promise.all(
-                packageJsonPaths.map(async relPackageJsonPath => {
-                    const installationPromise = tracePromise('Install dependencies for package', span, async span => {
-                        try {
-                            span.setTag('packageJsonPath', relPackageJsonPath)
-                            const relPackageJsonDirName = path.dirname(relPackageJsonPath)
-                            const logger = new PrefixedLogger(connectionLogger, 'install ' + relPackageJsonDirName)
-                            const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
-                            const hasDeps = await filterDependencies(absPackageJsonPath, { logger, span, token })
-                            if (!hasDeps) {
-                                return
-                            }
-
-                            // It's important that each concurrent yarn process has their own global and cache folders
-                            const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
-                            const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
-                            const cwd = path.join(extractPath, relPackageJsonDirName)
-
-                            await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
-
-                            await install({ cwd, globalFolder, cacheFolder, logger, span, token })
-
-                            await sanitizeTsConfigs({ cwd: path.join(cwd, 'node_modules'), logger, span, token })
-                        } catch (err) {
-                            logger.error(`Installation for ${relPackageJsonPath} failed`, err)
-                        }
-                    })
-                    // Save Promise so requests can wait for the installation to finish
-                    dependencyInstallationPromises.set(
-                        new URL(path.dirname(relPackageJsonPath) + '/', httpRootUri.href).href,
-                        installationPromise
-                    )
-                    await installationPromise
-                })
-            )
-            logger.info('Dependency installation done')
-            dependencyInstallationDone = true
-        })
 
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
@@ -456,22 +413,68 @@ webSocketServer.on('connection', connection => {
     }
 
     /**
-     * Waits for the installation of all package.jsons in parent directories of the given text document.
+     * Returns all known package.json directories that are an ancestor of the given URI (and therefor should be installed to provide codeintel on this URI).
+     *
+     * @param uri The HTTP URL of a text document
+     * @return HTTP URLs of package.json directories
      */
-    async function waitForDependencies(
+    const findParentPackageRoots = (uri: URL): URL[] =>
+        [...packageRootUris]
+            .filter(packageRoot => uri.href.startsWith(packageRoot))
+            .map(packageRoot => new URL(packageRoot))
+
+    /**
+     * Ensures dependencies for all package.jsons in parent directories of the given text document were installed.
+     * Errors will be caught and logged.
+     *
+     * @param textDocumentUri The HTTP text document URI that dependencies should be installed for
+     * @throws never
+     */
+    async function ensureDependencies(
         textDocumentUri: URL,
-        { span, token }: { span: Span; token: CancellationToken }
+        { span = new Span(), token = CancellationToken.None }: { span?: Span; token?: CancellationToken } = {}
     ): Promise<void> {
-        throwIfCancelled(token)
-        await tracePromise('Wait for dependency installation', span, async span => {
-            span.setTag('textDocument', textDocumentUri.href)
-            const installations = [...dependencyInstallationPromises].filter(([packageJsonDirUri]) =>
-                textDocumentUri.href.startsWith(packageJsonDirUri)
+        await tracePromise('Ensure dependencies', span, async span => {
+            throwIfCancelled(token)
+            const parentPackageRoots = findParentPackageRoots(textDocumentUri)
+            span.setTag('packageJsonLocations', parentPackageRoots.map(String))
+            logger.log(
+                `Ensuring dependencies for text document ${textDocumentUri} defined in`,
+                parentPackageRoots.map(String)
             )
-            const packageJsonLocations = installations.map(([uri]) => uri)
-            span.setTag('packageJsonLocations', packageJsonLocations)
-            logger.log('Waiting for dependency installations of package.json locations:', packageJsonLocations)
-            await Promise.all(installations.map(([, promise]) => promise))
+            await Promise.all(
+                parentPackageRoots.map(async packageRootUri => {
+                    let installationPromise = dependencyInstallationPromises.get(packageRootUri.href)
+                    if (!installationPromise) {
+                        installationPromise = tracePromise('Install dependencies for package', span, async span => {
+                            span.setTag('packageRoot', packageRootUri)
+                            const relPackageRoot = relativeUrl(httpRootUri, packageRootUri)
+                            const logger = new PrefixedLogger(connectionLogger, 'install ' + relPackageRoot)
+                            try {
+                                const absPackageJsonPath = path.join(extractPath, relPackageRoot, 'package.json')
+                                const hasDeps = await filterDependencies(absPackageJsonPath, { logger, span, token })
+                                if (!hasDeps) {
+                                    return
+                                }
+                                // It's important that each concurrent yarn process has their own global and cache folders
+                                const globalFolder = path.join(globalFolderRoot, relPackageRoot)
+                                const cacheFolder = path.join(cacheFolderRoot, relPackageRoot)
+                                const cwd = path.join(extractPath, relPackageRoot)
+                                await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
+                                await install({ cwd, globalFolder, cacheFolder, logger, span, token })
+                                await sanitizeTsConfigs({ cwd: path.join(cwd, 'node_modules'), logger, span, token })
+                            } catch (err) {
+                                logger.error('Installation failed', err)
+                            } finally {
+                                finishedDependencyInstallations.add(packageRootUri.href)
+                            }
+                        })
+                        // Save Promise so requests can wait for the installation to finish
+                        dependencyInstallationPromises.set(packageRootUri.href, installationPromise)
+                    }
+                    await installationPromise
+                })
+            )
         })
     }
 
@@ -486,7 +489,7 @@ webSocketServer.on('connection', connection => {
         dispatcher.setRequestHandler(type, async (params, token, span) => {
             const result = await callServer(type, params, token)
             if (shouldWaitForDependencies(params, result)) {
-                await waitForDependencies(new URL(params.textDocument.uri), { span, token })
+                await ensureDependencies(new URL(params.textDocument.uri), { span, token })
                 return await callServer(type, params, token)
             }
             return result
@@ -494,15 +497,17 @@ webSocketServer.on('connection', connection => {
     }
 
     dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
+        const textDocumentUri = new URL(params.textDocument.uri)
         const hover = await callServer(HoverRequest.type, params, token)
         const contents = !hover ? [] : Array.isArray(hover.contents) ? hover.contents : [hover.contents]
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
-            await waitForDependencies(new URL(params.textDocument.uri), { span, token })
+            await ensureDependencies(textDocumentUri, { span, token })
             return await callServer(HoverRequest.type, params, token)
         }
-        if (!dependencyInstallationDone) {
+        // If any of the parent package.json roots is not finished installing, let the user know
+        if (findParentPackageRoots(textDocumentUri).some(root => !finishedDependencyInstallations.has(root.href))) {
             contents.push(
                 '_Dependency installation is still in progress. The information shown might be missing type information._'
             )
@@ -542,12 +547,16 @@ webSocketServer.on('connection', connection => {
         serverMessageConnection.sendNotification(type, params)
     }
 
-    function forwardNotifications<P>(type: NotificationType<P>): void {
-        const subscription = dispatcher.observeNotification(type).subscribe(params => notifyServer(type, params))
-        connectionDisposables.add(subscriptionToDisposable(subscription))
-    }
-
-    forwardNotifications(DidOpenTextDocumentNotification.type)
+    connectionDisposables.add(
+        subscriptionToDisposable(
+            dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
+                notifyServer(DidOpenTextDocumentNotification.type, params)
+                // Kick off installation in the background
+                // tslint:disable-next-line no-floating-promises
+                ensureDependencies(new URL(params.textDocument.uri))
+            })
+        )
+    )
 })
 
 httpServer.listen(port, () => {
