@@ -395,11 +395,14 @@ webSocketServer.on('connection', connection => {
         // Install dependencies in the background
         // tslint:disable-next-line no-floating-promises
         tracePromise('Install dependencies', span, async span => {
+            const connectionLogger = logger
             await Promise.all(
                 packageJsonPaths.map(async relPackageJsonPath => {
                     const installationPromise = tracePromise('Install dependencies for package', span, async span => {
                         try {
                             span.setTag('packageJsonPath', relPackageJsonPath)
+                            const relPackageJsonDirName = path.dirname(relPackageJsonPath)
+                            const logger = new PrefixedLogger(connectionLogger, 'install ' + relPackageJsonDirName)
                             const absPackageJsonPath = path.join(extractPath, relPackageJsonPath)
                             const hasDeps = await filterDependencies(absPackageJsonPath, { logger, span, token })
                             if (!hasDeps) {
@@ -407,7 +410,6 @@ webSocketServer.on('connection', connection => {
                             }
 
                             // It's important that each concurrent yarn process has their own global and cache folders
-                            const relPackageJsonDirName = path.dirname(relPackageJsonPath)
                             const globalFolder = path.join(globalFolderRoot, relPackageJsonDirName)
                             const cacheFolder = path.join(cacheFolderRoot, relPackageJsonDirName)
                             const cwd = path.join(extractPath, relPackageJsonDirName)
