@@ -176,7 +176,7 @@ export async function install({ logger, tracer, span, token, ...spawnOptions }: 
         const using: Disposable[] = []
         try {
             await new Promise<void>((resolve, reject) => {
-                const yarnProcess = spawnYarn({ ...spawnOptions, tracer, token, logger })
+                const yarnProcess = spawnYarn({ ...spawnOptions, tracer, span, token, logger })
                 yarnProcess.on('success', resolve)
                 yarnProcess.on('error', reject)
                 using.push(
