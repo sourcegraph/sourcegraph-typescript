@@ -57,7 +57,7 @@ export async function activate(): Promise<void> {
         }
         const socket = new WebSocket(serverUrl)
         socket.addEventListener('close', event => {
-            console.log('WebSocket connection to TypeScript backend closed', event)
+            console.warn('WebSocket connection to TypeScript backend closed', event)
         })
         socket.addEventListener('error', event => {
             console.error('WebSocket error', event)
