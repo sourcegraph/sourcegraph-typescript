@@ -1,5 +1,5 @@
 import { ChildProcess, spawn } from 'child_process'
-import { Span } from 'opentracing'
+import { Span, Tracer } from 'opentracing'
 import * as path from 'path'
 import { Readable } from 'stream'
 import { CancellationToken, Disposable } from 'vscode-jsonrpc'
@@ -58,7 +58,10 @@ export interface YarnSpawnOptions {
     verbose?: boolean
 
     /** Logger to use */
-    logger?: Logger
+    logger: Logger
+
+    /** OpenTracing tracer */
+    tracer: Tracer
 
     /** OpenTracing parent span */
     span?: Span
@@ -167,18 +170,13 @@ interface YarnInstallOptions extends YarnSpawnOptions {
 /**
  * Wrapper around `spawnYarn()` returning a Promise and accepting an CancellationToken.
  */
-export async function install({
-    logger = new NoopLogger(),
-    span = new Span(),
-    token,
-    ...spawnOptions
-}: YarnInstallOptions): Promise<void> {
-    await tracePromise('yarn install', span, async span => {
+export async function install({ logger, tracer, span, token, ...spawnOptions }: YarnInstallOptions): Promise<void> {
+    await tracePromise('yarn install', tracer, span, async span => {
         throwIfCancelled(token)
         const using: Disposable[] = []
         try {
             await new Promise<void>((resolve, reject) => {
-                const yarnProcess = spawnYarn({ ...spawnOptions, token, logger })
+                const yarnProcess = spawnYarn({ ...spawnOptions, tracer, token, logger })
                 yarnProcess.on('success', resolve)
                 yarnProcess.on('error', reject)
                 using.push(

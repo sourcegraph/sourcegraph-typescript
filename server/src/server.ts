@@ -331,7 +331,7 @@ webSocketServer.on('connection', connection => {
         // Fetch zip and extract into temp folder
         logger.info('Fetching zip from', httpRootUri.href)
         const archivePath = path.join(tempDir, 'archive.zip')
-        await tracePromise('Fetch source archive', span, async span => {
+        await tracePromise('Fetch source archive', tracer, span, async span => {
             const using: Disposable[] = []
             try {
                 span.setTag('url', httpRootUri.href)
@@ -377,13 +377,13 @@ webSocketServer.on('connection', connection => {
         // Extract archive
         throwIfCancelled(token)
         logger.log('Extracting archive to ' + extractPath)
-        await tracePromise('Extract source archive', span, async span => {
+        await tracePromise('Extract source archive', tracer, span, async span => {
             await decompress(archivePath, extractPath)
         })
 
         // Find package.jsons to install
         throwIfCancelled(token)
-        const packageJsonPaths = await tracePromise('Find package.jsons', span, span =>
+        const packageJsonPaths = await tracePromise('Find package.jsons', tracer, span, span =>
             glob('**/package.json', { cwd: extractPath })
         )
         logger.log('package.jsons found:', packageJsonPaths)
@@ -392,7 +392,7 @@ webSocketServer.on('connection', connection => {
         )
 
         // Sanitize tsconfig.json files
-        await sanitizeTsConfigs({ cwd: extractPath, logger, span, token })
+        await sanitizeTsConfigs({ cwd: extractPath, logger, tracer, span, token })
 
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
@@ -423,6 +423,41 @@ webSocketServer.on('connection', connection => {
             .filter(packageRoot => uri.href.startsWith(packageRoot))
             .map(packageRoot => new URL(packageRoot))
 
+    async function installDependenciesForPackage(
+        packageRootUri: URL,
+        { tracer, span, token }: { tracer: Tracer; span?: Span; token: CancellationToken }
+    ): Promise<void> {
+        await tracePromise('Install dependencies for package', tracer, span, async span => {
+            span.setTag('packageRoot', packageRootUri)
+            const relPackageRoot = relativeUrl(httpRootUri, packageRootUri)
+            const logger = new PrefixedLogger(connectionLogger, 'install ' + relPackageRoot)
+            try {
+                const absPackageJsonPath = path.join(extractPath, relPackageRoot, 'package.json')
+                const hasDeps = await filterDependencies(absPackageJsonPath, { logger, tracer, span, token })
+                if (!hasDeps) {
+                    return
+                }
+                // It's important that each concurrent yarn process has their own global and cache folders
+                const globalFolder = path.join(globalFolderRoot, relPackageRoot)
+                const cacheFolder = path.join(cacheFolderRoot, relPackageRoot)
+                const cwd = path.join(extractPath, relPackageRoot)
+                await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
+                await install({ cwd, globalFolder, cacheFolder, logger, tracer, span, token })
+                await sanitizeTsConfigs({
+                    cwd: path.join(cwd, 'node_modules'),
+                    logger,
+                    tracer,
+                    span,
+                    token,
+                })
+            } catch (err) {
+                logger.error('Installation failed', err)
+            } finally {
+                finishedDependencyInstallations.add(packageRootUri.href)
+            }
+        })
+    }
+
     /**
      * Ensures dependencies for all package.jsons in parent directories of the given text document were installed.
      * Errors will be caught and logged.
@@ -432,9 +467,9 @@ webSocketServer.on('connection', connection => {
      */
     async function ensureDependencies(
         textDocumentUri: URL,
-        { span = new Span(), token = CancellationToken.None }: { span?: Span; token?: CancellationToken } = {}
+        { tracer, span, token = CancellationToken.None }: { tracer: Tracer; span?: Span; token?: CancellationToken }
     ): Promise<void> {
-        await tracePromise('Ensure dependencies', span, async span => {
+        await tracePromise('Ensure dependencies', tracer, span, async span => {
             throwIfCancelled(token)
             const parentPackageRoots = findParentPackageRoots(textDocumentUri)
             span.setTag('packageJsonLocations', parentPackageRoots.map(String))
@@ -446,29 +481,7 @@ webSocketServer.on('connection', connection => {
                 parentPackageRoots.map(async packageRootUri => {
                     let installationPromise = dependencyInstallationPromises.get(packageRootUri.href)
                     if (!installationPromise) {
-                        installationPromise = tracePromise('Install dependencies for package', span, async span => {
-                            span.setTag('packageRoot', packageRootUri)
-                            const relPackageRoot = relativeUrl(httpRootUri, packageRootUri)
-                            const logger = new PrefixedLogger(connectionLogger, 'install ' + relPackageRoot)
-                            try {
-                                const absPackageJsonPath = path.join(extractPath, relPackageRoot, 'package.json')
-                                const hasDeps = await filterDependencies(absPackageJsonPath, { logger, span, token })
-                                if (!hasDeps) {
-                                    return
-                                }
-                                // It's important that each concurrent yarn process has their own global and cache folders
-                                const globalFolder = path.join(globalFolderRoot, relPackageRoot)
-                                const cacheFolder = path.join(cacheFolderRoot, relPackageRoot)
-                                const cwd = path.join(extractPath, relPackageRoot)
-                                await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
-                                await install({ cwd, globalFolder, cacheFolder, logger, span, token })
-                                await sanitizeTsConfigs({ cwd: path.join(cwd, 'node_modules'), logger, span, token })
-                            } catch (err) {
-                                logger.error('Installation failed', err)
-                            } finally {
-                                finishedDependencyInstallations.add(packageRootUri.href)
-                            }
-                        })
+                        installationPromise = installDependenciesForPackage(packageRootUri, { tracer, span, token })
                         // Save Promise so requests can wait for the installation to finish
                         dependencyInstallationPromises.set(packageRootUri.href, installationPromise)
                     }
@@ -489,7 +502,7 @@ webSocketServer.on('connection', connection => {
         dispatcher.setRequestHandler(type, async (params, token, span) => {
             const result = await callServer(type, params, token)
             if (shouldWaitForDependencies(params, result)) {
-                await ensureDependencies(new URL(params.textDocument.uri), { span, token })
+                await ensureDependencies(new URL(params.textDocument.uri), { tracer, span, token })
                 return await callServer(type, params, token)
             }
             return result
@@ -503,7 +516,7 @@ webSocketServer.on('connection', connection => {
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
-            await ensureDependencies(textDocumentUri, { span, token })
+            await ensureDependencies(textDocumentUri, { tracer, span, token })
             return await callServer(HoverRequest.type, params, token)
         }
         // If any of the parent package.json roots is not finished installing, let the user know
@@ -553,7 +566,7 @@ webSocketServer.on('connection', connection => {
                 notifyServer(DidOpenTextDocumentNotification.type, params)
                 // Kick off installation in the background
                 // tslint:disable-next-line no-floating-promises
-                ensureDependencies(new URL(params.textDocument.uri))
+                ensureDependencies(new URL(params.textDocument.uri), { tracer })
             })
         )
     )

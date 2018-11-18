@@ -1,4 +1,4 @@
-import { Span } from 'opentracing'
+import { Span, Tracer } from 'opentracing'
 import { ERROR } from 'opentracing/lib/ext/tags'
 
 /**
@@ -29,15 +29,17 @@ export function traceSync<T>(operationName: string, childOf: Span, operation: (s
  * If the Promise is rejected, the Error is logged and the `error` tag set.
  *
  * @param operationName The operation name for the new span
+ * @param tracer OpenTracing tracer
  * @param childOf The parent span
  * @param operation The function to call
  */
 export async function tracePromise<T>(
     operationName: string,
-    childOf: Span,
+    tracer: Tracer,
+    childOf: Span | undefined,
     operation: (span: Span) => Promise<T>
 ): Promise<T> {
-    const span = childOf.tracer().startSpan(operationName, { childOf })
+    const span = tracer.startSpan(operationName, { childOf })
     try {
         return await operation(span)
     } catch (err) {

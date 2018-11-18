@@ -1,5 +1,5 @@
 import * as fs from 'mz/fs'
-import { Span } from 'opentracing'
+import { Span, Tracer } from 'opentracing'
 import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
 import { CancellationToken } from 'vscode-jsonrpc'
@@ -10,8 +10,8 @@ import { logErrorEvent, tracePromise } from './tracing'
 /**
  * Checks if a dependency from a package.json should be installed or not by checking whether it contains TypeScript typings.
  */
-function hasTypes(name: string, range: string, span: Span): Promise<boolean> {
-    return tracePromise('Fetch package metadata', span, async span => {
+function hasTypes(name: string, range: string, tracer: Tracer, span?: Span): Promise<boolean> {
+    return tracePromise('Fetch package metadata', tracer, span, async span => {
         span.setTag('name', name)
         const version = semver.validRange(range) || 'latest'
         span.setTag('version', version)
@@ -29,9 +29,9 @@ function hasTypes(name: string, range: string, span: Span): Promise<boolean> {
  */
 export async function filterDependencies(
     packageJsonPath: string,
-    { logger, span, token }: { logger: Logger; span: Span; token: CancellationToken }
+    { logger, tracer, span, token }: { logger: Logger; tracer: Tracer; span?: Span; token: CancellationToken }
 ): Promise<boolean> {
-    return await tracePromise('Filter dependencies', span, async span => {
+    return await tracePromise('Filter dependencies', tracer, span, async span => {
         span.setTag('packageJsonPath', packageJsonPath)
         logger.log('Filtering package.json at ', packageJsonPath)
         const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'))
@@ -47,7 +47,7 @@ export async function filterDependencies(
                     Object.entries(dependencies).map(async ([name, range]) => {
                         throwIfCancelled(token)
                         try {
-                            if (name.startsWith('@types/') || (await hasTypes(name, range, span))) {
+                            if (name.startsWith('@types/') || (await hasTypes(name, range, tracer, span))) {
                                 included.push(name)
                             } else {
                                 excluded.push(name)
