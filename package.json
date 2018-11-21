@@ -62,7 +62,7 @@
     "@commitlint/config-conventional": "^7.1.2",
     "@sourcegraph/prettierrc": "^2.2.0",
     "@sourcegraph/tsconfig": "^3.0.0",
-    "@sourcegraph/tslint-config": "^12.0.0",
+    "@sourcegraph/tslint-config": "^12.1.0",
     "@types/decompress": "4.2.3",
     "@types/globby": "8.0.0",
     "@types/json5": "0.0.30",
