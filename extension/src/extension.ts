@@ -109,11 +109,15 @@ export async function activate(): Promise<void> {
             capabilities: {},
             initializationOptions: {
                 // until workspace/configuration is allowed during initialize
-                configuration: fromPairs(
-                    Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
-                        key.startsWith('typescript.')
-                    )
-                ),
+                configuration: {
+                    // The server needs to use the API to resolve repositories
+                    'sourcegraph.url': sourcegraph.internal.sourcegraphURL,
+                    ...fromPairs(
+                        Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
+                            key.startsWith('typescript.')
+                        )
+                    ),
+                },
             },
         }
         console.log('Initializing TypeScript backend...')

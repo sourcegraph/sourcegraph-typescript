@@ -22,13 +22,15 @@ import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
+import fetchPackageMeta from 'package-json'
 import * as path from 'path'
 import * as prometheus from 'prom-client'
 import request from 'request'
 import rmfr from 'rmfr'
+import { NullableMappedPosition, SourceMapConsumer } from 'source-map'
 import { Tail } from 'tail'
 import { extract, FileStat } from 'tar'
-import { pathToFileURL } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
     CancellationToken,
@@ -40,16 +42,19 @@ import {
     InitializeRequest,
     IPCMessageReader,
     IPCMessageWriter,
+    Location,
     LogMessageNotification,
+    Range,
     ReferencesRequest,
     TextDocumentPositionParams,
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
 import { createAbortError, throwIfCancelled } from './cancellation'
-import { filterDependencies } from './dependencies'
+import { filterDependencies, getClosestPackageJson, PackageJson, resolveDependencyRootDir } from './dependencies'
 import { createDispatcher, createRequestDurationMetric, NotificationType, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
+import { resolveRepository } from './graphql'
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
@@ -130,6 +135,8 @@ let openConnections = 0
 interface Configuration {
     'typescript.langserver.log'?: false | 'log' | 'info' | 'warn' | 'error'
     'typescript.tsserver.log'?: false | 'terse' | 'normal' | 'requestTime' | 'verbose'
+    'typescript.accessToken'?: string
+    'sourcegraph.url'?: string
 }
 
 // Send a ping frame every 10s to keep the browser connection alive
@@ -222,17 +229,6 @@ webSocketServer.on('connection', connection => {
             throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
         }
         return fileUri
-    }
-    const transformFileToHttpUri = (fileUri: URL): URL => {
-        const relative = relativeUrl(fileRootUri, fileUri)
-        const httpUri = new URL(relative, httpRootUri.href)
-        if (!httpUri.href.startsWith(httpRootUri.href)) {
-            // Should never happen, since these are outgoing URIs
-            // This check may need to be removed in the future for xrepo codeintel
-            // For now, it's a sanity check against bugs (e.g. not realpath()ing the temp dir)
-            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
-        }
-        return httpUri
     }
 
     dispatcher.setRequestHandler(InitializeRequest.type, async (params, token, span) => {
@@ -405,7 +401,6 @@ webSocketServer.on('connection', connection => {
         params = cloneDeep(params)
         rewriteUris(params, transformHttpToFileUri)
         const result = await serverMessageConnection.sendRequest(type, params, token)
-        rewriteUris(result, transformFileToHttpUri)
         return result
     }
 
@@ -488,24 +483,6 @@ webSocketServer.on('connection', connection => {
         })
     }
 
-    /**
-     * Forwards all requests of a certain method to the server, rewriting URIs.
-     * It blocks on dependency installation if the function in the second parameter returns true.
-     */
-    function forwardRequests<P extends TextDocumentPositionParams, R>(
-        type: RequestType<P, R>,
-        shouldWaitForDependencies: (params: P, result: R) => boolean = () => false
-    ): void {
-        dispatcher.setRequestHandler(type, async (params, token, span) => {
-            const result = await callServer(type, params, token)
-            if (shouldWaitForDependencies(params, result)) {
-                await ensureDependencies(new URL(params.textDocument.uri), { tracer, span, token })
-                return await callServer(type, params, token)
-            }
-            return result
-        })
-    }
-
     dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
         const textDocumentUri = new URL(params.textDocument.uri)
         const hover = await callServer(HoverRequest.type, params, token)
@@ -525,8 +502,136 @@ webSocketServer.on('connection', connection => {
         return { ...hover, contents }
     })
 
+    /**
+     * Maps Locations returned as a result from a definition, type definition, implementation or references call to HTTP URLs
+     * and potentially to external repositories if the location is in node_modules.
+     *
+     * @param location A location on the file system (with a `file:` URI)
+     */
+    async function mapFileLocation(location: Location): Promise<Location> {
+        const uri = new URL(location.uri)
+        const relativeFilePath = decodeURIComponent(relativeUrl(fileRootUri, uri))
+        // Check if file path is inside a node_modules dir
+        // If it is inside node_modules, that means the file is out-of-workspace, i.e. outside of the HTTP root URI
+        // We return an HTTP URL to the client that the client can access
+        if (relativeFilePath.includes('node_modules/')) {
+            try {
+                const packageJson = await getClosestPackageJson(uri, fileRootUri)
+                if (!packageJson.repository) {
+                    throw new Error(`Package ${packageJson.name} has no repository field`)
+                }
+                const cloneUrl =
+                    typeof packageJson.repository === 'string' ? packageJson.repository : packageJson.repository.url
+                const packageMeta = (await fetchPackageMeta(packageJson.name, {
+                    version: packageJson.version,
+                    fullMetadata: true,
+                })) as PackageJson
+                const commit = packageMeta.gitHead
+                if (!commit) {
+                    throw new Error(`Package ${packageJson.name} has no gitHead metadata`)
+                }
+                const subdir = (typeof packageJson.repository === 'object' && packageJson.repository.directory) || ''
+
+                // fileUri is usually a .d.ts file that does not exist in the repo, only in node_modules
+                // Check if a source map exists to map it to the .ts source file that is checked into the repo
+                let mappedUri: URL
+                let mappedRange: Range
+                try {
+                    const sourceMapUri = new URL(uri.href + '.map')
+                    const sourceMap = await fs.readFile(fileURLToPath(sourceMapUri), 'utf-8')
+                    const consumer = await new SourceMapConsumer(sourceMap, sourceMapUri.href)
+                    let mappedStart: NullableMappedPosition
+                    let mappedEnd: NullableMappedPosition
+                    try {
+                        mappedStart = consumer.originalPositionFor({
+                            line: location.range.start.line,
+                            column: location.range.start.character,
+                        })
+                        mappedEnd = consumer.originalPositionFor({
+                            line: location.range.end.line,
+                            column: location.range.end.character,
+                        })
+                    } finally {
+                        consumer.destroy()
+                    }
+                    if (
+                        mappedStart.source === null ||
+                        mappedStart.line === null ||
+                        mappedStart.column === null ||
+                        mappedEnd.line === null ||
+                        mappedEnd.column === null
+                    ) {
+                        throw new Error('Could not map position')
+                    }
+                    mappedUri = new URL(mappedStart.source)
+                    if (!mappedUri.href.startsWith(fileRootUri.href)) {
+                        throw new Error(`Mapped source URI ${mappedUri} is not under root URI ${fileRootUri}`)
+                    }
+                    mappedRange = {
+                        start: {
+                            line: mappedStart.line,
+                            character: mappedStart.column,
+                        },
+                        end: {
+                            line: mappedEnd.line,
+                            character: mappedEnd.column,
+                        },
+                    }
+                } catch (err) {
+                    logger.error(`Source-mapping location failed`, location, err)
+                    // If mapping failed, use the original file
+                    mappedUri = uri
+                    mappedRange = location.range
+                }
+
+                const depRootDir = resolveDependencyRootDir(relativeFilePath)
+                const mappedRelativeFilePath = decodeURIComponent(relativeUrl(fileRootUri, mappedUri))
+                const mappedPackageRelativeFilePath = path.posix.relative(depRootDir, mappedRelativeFilePath)
+                const mappedRepoRelativeFilePath = path.posix.join(subdir, mappedPackageRelativeFilePath)
+
+                // Use the Sourcegraph endpoint from configuration
+                const instanceUrl = new URL(configuration['sourcegraph.url'] || 'https://sourcegraph.com')
+                const accessToken = configuration['typescript.accessToken']
+                const repoName = await resolveRepository(cloneUrl, { instanceUrl, accessToken })
+                const httpUrl = new URL(instanceUrl.href)
+                httpUrl.pathname = path.posix.join(`/${repoName}@${commit}/-/raw/`, mappedRepoRelativeFilePath)
+                if (accessToken) {
+                    httpUrl.username = accessToken
+                }
+                return { uri: httpUrl.href, range: mappedRange }
+            } catch (err) {
+                logger.error(`Could not resolve location in dependency to an HTTP URL`, location, err)
+                // Return the file URI as an opaque identifier
+                return location
+            }
+        }
+
+        // Not in node_modules, do not map to external repo, don't apply source maps.
+        const httpUri = new URL(relativeFilePath, httpRootUri.href)
+        if (!httpUri.href.startsWith(httpRootUri.href)) {
+            // Should never happen, since these are outgoing URIs
+            // Sanity check against bugs (e.g. not realpath()ing the temp dir)
+            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
+        }
+        return { uri: httpUri.href, range: location.range }
+    }
+
+    /**
+     * Maps Locations returned as a result from a definition, type definition, implementation or references call to HTTP URLs
+     * and potentially to external repositories if the location is in node_modules.
+     *
+     * @param definition One or multiple locations on the file system.
+     */
+    async function mapFileLocations(definition: Definition): Promise<Definition> {
+        if (!definition) {
+            return []
+        }
+        const arr = Array.isArray(definition) ? definition : [definition]
+        return await Promise.all(arr.map(mapFileLocation))
+    }
+
     /** Checks if a location result is not satisfactory and should be retried after dependency installation finished */
-    const shouldLocationsWaitForDependencies = (params: TextDocumentPositionParams, locations: Definition) => {
+    function shouldLocationsWaitForDependencies(params: TextDocumentPositionParams, locations: Definition): boolean {
         if (!locations) {
             return true
         }
@@ -545,10 +650,27 @@ webSocketServer.on('connection', connection => {
         // TODO check if location is at import statement
         return false
     }
-    forwardRequests(DefinitionRequest.type, shouldLocationsWaitForDependencies)
-    forwardRequests(TypeDefinitionRequest.type, shouldLocationsWaitForDependencies)
-    forwardRequests(ReferencesRequest.type, shouldLocationsWaitForDependencies)
-    forwardRequests(ImplementationRequest.type, shouldLocationsWaitForDependencies)
+
+    /**
+     * Forwards all requests of a certain method that returns Locations to the server, rewriting URIs.
+     * It blocks on dependency installation if needed.
+     * The returned locations get mapped to HTTP URLs and potentially to external repository URLs if they are in node_modules.
+     */
+    function forwardLocationRequests<P extends TextDocumentPositionParams>(type: RequestType<P, Definition>): void {
+        dispatcher.setRequestHandler(type, async (params, token, span) => {
+            const result = await mapFileLocations(await callServer(type, params, token))
+            if (shouldLocationsWaitForDependencies(params, result)) {
+                await ensureDependencies(new URL(params.textDocument.uri), { tracer, span, token })
+                return await mapFileLocations(await callServer(type, params, token))
+            }
+            return result
+        })
+    }
+
+    forwardLocationRequests(DefinitionRequest.type)
+    forwardLocationRequests(TypeDefinitionRequest.type)
+    forwardLocationRequests(ReferencesRequest.type)
+    forwardLocationRequests(ImplementationRequest.type)
 
     /** Sends a notification to the server, rewriting URIs in the parameters and result. */
     function notifyServer<P, R>(type: NotificationType<P>, params: P): void {
