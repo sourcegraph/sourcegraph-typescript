@@ -127,7 +127,6 @@ const openConnectionsMetric = new prometheus.Gauge({
 const requestDurationMetric = createRequestDurationMetric()
 prometheus.collectDefaultMetrics()
 let openConnections = 0
-let connectionIds = 0
 
 interface Configuration {
     'typescript.langserver.log'?: false | 'log' | 'info' | 'warn' | 'error'
@@ -142,7 +141,7 @@ setInterval(() => {
 }, 10000)
 
 webSocketServer.on('connection', connection => {
-    const connectionId = connectionIds++
+    const connectionId = uuid.v1()
     openConnectionsMetric.inc()
     openConnections++
     console.log(`New WebSocket connection, ${openConnections} open`)
@@ -256,7 +255,7 @@ webSocketServer.on('connection', connection => {
         }
 
         // Create temp folders
-        tempDir = path.join(CACHE_DIR, uuid.v1())
+        tempDir = path.join(CACHE_DIR, connectionId)
         await mkdirp(tempDir)
         connectionDisposables.add({
             disposeAsync: async () => {
