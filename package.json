@@ -30,11 +30,23 @@
         },
         "typescript.langserver.log": {
           "description": "The log level to pass to the TypeScript language server. Logs will be forwarded to the browser console with the prefix [langserver].",
-          "enum": [false, "log", "info", "warn", "error"]
+          "enum": [
+            false,
+            "log",
+            "info",
+            "warn",
+            "error"
+          ]
         },
         "typescript.tsserver.log": {
           "description": "The log level to pass to tsserver. Logs will be forwarded to the browser console with the prefix [tsserver].",
-          "enum": [false, "terse", "normal", "requestTime", "verbose"]
+          "enum": [
+            false,
+            "terse",
+            "normal",
+            "requestTime",
+            "verbose"
+          ]
         }
       }
     }
@@ -63,7 +75,6 @@
     "@sourcegraph/prettierrc": "^2.2.0",
     "@sourcegraph/tsconfig": "^3.0.0",
     "@sourcegraph/tslint-config": "^12.1.0",
-    "@types/decompress": "4.2.3",
     "@types/globby": "8.0.0",
     "@types/json5": "0.0.30",
     "@types/lodash": "4.14.118",
@@ -75,6 +86,7 @@
     "@types/request": "2.48.1",
     "@types/rmfr": "2.0.0",
     "@types/tail": "1.2.0",
+    "@types/tar": "^4.0.0",
     "@types/uuid": "3.4.4",
     "@types/whatwg-url": "6.4.0",
     "@types/ws": "6.0.1",
@@ -88,7 +100,6 @@
   "dependencies": {
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^1.0.2",
-    "decompress": "^4.2.0",
     "globby": "^8.0.1",
     "json5": "^2.1.0",
     "lightstep-tracer": "^0.20.13",
@@ -106,6 +117,7 @@
     "sourcegraph": "^19.1.0",
     "tagged-template-noop": "^2.1.0",
     "tail": "^2.0.1",
+    "tar": "^4.4.8",
     "typescript-language-server": "^0.3.6",
     "uuid": "^3.3.2",
     "vscode-languageserver-protocol": "^3.13.0",
