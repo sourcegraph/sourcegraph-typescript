@@ -103,7 +103,7 @@
     "rmfr": "^2.0.0",
     "rxjs": "^6.3.3",
     "source-map-support": "^0.5.9",
-    "sourcegraph": "^19.1.0",
+    "sourcegraph": "^19.2.0",
     "tagged-template-noop": "^2.1.0",
     "tail": "^2.0.1",
     "typescript-language-server": "^0.3.6",
