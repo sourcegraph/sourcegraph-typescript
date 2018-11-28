@@ -1035,7 +1035,7 @@
   resolved "https://registry.npmjs.org/@types/tail/-/tail-1.2.0.tgz#f8b81bacf950fae81172d5473fd08c9bfc043fda"
   integrity sha512-K9sbawuDHPH2l1pE2IRJ1CS6K1OsdbM4ob+j3Q0s6gh/HDhsoJNFnPa5+8gbi18c1P1dz0kT+hLfg5EdLzFQOg==
 
-"@types/tar@^4.0.0":
+"@types/tar@4.0.0":
   version "4.0.0"
   resolved "https://registry.npmjs.org/@types/tar/-/tar-4.0.0.tgz#e3239d969eeb693a012200613860d0eb871c94f0"
   integrity sha512-YybbEHNngcHlIWVCYsoj7Oo1JU9JqONuAlt1LlTH/lmL8BMhbzdFUgReY87a05rY1j8mfK47Del+TCkaLAXwLw==
@@ -8052,10 +8052,10 @@ source-map@^0.5.0, source-map@^0.5.3, source-map@^0.5.6:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.5.7.tgz#8a039d2d1021d22d1ea14c80d8ea468ba2ef3fcc"
   integrity sha1-igOdLRAh0i0eoUyA2OpGi6LvP8w=
 
-sourcegraph@^19.2.0:
-  version "19.2.0"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-19.2.0.tgz#bcb6bc14ec756981e36f616cff55d8e34169b9c8"
-  integrity sha512-mGoCuJngYCT2DOiHLY9/JQrg2Me73dpgtLUlCYOTZjhYg8g0B4XRmde1RLIX+Geb5WM1/0d5IlyV1gVfCe5aYw==
+sourcegraph@^19.1.0:
+  version "19.1.0"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-19.1.0.tgz#70fe2b823b42557bcf663143c75a7e6da3819f32"
+  integrity sha512-1/NTtqx6X9ORMX2bkl70DQGipHp57/tMPT5lhe/GWwlWXlTwyWsRwN5yaaaL4RUFsIbAfcyhsW+6W3QjSgMW1g==
 
 spawn-error-forwarder@~1.0.0:
   version "1.0.0"
