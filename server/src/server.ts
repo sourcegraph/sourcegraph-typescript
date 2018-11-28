@@ -13,15 +13,13 @@ import {
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import { fork } from 'child_process'
-import decompress from 'decompress'
-import glob from 'globby'
 import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { cloneDeep, noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
+import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
-import { createWriteStream, realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import * as path from 'path'
@@ -29,6 +27,7 @@ import * as prometheus from 'prom-client'
 import request from 'request'
 import rmfr from 'rmfr'
 import { Tail } from 'tail'
+import { extract, FileStat } from 'tar'
 import { pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
@@ -139,6 +138,8 @@ setInterval(() => {
         client.ping()
     }
 }, 10000)
+
+const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
 
 webSocketServer.on('connection', connection => {
     const connectionId = uuid.v1()
@@ -327,9 +328,10 @@ webSocketServer.on('connection', connection => {
             )
         }
 
-        // Fetch zip and extract into temp folder
-        logger.info('Fetching zip from', httpRootUri.href)
-        const archivePath = path.join(tempDir, 'archive.zip')
+        // Fetch tar and extract into temp folder
+        const packageJsonPaths: string[] = []
+        logger.info('Fetching archive from', httpRootUri.href)
+        logger.log('Extracting to', extractPath)
         await tracePromise('Fetch source archive', tracer, span, async span => {
             const using: Disposable[] = []
             try {
@@ -337,7 +339,7 @@ webSocketServer.on('connection', connection => {
                 let bytes = 0
                 await new Promise<void>((resolve, reject) => {
                     const headers = {
-                        Accept: 'application/zip',
+                        Accept: 'application/x-tar',
                         'User-Agent': 'TypeScript language server',
                     }
                     span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
@@ -363,7 +365,13 @@ webSocketServer.on('connection', connection => {
                         .on('data', (chunk: Buffer) => {
                             bytes += chunk.byteLength
                         })
-                        .pipe(createWriteStream(archivePath))
+                        .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
+                        .on('entry', (entry: FileStat) => {
+                            if (entry.header.path && entry.header.path.endsWith('package.json')) {
+                                packageJsonPaths.push(entry.header.path)
+                            }
+                        })
+                        .on('warn', warning => logger.warn(warning))
                         .once('finish', resolve)
                         .once('error', reject)
                 })
@@ -373,18 +381,8 @@ webSocketServer.on('connection', connection => {
             }
         })
 
-        // Extract archive
-        throwIfCancelled(token)
-        logger.log('Extracting archive to ' + extractPath)
-        await tracePromise('Extract source archive', tracer, span, async span => {
-            await decompress(archivePath, extractPath)
-        })
-
         // Find package.jsons to install
         throwIfCancelled(token)
-        const packageJsonPaths = await tracePromise('Find package.jsons', tracer, span, span =>
-            glob('**/package.json', { cwd: extractPath })
-        )
         logger.log('package.jsons found:', packageJsonPaths)
         packageRootUris = new Set(
             packageJsonPaths.map(packageJsonPath => new URL(path.dirname(packageJsonPath) + '/', httpRootUri.href).href)
