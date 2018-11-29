@@ -183,7 +183,8 @@ export async function install({
         throwIfCancelled(token)
         const using: Disposable[] = []
         try {
-            logger.log('yarn config', await exec('yarn config list', { cwd }))
+            const [stdout] = await exec('yarn config list', { cwd })
+            logger.log('yarn config', stdout)
             await new Promise<void>((resolve, reject) => {
                 const yarnProcess = spawnYarn({ ...spawnOptions, cwd, tracer, span, token, logger })
                 yarnProcess.on('success', resolve)
