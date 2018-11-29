@@ -2,6 +2,7 @@ import * as fs from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
 import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
+import { fileURLToPath } from 'url'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
@@ -71,4 +72,66 @@ export async function filterDependencies(
         }
         return included.length > 0
     })
+}
+
+export interface PackageJson {
+    name: string
+    version: string
+    repository?:
+        | string
+        | {
+              type: string
+              url: string
+
+              /**
+               * https://github.com/npm/rfcs/blob/d39184cdedc000aa8e60b4d63878b834aa5f0ff0/accepted/0000-monorepo-subdirectory-declaration.md
+               */
+              directory?: string
+          }
+    /** Commit SHA1 of the repo at the time of publishing */
+    gitHead?: string
+}
+
+/**
+ * Finds the closest package.json for a given URL.
+ */
+export async function getClosestPackageJson(resource: URL, rootUri: URL): Promise<PackageJson> {
+    if (resource.protocol !== 'file:') {
+        throw new Error('Only file: URIs supported')
+    }
+    let parent: URL
+    while (true) {
+        parent = new URL('..', resource.href)
+        if (!parent.href.startsWith(rootUri.href)) {
+            throw new Error(`No package.json found for ${resource}`)
+        }
+        const packageJsonUri = new URL('package.json', parent.href)
+        try {
+            const content = await fs.readFile(fileURLToPath(packageJsonUri), 'utf-8')
+            return JSON.parse(content)
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                continue
+            }
+            throw err
+        }
+    }
+}
+
+/**
+ * @param filePath e.g. `/foo/node_modules/pkg/dist/bar.ts`
+ * @returns e.g. `foo/node_modules/pkg`
+ */
+export function resolveDependencyRootDir(filePath: string): string {
+    const parts = filePath.split('/')
+    while (
+        parts.length > 0 &&
+        !(
+            parts[parts.length - 2] === 'node_modules' ||
+            (parts[parts.length - 3] === 'node_modules' && parts[parts.length - 2].startsWith('@'))
+        )
+    ) {
+        parts.pop()
+    }
+    return parts.join('/')
 }
