@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'child_process'
+import { exec } from 'mz/child_process'
 import { Span, Tracer } from 'opentracing'
 import * as path from 'path'
 import { Readable } from 'stream'
@@ -170,18 +171,26 @@ interface YarnInstallOptions extends YarnSpawnOptions {
 /**
  * Wrapper around `spawnYarn()` returning a Promise and accepting an CancellationToken.
  */
-export async function install({ logger, tracer, span, token, ...spawnOptions }: YarnInstallOptions): Promise<void> {
+export async function install({
+    logger,
+    tracer,
+    span,
+    token,
+    cwd,
+    ...spawnOptions
+}: YarnInstallOptions): Promise<void> {
     await tracePromise('yarn install', tracer, span, async span => {
         throwIfCancelled(token)
         const using: Disposable[] = []
         try {
+            logger.log('yarn config', await exec('yarn config list', { cwd }))
             await new Promise<void>((resolve, reject) => {
-                const yarnProcess = spawnYarn({ ...spawnOptions, tracer, span, token, logger })
+                const yarnProcess = spawnYarn({ ...spawnOptions, cwd, tracer, span, token, logger })
                 yarnProcess.on('success', resolve)
                 yarnProcess.on('error', reject)
                 using.push(
                     token.onCancellationRequested(() => {
-                        logger.log('Killing yarn process in ', spawnOptions.cwd)
+                        logger.log('Killing yarn process in ', cwd)
                         yarnProcess.kill()
                         reject(createAbortError())
                     })
