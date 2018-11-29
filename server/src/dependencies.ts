@@ -2,10 +2,10 @@ import * as fs from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
 import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
-import { fileURLToPath } from 'url'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
+import { pickResourceRetriever, ResourceNotFoundError } from './resources'
 import { logErrorEvent, tracePromise } from './tracing'
 
 /**
@@ -96,9 +96,6 @@ export interface PackageJson {
  * Finds the closest package.json for a given URL.
  */
 export async function getClosestPackageJson(resource: URL, rootUri: URL): Promise<PackageJson> {
-    if (resource.protocol !== 'file:') {
-        throw new Error('Only file: URIs supported')
-    }
     let parent: URL
     while (true) {
         parent = new URL('..', resource.href)
@@ -107,10 +104,10 @@ export async function getClosestPackageJson(resource: URL, rootUri: URL): Promis
         }
         const packageJsonUri = new URL('package.json', parent.href)
         try {
-            const content = await fs.readFile(fileURLToPath(packageJsonUri), 'utf-8')
+            const content = await pickResourceRetriever(packageJsonUri).fetch()
             return JSON.parse(content)
         } catch (err) {
-            if (err.code === 'ENOENT') {
+            if (err instanceof ResourceNotFoundError) {
                 continue
             }
             throw err

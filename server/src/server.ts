@@ -18,8 +18,8 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { cloneDeep, noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import fetchPackageMeta from 'package-json'
@@ -30,7 +30,7 @@ import rmfr from 'rmfr'
 import { NullableMappedPosition, SourceMapConsumer } from 'source-map'
 import { Tail } from 'tail'
 import { extract, FileStat } from 'tar'
-import { fileURLToPath, pathToFileURL } from 'url'
+import { pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
     CancellationToken,
@@ -56,6 +56,7 @@ import { createDispatcher, createRequestDurationMetric, NotificationType, Reques
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
+import { pickResourceRetriever } from './resources'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { relativeUrl } from './uri'
@@ -538,7 +539,7 @@ webSocketServer.on('connection', connection => {
                 let mappedRange: Range
                 try {
                     const sourceMapUri = new URL(uri.href + '.map')
-                    const sourceMap = await fs.readFile(fileURLToPath(sourceMapUri), 'utf-8')
+                    const sourceMap = await pickResourceRetriever(sourceMapUri).fetch()
                     const consumer = await new SourceMapConsumer(sourceMap, sourceMapUri.href)
                     let mappedStart: NullableMappedPosition
                     let mappedEnd: NullableMappedPosition
