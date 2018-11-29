@@ -133,6 +133,6 @@
     "vscode-languageserver-types": "^3.13.0",
     "whatwg-url": "^7.0.0",
     "ws": "^6.1.0",
-    "yarn": "^1.12.1"
+    "yarn": "^1.12.3"
   }
 }
