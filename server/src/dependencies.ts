@@ -94,18 +94,24 @@ export interface PackageJson {
 
 /**
  * Finds the closest package.json for a given URL.
+ *
+ * @param resource The URL from which to walk upwards.
+ * @param rootUri A URL at which to stop searching. If not given, defaults to the root of the resource URL.
  */
-export async function getClosestPackageJson(resource: URL, rootUri: URL): Promise<PackageJson> {
-    let parent: URL
+export async function findClosestPackageJson(
+    resource: URL,
+    rootUri: URL = Object.assign(new URL(resource.href), { pathname: '' })
+): Promise<[URL, PackageJson]> {
+    let parent = resource
     while (true) {
-        parent = new URL('..', resource.href)
+        parent = new URL('..', parent.href)
         if (!parent.href.startsWith(rootUri.href)) {
             throw new Error(`No package.json found for ${resource}`)
         }
         const packageJsonUri = new URL('package.json', parent.href)
         try {
-            const content = await pickResourceRetriever(packageJsonUri).fetch()
-            return JSON.parse(content)
+            const content = await pickResourceRetriever(packageJsonUri).fetch(packageJsonUri)
+            return [packageJsonUri, JSON.parse(content)]
         } catch (err) {
             if (err instanceof ResourceNotFoundError) {
                 continue

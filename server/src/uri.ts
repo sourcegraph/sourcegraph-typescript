@@ -17,5 +17,5 @@ const RELATE_URL_OPTIONS: RelateUrl.Options = {
  * Like `path.relative()` but for URLs.
  * Inverse of `url.resolve()` or `new URL(relative, base)`.
  */
-export const relativeUrl = (from: string | URL, to: string | URL): string =>
+export const relativeUrl = (from: URL, to: URL): string =>
     RelateUrl.relate(from.toString(), to.toString(), RELATE_URL_OPTIONS)
