@@ -16,7 +16,7 @@ import { fork } from 'child_process'
 import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
-import { cloneDeep, noop } from 'lodash'
+import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
 import * as fs from 'mz/fs'
 import { realpathSync } from 'mz/fs'
@@ -27,16 +27,18 @@ import * as path from 'path'
 import * as prometheus from 'prom-client'
 import request from 'request'
 import rmfr from 'rmfr'
-import { NullableMappedPosition, SourceMapConsumer } from 'source-map'
+import { NullableMappedPosition, RawSourceMap, SourceMapConsumer } from 'source-map'
 import { Tail } from 'tail'
 import { extract, FileStat } from 'tar'
-import { pathToFileURL } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
     CancellationToken,
+    CancellationTokenSource,
     Definition,
     DefinitionRequest,
     DidOpenTextDocumentNotification,
+    DidOpenTextDocumentParams,
     HoverRequest,
     ImplementationRequest,
     InitializeRequest,
@@ -51,8 +53,8 @@ import {
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
 import { createAbortError, throwIfCancelled } from './cancellation'
-import { filterDependencies, getClosestPackageJson, PackageJson, resolveDependencyRootDir } from './dependencies'
-import { createDispatcher, createRequestDurationMetric, NotificationType, RequestType } from './dispatcher'
+import { filterDependencies, findClosestPackageJson, PackageJson, resolveDependencyRootDir } from './dependencies'
+import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
@@ -64,30 +66,6 @@ import { install } from './yarn'
 
 const CACHE_DIR = process.env.CACHE_DIR || realpathSync(tmpdir())
 console.log(`Using CACHE_DIR ${CACHE_DIR}`)
-
-/**
- * Rewrites all `uri` properties in an object, recursively
- */
-function rewriteUris(obj: any, transform: (uri: URL) => URL): void {
-    // Scalar
-    if (typeof obj !== 'object' || obj === null) {
-        return
-    }
-    // Array
-    if (Array.isArray(obj)) {
-        for (const element of obj) {
-            rewriteUris(element, transform)
-        }
-        return
-    }
-    // Object
-    if ('uri' in obj) {
-        obj.uri = transform(new URL(obj.uri)).href
-    }
-    for (const key of Object.keys(obj)) {
-        rewriteUris(obj[key], transform)
-    }
-}
 
 let tracer = new Tracer()
 if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
@@ -218,16 +196,109 @@ webSocketServer.on('connection', connection => {
     const dispatcher = createDispatcher(webSocketConnection, { tracer, logger, requestDurationMetric })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
 
+    /** Checks if the given URI is under the root URI */
+    const isInWorkspace = (resource: URL): boolean => resource.href.startsWith(httpRootUri.href)
+
     /**
-     * @param httpUri Example: `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
+     * Maps TextDocumentPositionParams with a http URI to one with a file URI.
+     * If the http URI is out-of-workspace (ouside the rootUri), it attempts to map it to a file: URI within node_modules.
+     *
+     * @param incomingUri Example: `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts`
      */
-    const transformHttpToFileUri = (httpUri: URL): URL => {
-        const relative = relativeUrl(httpRootUri, httpUri)
+    async function mapTextDocumentPositionParams(
+        params: TextDocumentPositionParams,
+        { span, token }: { span: Span; token: CancellationToken }
+    ): Promise<TextDocumentPositionParams> {
+        throwIfCancelled(token)
+        const incomingUri = new URL(params.textDocument.uri)
+        if (isInWorkspace(incomingUri)) {
+            // In-workspace URI, do a simple rewrite from http to file URI
+            return {
+                textDocument: {
+                    uri: mapHttpToFileUrlSimple(incomingUri).href,
+                },
+                position: params.position,
+            }
+        }
+        // URI is an out-of-workspace URI (a URI from a different project)
+        // This external project may exist in the form of a dependency in node_modules
+        // Find the closest package.json to it to figure out the package name
+        const [packageJsonUri, packageJson] = await findClosestPackageJson(incomingUri)
+        const packageRoot = new URL('.', packageJsonUri)
+        const packageRootRelativePath = decodeURIComponent(relativeUrl(packageRoot, incomingUri))
+        await ensureDependencies(incomingUri, { tracer, span, token })
+        // Find all .d.ts.map files in the package
+        const patternUrl = new URL(`**/node_modules/${packageJson.name}/**/*.d.ts.map`, fileRootUri)
+        const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl)
+        const cancellation = new CancellationTokenSource()
+        const cancelDisposable = token.onCancellationRequested(() => cancellation.cancel())
+        let mappedParams: TextDocumentPositionParams | undefined
+        await Promise.all(
+            declarationMapUrls.map(async declarationMapUrl => {
+                throwIfCancelled(cancellation.token)
+                try {
+                    const declarationMap: RawSourceMap = JSON.parse(
+                        await pickResourceRetriever(declarationMapUrl).fetch(declarationMapUrl)
+                    )
+                    const packageRootPath = resolveDependencyRootDir(fileURLToPath(declarationMapUrl))
+                    const packageRootFileUrl = new URL(packageRootPath + '/', fileRootUri)
+                    const sourceFileUrl = new URL(packageRootRelativePath, packageRootFileUrl)
+                    // Check if any of the sources of this source file matches the source file we are looking for
+                    if (
+                        declarationMap.sources.some(
+                            source => new URL(source, declarationMapUrl).href === sourceFileUrl.href
+                        )
+                    ) {
+                        const declarationFile = new URL(declarationMap.file, declarationMapUrl)
+                        throwIfCancelled(cancellation.token)
+                        // Use the source map to match the location in the source file to the location in the .d.ts file
+                        const consumer = await new SourceMapConsumer(declarationMap, declarationMapUrl.href)
+                        try {
+                            throwIfCancelled(cancellation.token)
+                            const declarationPosition = consumer.generatedPositionFor({
+                                source: sourceFileUrl.href,
+                                line: params.position.line,
+                                column: params.position.character,
+                            })
+                            if (declarationPosition.line === null || declarationPosition.column === null) {
+                                throw new Error(
+                                    `Could not map source position ${sourceFileUrl}:${params.position.line}:${
+                                        params.position.character
+                                    } to position in declaration file`
+                                )
+                            }
+                            mappedParams = {
+                                textDocument: {
+                                    uri: declarationFile.href,
+                                },
+                                position: {
+                                    line: declarationPosition.line,
+                                    character: declarationPosition.column,
+                                },
+                            }
+                            cancellation.cancel() // Found a result, stop looking
+                        } finally {
+                            consumer.destroy()
+                        }
+                    }
+                } catch (err) {
+                    logger.error(`Error processing declaration map ${declarationMapUrl}`, err)
+                }
+            })
+        )
+        cancelDisposable.dispose()
+        if (!mappedParams) {
+            throw new Error(`Could not find out-of-workspace URI ${incomingUri} in workspace's dependencies`)
+        }
+        return mappedParams
+    }
+    function mapHttpToFileUrlSimple(uri: URL): URL {
+        const relative = relativeUrl(httpRootUri, uri)
         const fileUri = new URL(relative, fileRootUri.href)
         // Security check to prevent access from one connection into
         // other files on the container or other connection's directories
         if (!fileUri.href.startsWith(fileRootUri.href)) {
-            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
+            throw new Error(`URI ${uri} is not under rootUri ${httpRootUri}`)
         }
         return fileUri
     }
@@ -391,19 +462,10 @@ webSocketServer.on('connection', connection => {
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
         // URIs are rewritten by rewriteUris below, but it doesn't touch rootPath
-        params = { ...params, rootPath: extractPath }
+        params = { ...params, rootPath: extractPath, rootUri: fileRootUri.href }
 
-        return await callServer(InitializeRequest.type, params, token)
+        return await serverMessageConnection.sendRequest(InitializeRequest.type, params, token)
     })
-
-    /** Sends a request to the server, rewriting URIs in the parameters and result. */
-    async function callServer<P, R>(type: RequestType<P, R>, params: P, token: CancellationToken): Promise<R> {
-        throwIfCancelled(token)
-        params = cloneDeep(params)
-        rewriteUris(params, transformHttpToFileUri)
-        const result = await serverMessageConnection.sendRequest(type, params, token)
-        return result
-    }
 
     /**
      * Returns all known package.json directories that are an ancestor of the given URI (and therefor should be installed to provide codeintel on this URI).
@@ -485,17 +547,20 @@ webSocketServer.on('connection', connection => {
     }
 
     dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
-        const textDocumentUri = new URL(params.textDocument.uri)
-        const hover = await callServer(HoverRequest.type, params, token)
+        const httpResourceUri = new URL(params.textDocument.uri)
+        // Map the http URI in params to file URIs
+        const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
+        const hover = await serverMessageConnection.sendRequest(HoverRequest.type, mappedParams, token)
         const contents = !hover ? [] : Array.isArray(hover.contents) ? hover.contents : [hover.contents]
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
-            await ensureDependencies(textDocumentUri, { tracer, span, token })
-            return await callServer(HoverRequest.type, params, token)
+            await ensureDependencies(httpResourceUri, { tracer, span, token })
+            throwIfCancelled(token)
+            return await serverMessageConnection.sendRequest(HoverRequest.type, mappedParams, token)
         }
         // If any of the parent package.json roots is not finished installing, let the user know
-        if (findParentPackageRoots(textDocumentUri).some(root => !finishedDependencyInstallations.has(root.href))) {
+        if (findParentPackageRoots(httpResourceUri).some(root => !finishedDependencyInstallations.has(root.href))) {
             contents.push(
                 '_Dependency installation is still in progress. The information shown might be missing type information._'
             )
@@ -517,7 +582,7 @@ webSocketServer.on('connection', connection => {
         // We return an HTTP URL to the client that the client can access
         if (relativeFilePath.includes('node_modules/')) {
             try {
-                const packageJson = await getClosestPackageJson(uri, fileRootUri)
+                const [, packageJson] = await findClosestPackageJson(uri, fileRootUri)
                 if (!packageJson.repository) {
                     throw new Error(`Package ${packageJson.name} has no repository field`)
                 }
@@ -539,7 +604,7 @@ webSocketServer.on('connection', connection => {
                 let mappedRange: Range
                 try {
                     const sourceMapUri = new URL(uri.href + '.map')
-                    const sourceMap = await pickResourceRetriever(sourceMapUri).fetch()
+                    const sourceMap = await pickResourceRetriever(sourceMapUri).fetch(sourceMapUri)
                     const consumer = await new SourceMapConsumer(sourceMap, sourceMapUri.href)
                     let mappedStart: NullableMappedPosition
                     let mappedEnd: NullableMappedPosition
@@ -631,7 +696,12 @@ webSocketServer.on('connection', connection => {
         return await Promise.all(arr.map(mapFileLocation))
     }
 
-    /** Checks if a location result is not satisfactory and should be retried after dependency installation finished */
+    /**
+     * Checks if a location result is not satisfactory and should be retried after dependency installation finished
+     *
+     * @param params Original HTTP TextDocumentPositionParams as given by the client
+     * @param locations Locations mapped back to HTTP URIs
+     */
     function shouldLocationsWaitForDependencies(params: TextDocumentPositionParams, locations: Definition): boolean {
         if (!locations) {
             return true
@@ -659,10 +729,12 @@ webSocketServer.on('connection', connection => {
      */
     function forwardLocationRequests<P extends TextDocumentPositionParams>(type: RequestType<P, Definition>): void {
         dispatcher.setRequestHandler(type, async (params, token, span) => {
-            const result = await mapFileLocations(await callServer(type, params, token))
+            const httpTextDocumentUri = new URL(params.textDocument.uri)
+            const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
+            const result = await mapFileLocations(await serverMessageConnection.sendRequest(type, mappedParams, token))
             if (shouldLocationsWaitForDependencies(params, result)) {
-                await ensureDependencies(new URL(params.textDocument.uri), { tracer, span, token })
-                return await mapFileLocations(await callServer(type, params, token))
+                await ensureDependencies(httpTextDocumentUri, { tracer, span, token })
+                return await mapFileLocations(await serverMessageConnection.sendRequest(type, mappedParams, token))
             }
             return result
         })
@@ -673,20 +745,20 @@ webSocketServer.on('connection', connection => {
     forwardLocationRequests(ReferencesRequest.type)
     forwardLocationRequests(ImplementationRequest.type)
 
-    /** Sends a notification to the server, rewriting URIs in the parameters and result. */
-    function notifyServer<P, R>(type: NotificationType<P>, params: P): void {
-        params = cloneDeep(params)
-        rewriteUris(params, transformHttpToFileUri)
-        serverMessageConnection.sendNotification(type, params)
-    }
-
     connectionDisposables.add(
         subscriptionToDisposable(
             dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
-                notifyServer(DidOpenTextDocumentNotification.type, params)
+                const uri = new URL(params.textDocument.uri)
+                const mappedParams: DidOpenTextDocumentParams = {
+                    textDocument: {
+                        ...params.textDocument,
+                        uri: mapHttpToFileUrlSimple(uri).href,
+                    },
+                }
+                serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
                 // Kick off installation in the background
                 // tslint:disable-next-line no-floating-promises
-                ensureDependencies(new URL(params.textDocument.uri), { tracer })
+                ensureDependencies(uri, { tracer })
             })
         )
     )
