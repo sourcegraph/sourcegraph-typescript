@@ -86,7 +86,7 @@
     "@types/lodash": "4.14.118",
     "@types/mkdirp-promise": "5.0.0",
     "@types/mz": "0.0.32",
-    "@types/node": "10.12.11",
+    "@types/node": "10.12.12",
     "@types/package-json": "4.0.1",
     "@types/relateurl": "0.2.28",
     "@types/request": "2.48.1",
