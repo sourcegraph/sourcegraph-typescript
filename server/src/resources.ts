@@ -22,6 +22,9 @@ export interface ResourceRetriever {
 
 export class ResourceNotFoundError extends Error {
     public readonly name = 'ResourceNotFoundError'
+    constructor(public readonly resource: URL) {
+        super(`Resource not found: ${resource}`)
+    }
 }
 
 /**
@@ -38,7 +41,7 @@ class FileResourceRetriever implements ResourceRetriever {
             return await readFile(fileURLToPath(resource), 'utf-8')
         } catch (err) {
             if (err.code === 'ENOENT') {
-                throw new ResourceNotFoundError()
+                throw new ResourceNotFoundError(resource)
             }
             throw err
         }
@@ -72,7 +75,7 @@ class HttpResourceRetriever implements ResourceRetriever {
             return response.body
         } catch (err) {
             if (err.statusCode === 404) {
-                throw new ResourceNotFoundError()
+                throw new ResourceNotFoundError(resource)
             }
             throw err
         }
