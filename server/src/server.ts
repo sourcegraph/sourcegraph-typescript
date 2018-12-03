@@ -58,7 +58,7 @@ import { createDispatcher, createRequestDurationMetric, RequestType } from './di
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
-import { pickResourceRetriever } from './resources'
+import { pickResourceRetriever, ResourceNotFoundError } from './resources'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { relativeUrl } from './uri'
@@ -126,6 +126,12 @@ setInterval(() => {
 }, 10000)
 
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
+
+const TYPESCRIPT_DIR_URI = pathToFileURL(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript') + '/')
+const TYPESCRIPT_VERSION = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript', 'package.json'), 'utf-8')
+).version
+console.log(`Using TypeScript version ${TYPESCRIPT_VERSION} from ${TYPESCRIPT_DIR_URI}`)
 
 webSocketServer.on('connection', connection => {
     const connectionId = uuid.v1()
@@ -257,8 +263,9 @@ webSocketServer.on('connection', connection => {
                             throwIfCancelled(cancellation.token)
                             const declarationPosition = consumer.generatedPositionFor({
                                 source: sourceFileUrl.href,
-                                line: params.position.line,
-                                column: params.position.character,
+                                // LSP is 0-based, source maps are 1-based
+                                line: params.position.line + 1,
+                                column: params.position.character + 1,
                             })
                             if (declarationPosition.line === null || declarationPosition.column === null) {
                                 throw new Error(
@@ -272,8 +279,8 @@ webSocketServer.on('connection', connection => {
                                     uri: declarationFile.href,
                                 },
                                 position: {
-                                    line: declarationPosition.line,
-                                    character: declarationPosition.column,
+                                    line: declarationPosition.line - 1,
+                                    character: declarationPosition.column - 1,
                                 },
                             }
                             cancellation.cancel() // Found a result, stop looking
@@ -576,6 +583,16 @@ webSocketServer.on('connection', connection => {
      */
     async function mapFileLocation(location: Location): Promise<Location> {
         const uri = new URL(location.uri)
+        // Check if file path is in TypeScript lib
+        // If yes, point to Microsoft/TypeScript GitHub repo
+        if (uri.href.startsWith(TYPESCRIPT_DIR_URI.href)) {
+            const relativeFilePath = relativeUrl(TYPESCRIPT_DIR_URI, uri)
+            // TypeScript git tags their releases, but has no gitHead field.
+            const typescriptUrl = new URL(
+                `https://sourcegraph.com/github.com/Microsoft/TypeScript@v${TYPESCRIPT_VERSION}/-/raw/${relativeFilePath}`
+            )
+            return { uri: typescriptUrl.href, range: location.range }
+        }
         const relativeFilePath = decodeURIComponent(relativeUrl(fileRootUri, uri))
         // Check if file path is inside a node_modules dir
         // If it is inside node_modules, that means the file is out-of-workspace, i.e. outside of the HTTP root URI
@@ -592,11 +609,17 @@ webSocketServer.on('connection', connection => {
                     version: packageJson.version,
                     fullMetadata: true,
                 })) as PackageJson
-                const commit = packageMeta.gitHead
-                if (!commit) {
-                    throw new Error(`Package ${packageJson.name} has no gitHead metadata`)
+                const commit = packageMeta.gitHead || 'HEAD'
+                if (commit === 'HEAD') {
+                    logger.warn(`Package ${packageJson.name} has no gitHead metadata, using latest HEAD`)
                 }
-                const subdir = (typeof packageJson.repository === 'object' && packageJson.repository.directory) || ''
+                let subdir = ''
+                if (typeof packageJson.repository === 'object' && packageJson.repository.directory) {
+                    subdir = packageJson.repository.directory
+                } else if (packageJson.name.startsWith('@types/')) {
+                    // Special-case DefinitelyTyped
+                    subdir = packageJson.name.substr(1)
+                }
 
                 // fileUri is usually a .d.ts file that does not exist in the repo, only in node_modules
                 // Check if a source map exists to map it to the .ts source file that is checked into the repo
@@ -610,12 +633,12 @@ webSocketServer.on('connection', connection => {
                     let mappedEnd: NullableMappedPosition
                     try {
                         mappedStart = consumer.originalPositionFor({
-                            line: location.range.start.line,
-                            column: location.range.start.character,
+                            line: location.range.start.line + 1,
+                            column: location.range.start.character + 1,
                         })
                         mappedEnd = consumer.originalPositionFor({
-                            line: location.range.end.line,
-                            column: location.range.end.character,
+                            line: location.range.end.line + 1,
+                            column: location.range.end.character + 1,
                         })
                     } finally {
                         consumer.destroy()
@@ -635,16 +658,20 @@ webSocketServer.on('connection', connection => {
                     }
                     mappedRange = {
                         start: {
-                            line: mappedStart.line,
-                            character: mappedStart.column,
+                            line: mappedStart.line - 1,
+                            character: mappedStart.column - 1,
                         },
                         end: {
-                            line: mappedEnd.line,
-                            character: mappedEnd.column,
+                            line: mappedEnd.line - 1,
+                            character: mappedEnd.column - 1,
                         },
                     }
                 } catch (err) {
-                    logger.error(`Source-mapping location failed`, location, err)
+                    if (err instanceof ResourceNotFoundError) {
+                        logger.warn(`No declaration map for ${uri}, using declaration file`)
+                    } else {
+                        logger.error(`Source-mapping location failed`, location, err)
+                    }
                     // If mapping failed, use the original file
                     mappedUri = uri
                     mappedRange = location.range
@@ -748,17 +775,21 @@ webSocketServer.on('connection', connection => {
     connectionDisposables.add(
         subscriptionToDisposable(
             dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
-                const uri = new URL(params.textDocument.uri)
-                const mappedParams: DidOpenTextDocumentParams = {
-                    textDocument: {
-                        ...params.textDocument,
-                        uri: mapHttpToFileUrlSimple(uri).href,
-                    },
+                try {
+                    const uri = new URL(params.textDocument.uri)
+                    const mappedParams: DidOpenTextDocumentParams = {
+                        textDocument: {
+                            ...params.textDocument,
+                            uri: mapHttpToFileUrlSimple(uri).href,
+                        },
+                    }
+                    serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
+                    // Kick off installation in the background
+                    // tslint:disable-next-line no-floating-promises
+                    ensureDependencies(uri, { tracer })
+                } catch (err) {
+                    logger.error('Error handling textDocument/didOpen notification', params, err)
                 }
-                serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
-                // Kick off installation in the background
-                // tslint:disable-next-line no-floating-promises
-                ensureDependencies(uri, { tracer })
             })
         )
     )
