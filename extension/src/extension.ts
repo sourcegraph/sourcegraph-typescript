@@ -48,6 +48,9 @@ export async function activate(): Promise<void> {
         return authenticatedUri
     }
 
+    /**
+     * @param rootUri The server HTTP root URI
+     */
     async function connect(rootUri: URL): Promise<MessageConnection> {
         const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
         if (typeof serverUrl !== 'string') {
@@ -123,26 +126,31 @@ export async function activate(): Promise<void> {
         console.log('Initializing TypeScript backend...')
         const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
         console.log('TypeScript backend initialized', initResult)
-        // Tell language server about all currently open text documents
-        await Promise.all(
-            sourcegraph.workspace.textDocuments
-                .filter(textDocument => isTypeScriptFile(new URL(textDocument.uri)))
-                .map(textDocument => {
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(new URL(textDocument.uri)))
-                    const didOpenParams: DidOpenTextDocumentParams = {
-                        textDocument: {
-                            uri: serverTextDocumentUri.href,
-                            languageId: textDocument.languageId,
-                            text: textDocument.text,
-                            version: 1,
-                        },
-                    }
-                    connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
-                })
-        )
+        // Tell language server about all currently open text documents under this root
+        for (const textDocument of sourcegraph.workspace.textDocuments) {
+            if (!isTypeScriptFile(new URL(textDocument.uri))) {
+                continue
+            }
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(new URL(textDocument.uri)))
+            if (!serverTextDocumentUri.href.startsWith(rootUri.href)) {
+                continue
+            }
+            const didOpenParams: DidOpenTextDocumentParams = {
+                textDocument: {
+                    uri: serverTextDocumentUri.href,
+                    languageId: textDocument.languageId,
+                    text: textDocument.text,
+                    version: 1,
+                },
+            }
+            connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+        }
         return connection
     }
 
+    /**
+     * @param rootUri The server HTTP root URI
+     */
     async function getOrCreateConnection(rootUri: URL): Promise<MessageConnection> {
         let connectionPromise = connectionsByRootUri.get(rootUri.href)
         if (!connectionPromise) {
