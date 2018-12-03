@@ -8810,10 +8810,10 @@ typescript-language-server@^0.3.6:
     vscode-languageserver "^4.4.0"
     vscode-uri "^1.0.5"
 
-typescript@^3.2.0-dev.20181113:
-  version "3.2.0-dev.20181113"
-  resolved "https://registry.npmjs.org/typescript/-/typescript-3.2.0-dev.20181113.tgz#2d48b6f62843c6cbd0dd41a0ee9015bd7d22dcca"
-  integrity sha512-OoyIVhVzYUT33UCQfr1iBfhpk6iF7qSCgtRU/klz5tpWfIjvsOH+2jILNQNzaSoz5l3ulXCQNeAxDy10zRhz6w==
+typescript@^3.2.1:
+  version "3.2.1"
+  resolved "https://registry.npmjs.org/typescript/-/typescript-3.2.1.tgz#0b7a04b8cf3868188de914d9568bd030f0c56192"
+  integrity sha512-jw7P2z/h6aPT4AENXDGjcfHTu5CSqzsbZc6YlUIebTyBAq8XaKp78x7VcSh30xwSCcsu5irZkYZUSFP1MrAMbg==
 
 uglify-js@^3.1.4:
   version "3.4.9"
