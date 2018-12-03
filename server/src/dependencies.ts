@@ -104,9 +104,8 @@ export async function findClosestPackageJson(
 ): Promise<[URL, PackageJson]> {
     let parent = resource
     while (true) {
-        parent = new URL('..', parent.href)
         if (!parent.href.startsWith(rootUri.href)) {
-            throw new Error(`No package.json found for ${resource}`)
+            throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
         }
         const packageJsonUri = new URL('package.json', parent.href)
         try {
@@ -114,6 +113,7 @@ export async function findClosestPackageJson(
             return [packageJsonUri, JSON.parse(content)]
         } catch (err) {
             if (err instanceof ResourceNotFoundError) {
+                parent = new URL('..', parent.href)
                 continue
             }
             throw err
