@@ -83,7 +83,7 @@
     "@types/globby": "8.0.0",
     "@types/got": "9.2.1",
     "@types/json5": "0.0.30",
-    "@types/lodash": "4.14.118",
+    "@types/lodash": "4.14.119",
     "@types/mkdirp-promise": "5.0.0",
     "@types/mz": "0.0.32",
     "@types/node": "10.12.12",
