@@ -34,13 +34,15 @@ export function convertHover(hover: Hover | null): sourcegraph.Hover | null {
     }
 }
 
+export const convertLocation = (location: Location): sourcegraph.Location => ({
+    uri: sourcegraph.URI.parse(location.uri),
+    range: convertRange(location.range),
+})
+
 export function convertLocations(locationOrLocations: Location | Location[] | null): sourcegraph.Location[] | null {
     if (!locationOrLocations) {
         return null
     }
     const locations = Array.isArray(locationOrLocations) ? locationOrLocations : [locationOrLocations]
-    return locations.map(location => ({
-        uri: sourcegraph.URI.parse(location.uri),
-        range: convertRange(location.range),
-    }))
+    return locations.map(convertLocation)
 }

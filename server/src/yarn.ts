@@ -68,6 +68,8 @@ export interface YarnSpawnOptions {
     span?: Span
 }
 
+const YARN_BIN_JS = path.resolve(__dirname, '..', '..', 'node_modules', 'yarn', 'lib', 'cli.js')
+
 /**
  * Spawns a yarn child process.
  * The returned child process emits additional events from the streamed JSON events yarn writes to STDIO.
@@ -81,7 +83,7 @@ export function spawnYarn({
     ...options
 }: YarnInstallOptions): YarnProcess {
     const args = [
-        path.resolve(__dirname, '..', '..', 'node_modules', 'yarn', 'lib', 'cli.js'),
+        YARN_BIN_JS,
         '--ignore-scripts', // Don't run package.json scripts
         '--ignore-platform', // Don't error on failing platform checks
         '--ignore-engines', // Don't check package.json engines field
@@ -183,7 +185,7 @@ export async function install({
         throwIfCancelled(token)
         const using: Disposable[] = []
         try {
-            const [stdout] = await exec('yarn config list', { cwd })
+            const [stdout] = await exec(`node ${YARN_BIN_JS} config list`, { cwd })
             logger.log('yarn config', stdout)
             await new Promise<void>((resolve, reject) => {
                 const yarnProcess = spawnYarn({ ...spawnOptions, cwd, tracer, span, token, logger })

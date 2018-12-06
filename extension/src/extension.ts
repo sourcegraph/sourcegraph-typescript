@@ -11,6 +11,9 @@ import {
     WebSocketMessageReader,
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
+import { AsyncIterableX, merge } from 'ix/asynciterable/index'
+import { MergeAsyncIterable } from 'ix/asynciterable/merge'
+import { flatMap, map, scan } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import * as sourcegraph from 'sourcegraph'
 import {
@@ -21,7 +24,6 @@ import {
     ImplementationRequest,
     InitializeParams,
     InitializeRequest,
-    Location,
     LogMessageNotification,
     ReferenceContext,
     ReferenceParams,
@@ -29,14 +31,19 @@ import {
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
-import { convertHover, convertLocations } from './lsp-conversion'
+import {
+    findClosestPackageJson,
+    findPackageDependentsWithNpm,
+    findPackageDependentsWithSourcegraph,
+} from './dependencies'
+import { resolveRev, SourcegraphInstanceOptions } from './graphql'
+import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
+import { asArray, observableFromAsyncIterable } from './util'
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
-
-const asArray = <T>(val: T[] | T | null): T[] => (!val ? [] : Array.isArray(val) ? val : [val])
 
 export async function activate(): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 10))
@@ -236,83 +243,129 @@ export async function activate(): Promise<void> {
 
     // References
     sourcegraph.languages.registerReferenceProvider([{ pattern: '**/*.*' }], {
-        provideReferences: async (textDocument, position) => {
-            const textDocumentUri = new URL(textDocument.uri)
-            if (!isTypeScriptFile(textDocumentUri)) {
-                return undefined
-            }
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-            const connection = await getOrCreateConnection(serverRootUri)
-
-            const context: ReferenceContext = {
-                includeDeclaration: false,
-            }
-
-            const references: Location[] = []
-
-            // Same-repo references
-            const sameRepoReferences = asArray(
-                await connection.sendRequest(ReferencesRequest.type, {
-                    textDocument: { uri: serverTextDocumentUri.href },
-                    position,
-                    context,
-                })
-            )
-            for (const reference of sameRepoReferences) {
-                references.push(reference)
-            }
-
-            // Cross-repo references
-            // Find canonical source location
-            const definitions = asArray(
-                await connection.sendRequest(DefinitionRequest.type, {
-                    textDocument: { uri: serverTextDocumentUri.href },
-                    position,
-                })
-            )
-            for (const definition of definitions) {
-                const definitionUri = new URL(definition.uri)
-
-                const referenceParams: ReferenceParams = {
-                    textDocument: { uri: definitionUri.href },
-                    position,
-                    context,
-                }
-
-                // Find containing package
-                const packageJson = await findClosestPackageJson(definitionUri)
-                // Find dependent packages on the package
-                const dependents = await findPackageDependents(packageJson.name)
-                for (const dependent of dependents) {
-                    const dependentPackageMeta = await fetchPackageMeta(dependent)
-
-                    const cloneUrl =
-                        typeof packageJson.repository === 'string' ? packageJson.repository : packageJson.repository.url
-                    const commit = dependentPackageMeta.gitHead
-                    if (!commit) {
-                        throw new Error(`Package ${packageJson.name} has no gitHead metadata`)
+        provideReferences: (textDocument, position) =>
+            observableFromAsyncIterable(
+                (async function*() {
+                    const textDocumentUri = new URL(textDocument.uri)
+                    if (!isTypeScriptFile(textDocumentUri)) {
+                        return
                     }
-                    // const subdir =
-                    //     (typeof packageJson.repository === 'object' && packageJson.repository.directory) || ''
-                    const repoName = await resolveRepository(cloneUrl)
+                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                    const connection = await getOrCreateConnection(serverRootUri)
 
-                    const dependentRootUri = new URL(`https://sourcegraph.com/${repoName}@${commit}/-/raw/`)
+                    const context: ReferenceContext = {
+                        includeDeclaration: false,
+                    }
 
-                    const dependentConnection = await getOrCreateConnection(dependentRootUri)
+                    yield* merge(
+                        // Same-repo references
+                        (async function*() {
+                            console.log('Searching for same-repo references')
+                            const sameRepoReferences = asArray(
+                                await connection.sendRequest(ReferencesRequest.type, {
+                                    textDocument: { uri: serverTextDocumentUri.href },
+                                    position,
+                                    context,
+                                })
+                            )
+                            console.log(`Found ${sameRepoReferences.length} same-repo references`)
+                            yield* sameRepoReferences
+                        })(),
+                        // Cross-repo references
+                        // Find canonical source location
+                        (async function*() {
+                            console.log('Getting canonical definition for cross-repo references')
+                            const definitions = asArray(
+                                await connection.sendRequest(DefinitionRequest.type, {
+                                    textDocument: { uri: serverTextDocumentUri.href },
+                                    position,
+                                })
+                            )
+                            console.log(`Got ${definitions.length} definitions`)
+                            const instanceUrl = new URL(sourcegraph.internal.sourcegraphURL.toString())
+                            const sgInstanceOptions: SourcegraphInstanceOptions = {
+                                accessToken,
+                                instanceUrl,
+                            }
+                            const findDependents =
+                                instanceUrl.hostname === 'sourcegraph.com'
+                                    ? findPackageDependentsWithNpm
+                                    : findPackageDependentsWithSourcegraph
 
-                    const referencesInDependent = asArray(
-                        await dependentConnection.sendRequest(ReferencesRequest.type, referenceParams)
+                            yield* new MergeAsyncIterable(
+                                definitions.map(async function*(definition) {
+                                    console.log(`Getting external references for definition`, definition)
+
+                                    const definitionUri = new URL(definition.uri)
+
+                                    const referenceParams: ReferenceParams = {
+                                        textDocument: { uri: definitionUri.href },
+                                        position: definition.range.start,
+                                        context,
+                                    }
+
+                                    // Find containing package
+                                    const [, packageJson] = await findClosestPackageJson(definitionUri)
+
+                                    // Find dependent packages on the package
+                                    const dependents = findDependents(packageJson.name, sgInstanceOptions)
+
+                                    // Search for references in each dependent
+                                    yield* AsyncIterableX.from(dependents).pipe(
+                                        flatMap(async function*(repoName) {
+                                            try {
+                                                const commitID = await resolveRev(repoName, 'HEAD', sgInstanceOptions)
+                                                const dependentRootUri = authenticateUri(
+                                                    new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
+                                                )
+                                                console.log(
+                                                    `Looking for external references in dependent repo ${repoName}`
+                                                )
+                                                const dependentConnection = await getOrCreateConnection(
+                                                    dependentRootUri
+                                                )
+                                                const referencesInDependent = asArray(
+                                                    await dependentConnection.sendRequest(
+                                                        ReferencesRequest.type,
+                                                        referenceParams
+                                                    )
+                                                )
+                                                console.log(
+                                                    `Found ${
+                                                        referencesInDependent.length
+                                                    } references in dependent repo ${repoName}`
+                                                )
+                                                yield* referencesInDependent
+                                            } catch (err) {
+                                                console.error(
+                                                    `Error searching dependent repo "${repoName}" for references`,
+                                                    err
+                                                )
+                                            }
+                                        })
+                                    )
+
+                                    console.log('Done going through dependents')
+                                })
+                            )
+                        })()
+                    ).pipe(
+                        // Rewrite URIs
+                        map(location => ({
+                            ...location,
+                            uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
+                        })),
+                        // Convert from LSP to Sourcegraph Location
+                        map(convertLocation),
+                        // Aggregate individual Locations into a growing array (which is what Sourcegraph expects)
+                        scan<sourcegraph.Location, sourcegraph.Location[]>(
+                            (references, reference) => [...references, reference],
+                            []
+                        )
                     )
-                    for (const reference of referencesInDependent) {
-                        references.push(reference)
-                    }
-                }
-            }
-
-            rewriteUris(references, toSourcegraphTextDocumentUri)
-            return convertLocations(references)
-        },
+                })()
+            ),
     })
 
     // Implementations

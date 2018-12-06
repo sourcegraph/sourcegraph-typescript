@@ -5,7 +5,7 @@ import * as semver from 'semver'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
-import { pickResourceRetriever, ResourceNotFoundError } from './resources'
+import { ResourceNotFoundError, ResourceRetrieverPicker } from './resources'
 import { logErrorEvent, tracePromise } from './tracing'
 
 /**
@@ -90,6 +90,8 @@ export interface PackageJson {
           }
     /** Commit SHA1 of the repo at the time of publishing */
     gitHead?: string
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
 }
 
 /**
@@ -100,6 +102,7 @@ export interface PackageJson {
  */
 export async function findClosestPackageJson(
     resource: URL,
+    pickResourceRetriever: ResourceRetrieverPicker,
     rootUri: URL = Object.assign(new URL(resource.href), { pathname: '' })
 ): Promise<[URL, PackageJson]> {
     let parent = resource
@@ -109,8 +112,8 @@ export async function findClosestPackageJson(
         }
         const packageJsonUri = new URL('package.json', parent.href)
         try {
-            const content = await pickResourceRetriever(packageJsonUri).fetch(packageJsonUri)
-            return [packageJsonUri, JSON.parse(content)]
+            const packageJson = await readPackageJson(packageJsonUri, pickResourceRetriever)
+            return [packageJsonUri, packageJson]
         } catch (err) {
             if (err instanceof ResourceNotFoundError) {
                 parent = new URL('..', parent.href)
@@ -119,6 +122,13 @@ export async function findClosestPackageJson(
             throw err
         }
     }
+}
+
+export async function readPackageJson(
+    pkgJsonUri: URL,
+    pickResourceRetriever: ResourceRetrieverPicker
+): Promise<PackageJson> {
+    return JSON.parse(await pickResourceRetriever(pkgJsonUri).fetch(pkgJsonUri))
 }
 
 /**
