@@ -272,8 +272,7 @@ To debug the server, build, then run it locally with `yarn start-server` and poi
 To also debug the extension, serve the extension from localhost with `yarn serve-ext` and publish it pointing to localhost with
 
 ```sh
-src ext publish --url=http://localhost:1234/extension.js
+src ext publish --url=http://localhost:1234/extension.js --extension-id $YOUR_SOURCEGRAPH_USERNAME/lang-typescript
 ```
 
-NOTE: This can only be done if you are the publisher of this extension and will override this for all users.
-This will change in the future.
+Then disable `sourcegraph/lang-typescript` on the extensions page and enable the one published under your username.
