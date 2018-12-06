@@ -3,7 +3,7 @@
   "title": "WIP: Code intelligence for TypeScript",
   "description": "Provides code intelligence for TypeScript",
   "private": true,
-  "publisher": "felixfbecker",
+  "publisher": "sourcegraph",
   "engines": {
     "node": ">=11.1.0"
   },
