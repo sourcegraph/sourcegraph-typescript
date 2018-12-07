@@ -1,5 +1,4 @@
 import { Observable } from 'rxjs'
-import * as sourcegraph from 'sourcegraph'
 
 export const createAbortError = () => Object.assign(new Error('Aborted'), { name: 'AbortError' })
 
