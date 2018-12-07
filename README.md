@@ -10,7 +10,7 @@ The server is available as a Docker image `sourcegraph/lang-typescript` from Doc
 You can run it locally with:
 
 ```sh
-docker run sourcegraph/lang-typescript -p 80:8080
+docker run -p 80:8080 sourcegraph/lang-typescript
 ```
 
 This will make the server listen on `ws://localhost:8080`, which is the address you then need to specify in Sourcegraph settings for the extension to connect to.
