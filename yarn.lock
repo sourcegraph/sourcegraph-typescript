@@ -915,6 +915,19 @@
     tslint-config-prettier "^1.6.0"
     tslint-react "^3.2.0"
 
+"@sourcegraph/typescript-language-server@^0.3.7-fork":
+  version "0.3.7-fork"
+  resolved "https://registry.npmjs.org/@sourcegraph/typescript-language-server/-/typescript-language-server-0.3.7-fork.tgz#10dbd707be6da80ddb5c0e3c5c1205057aeca796"
+  integrity sha512-4+xMxFbgp049oiVUYLVbCpiOT/8OTKNRmhnc6FizP6juBylBvWGJon3KMRVIuMv0QW05zxq0gax1/IQYX0gTOw==
+  dependencies:
+    command-exists "1.2.6"
+    commander "^2.11.0"
+    fs-extra "^7.0.0"
+    p-debounce "^1.0.0"
+    tempy "^0.2.1"
+    vscode-languageserver "^4.4.0"
+    vscode-uri "^1.0.5"
+
 "@sourcegraph/vscode-ws-jsonrpc@0.0.3-fork":
   version "0.0.3-fork"
   resolved "https://registry.npmjs.org/@sourcegraph/vscode-ws-jsonrpc/-/vscode-ws-jsonrpc-0.0.3-fork.tgz#83728a14616ef0587298e7849d960b61853a9954"
@@ -8803,19 +8816,6 @@ typedarray@^0.0.6:
   version "0.0.6"
   resolved "https://registry.npmjs.org/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
-
-typescript-language-server@^0.3.6:
-  version "0.3.6"
-  resolved "https://registry.npmjs.org/typescript-language-server/-/typescript-language-server-0.3.6.tgz#729a9b697055e16f8f3b7c0b1f13838b40076818"
-  integrity sha512-f+AP/EH9TqBEY43y5wYE3KD/2xouUS/GyJqLC9PYVhEjO2AJgmJw/jpCxM+KrJsKrzzYWqJCiJHdFhGY8yNSDg==
-  dependencies:
-    command-exists "1.2.6"
-    commander "^2.11.0"
-    fs-extra "^7.0.0"
-    p-debounce "^1.0.0"
-    tempy "^0.2.1"
-    vscode-languageserver "^4.4.0"
-    vscode-uri "^1.0.5"
 
 typescript@^3.2.1:
   version "3.2.1"

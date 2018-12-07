@@ -139,6 +139,17 @@ setInterval(() => {
 
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
 
+const TYPESCRIPT_LANGSERVER_JS_BIN = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    'node_modules',
+    '@sourcegraph',
+    'typescript-language-server',
+    'lib',
+    'cli.js'
+)
+
 const pickResourceRetriever = createResourceRetrieverPicker([new HttpResourceRetriever(), new FileResourceRetriever()])
 
 const TYPESCRIPT_DIR_URI = pathToFileURL(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript') + '/')
@@ -433,11 +444,10 @@ webSocketServer.on('connection', connection => {
             serverArgs.push('--tsserver-log-verbosity', configuration['typescript.tsserver.log'] || 'verbose')
         }
         // Spawn language server
-        const serverProcess = fork(
-            path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
-            serverArgs,
-            { stdio: ['ipc', 'inherit'], execArgv: [] }
-        )
+        const serverProcess = fork(TYPESCRIPT_LANGSERVER_JS_BIN, serverArgs, {
+            stdio: ['ipc', 'inherit'],
+            execArgv: [],
+        })
         connectionDisposables.add({ dispose: () => serverProcess.kill() })
         serverProcess.on('error', err => {
             logger.error('Launching language server failed', err)
