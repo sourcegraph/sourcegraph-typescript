@@ -1,12 +1,12 @@
 import { Observable } from 'rxjs'
 
+export const isAbortError = (val: any) => typeof val === 'object' && val !== null && val.name === 'AbortError'
+
 export function throwIfAbortError(err: any): void {
     if (isAbortError(err)) {
         throw err
     }
 }
-
-export const isAbortError = (val: any) => typeof val === 'object' && val !== null && val.name === 'AbortError'
 
 export const createAbortError = () => Object.assign(new Error('Aborted'), { name: 'AbortError' })
 
