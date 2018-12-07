@@ -13,7 +13,7 @@ import {
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import { AsyncIterableX, merge } from 'ix/asynciterable/index'
 import { MergeAsyncIterable } from 'ix/asynciterable/merge'
-import { flatMap, map, scan } from 'ix/asynciterable/pipe/index'
+import { filter, flatMap, map, scan } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import * as sourcegraph from 'sourcegraph'
 import {
@@ -354,6 +354,7 @@ export async function activate(): Promise<void> {
                             )
                         })()
                     ).pipe(
+                        filter(chunk => chunk.length > 0),
                         // Rewrite URIs and convert from LSP to Sourcegraph Location
                         map(chunk =>
                             chunk.map(location =>
