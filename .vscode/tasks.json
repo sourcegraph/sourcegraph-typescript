@@ -7,6 +7,11 @@
       "type": "npm",
       "script": "build-server",
       "problemMatcher": ["$tsc"]
+    },
+    {
+      "type": "npm",
+      "script": "serve-ext",
+      "problemMatcher": []
     }
   ]
 }

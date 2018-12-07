@@ -108,6 +108,7 @@
     "abort-controller": "^1.0.2",
     "globby": "^8.0.1",
     "got": "^9.3.2",
+    "ix": "^2.3.5",
     "json5": "^2.1.0",
     "lightstep-tracer": "^0.20.13",
     "lodash": "^4.17.11",

@@ -4575,6 +4575,13 @@ isurl@^1.0.0-alpha5:
     has-to-string-tag-x "^1.2.0"
     is-object "^1.0.1"
 
+ix@^2.3.5:
+  version "2.3.5"
+  resolved "https://registry.npmjs.org/ix/-/ix-2.3.5.tgz#8f1f221d420e248833009601ca49d4fae3d794c9"
+  integrity sha512-mdW2LtQiy+gPtggKa393EdSaI46RARsAa5zjlLgNKMlE57vC6dc6g6nehROI1Gj/HhsTvpb3WALSwg0EWhhz0Q==
+  dependencies:
+    tslib "^1.8.0"
+
 java-properties@^0.2.9:
   version "0.2.10"
   resolved "https://registry.npmjs.org/java-properties/-/java-properties-0.2.10.tgz#2551560c25fa1ad94d998218178f233ad9b18f60"

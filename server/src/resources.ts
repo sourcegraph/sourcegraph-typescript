@@ -4,6 +4,9 @@ import { readFile } from 'mz/fs'
 import { fileURLToPath, pathToFileURL } from 'url'
 
 export interface ResourceRetriever {
+    /** The URI protocols (including trailing colon) this ResourceRetriever can handle */
+    readonly protocols: ReadonlySet<string>
+
     /**
      * Fetches the content of the resource and returns it as an UTF8 string.
      * If the resource does not exist, will reject with a `ResourceNotFoundError`.
@@ -30,9 +33,16 @@ export class ResourceNotFoundError extends Error {
 /**
  * Can retrieve a file: resource
  */
-class FileResourceRetriever implements ResourceRetriever {
+export class FileResourceRetriever implements ResourceRetriever {
+    public readonly protocols = new Set(['file:'])
+
     public async glob(pattern: URL): Promise<URL[]> {
-        const files = await globby(fileURLToPath(pattern), { absolute: true, markDirectories: true, onlyFiles: false })
+        const files = await globby(fileURLToPath(pattern), {
+            absolute: true,
+            markDirectories: true,
+            onlyFiles: false,
+            expandDirectories: false,
+        })
         return files.map(pathToFileURL)
     }
 
@@ -53,15 +63,17 @@ const USER_AGENT = 'TypeScript language server'
 /**
  * Can retrieve an http(s): resource
  */
-class HttpResourceRetriever implements ResourceRetriever {
+export class HttpResourceRetriever implements ResourceRetriever {
+    public readonly protocols = new Set(['http:', 'https:'])
     public async glob(pattern: URL): Promise<URL[]> {
-        const response = await got.get(pattern, {
-            headers: {
-                Accept: 'text/plain',
-                'User-Agent': USER_AGENT,
-            },
-        })
-        return response.body.split('\n').map(url => new URL(url, pattern))
+        throw new Error('Globbing is not implemented over HTTP')
+        // const response = await got.get(pattern, {
+        //     headers: {
+        //         Accept: 'text/plain',
+        //         'User-Agent': USER_AGENT,
+        //     },
+        // })
+        // return response.body.split('\n').map(url => new URL(url, pattern))
     }
 
     public async fetch(resource: URL): Promise<string> {
@@ -82,13 +94,14 @@ class HttpResourceRetriever implements ResourceRetriever {
     }
 }
 
-export function pickResourceRetriever(uri: URL): ResourceRetriever {
-    switch (uri.protocol) {
-        case 'file:':
-            return new FileResourceRetriever()
-        case 'http:':
-        case 'https:':
-            return new HttpResourceRetriever()
+export type ResourceRetrieverPicker = (uri: URL) => ResourceRetriever
+
+export function createResourceRetrieverPicker(retrievers: ResourceRetriever[]): ResourceRetrieverPicker {
+    return uri => {
+        const retriever = retrievers.find(retriever => retriever.protocols.has(uri.protocol))
+        if (!retriever) {
+            throw new Error(`Unsupported protocol ${uri}`)
+        }
+        return retriever
     }
-    throw new Error(`Unsupported protocol ${uri}`)
 }

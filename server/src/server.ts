@@ -53,12 +53,24 @@ import {
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
 import { createAbortError, throwIfCancelled } from './cancellation'
-import { filterDependencies, findClosestPackageJson, PackageJson, resolveDependencyRootDir } from './dependencies'
+import {
+    filterDependencies,
+    findClosestPackageJson,
+    findPackageRootAndName,
+    PackageJson,
+    readPackageJson,
+    resolveDependencyRootDir,
+} from './dependencies'
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
-import { pickResourceRetriever, ResourceNotFoundError } from './resources'
+import {
+    createResourceRetrieverPicker,
+    FileResourceRetriever,
+    HttpResourceRetriever,
+    ResourceNotFoundError,
+} from './resources'
 import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { relativeUrl } from './uri'
@@ -127,6 +139,8 @@ setInterval(() => {
 
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
 
+const pickResourceRetriever = createResourceRetrieverPicker([new HttpResourceRetriever(), new FileResourceRetriever()])
+
 const TYPESCRIPT_DIR_URI = pathToFileURL(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript') + '/')
 const TYPESCRIPT_VERSION = JSON.parse(
     fs.readFileSync(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript', 'package.json'), 'utf-8')
@@ -175,12 +189,11 @@ webSocketServer.on('connection', connection => {
         webSocketConnection.writer,
         console
     )
-    const logger: Logger = new MultiLogger([
-        new PrefixedLogger(console, `conn ${connectionId}`),
-        new LSPLogger(webSocketMessageConnection),
-    ])
+    const logger: Logger = new PrefixedLogger(
+        new MultiLogger([console, new LSPLogger(webSocketMessageConnection)]),
+        `conn ${connectionId}`
+    )
     const connectionLogger = logger
-    logger.log(`Connection ID ${connectionId}`)
 
     // Connection state set on initialize
     let serverMessageConnection: MessageConnection
@@ -198,6 +211,8 @@ webSocketServer.on('connection', connection => {
     const dependencyInstallationPromises = new Map<string, Promise<void>>()
     /** HTTP URIs of directories with package.jsons in the workspace that finished installation */
     const finishedDependencyInstallations = new Set<string>()
+    /** HTTP URIs of text documents that were sent didOpen for */
+    const openTextDocuments = new Set<string>()
 
     const dispatcher = createDispatcher(webSocketConnection, { tracer, logger, requestDurationMetric })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
@@ -215,46 +230,97 @@ webSocketServer.on('connection', connection => {
         params: TextDocumentPositionParams,
         { span, token }: { span: Span; token: CancellationToken }
     ): Promise<TextDocumentPositionParams> {
-        throwIfCancelled(token)
-        const incomingUri = new URL(params.textDocument.uri)
-        if (isInWorkspace(incomingUri)) {
-            // In-workspace URI, do a simple rewrite from http to file URI
-            return {
-                textDocument: {
-                    uri: mapHttpToFileUrlSimple(incomingUri).href,
-                },
-                position: params.position,
+        return await tracePromise('Map parameters to file location', tracer, span, async span => {
+            throwIfCancelled(token)
+            const incomingUri = new URL(params.textDocument.uri)
+            if (isInWorkspace(incomingUri)) {
+                // In-workspace URI, do a simple rewrite from http to file URI
+                return {
+                    textDocument: {
+                        uri: mapHttpToFileUrlSimple(incomingUri).href,
+                    },
+                    position: params.position,
+                }
             }
-        }
-        // URI is an out-of-workspace URI (a URI from a different project)
-        // This external project may exist in the form of a dependency in node_modules
-        // Find the closest package.json to it to figure out the package name
-        const [packageJsonUri, packageJson] = await findClosestPackageJson(incomingUri)
-        const packageRoot = new URL('.', packageJsonUri)
-        const packageRootRelativePath = decodeURIComponent(relativeUrl(packageRoot, incomingUri))
-        await ensureDependencies(incomingUri, { tracer, span, token })
-        // Find all .d.ts.map files in the package
-        const patternUrl = new URL(`**/node_modules/${packageJson.name}/**/*.d.ts.map`, fileRootUri)
-        const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl)
-        const cancellation = new CancellationTokenSource()
-        const cancelDisposable = token.onCancellationRequested(() => cancellation.cancel())
-        let mappedParams: TextDocumentPositionParams | undefined
-        await Promise.all(
-            declarationMapUrls.map(async declarationMapUrl => {
-                throwIfCancelled(cancellation.token)
-                try {
-                    const declarationMap: RawSourceMap = JSON.parse(
-                        await pickResourceRetriever(declarationMapUrl).fetch(declarationMapUrl)
-                    )
-                    const packageRootPath = resolveDependencyRootDir(fileURLToPath(declarationMapUrl))
-                    const packageRootFileUrl = new URL(packageRootPath + '/', fileRootUri)
-                    const sourceFileUrl = new URL(packageRootRelativePath, packageRootFileUrl)
-                    // Check if any of the sources of this source file matches the source file we are looking for
+
+            // URI is an out-of-workspace URI (a URI from a different project)
+            // This external project may exist in the form of a dependency in node_modules
+            // Find the closest package.json to it to figure out the package name
+            const [packageRoot, packageName] = await findPackageRootAndName(incomingUri, pickResourceRetriever)
+            // Run yarn install for all package.jsons that contain the dependency we are looking for
+            logger.log(`Installing dependencies for all package.jsons that depend on "${packageName}"`)
+            await Promise.all(
+                [...packageRootUris].map(async packageRootUri => {
+                    const pkgJsonUri = new URL('package.json', packageRootUri)
+                    const pkgJson = await readPackageJson(pkgJsonUri, pickResourceRetriever)
                     if (
-                        declarationMap.sources.some(
-                            source => new URL(source, declarationMapUrl).href === sourceFileUrl.href
-                        )
+                        (pkgJson.dependencies && pkgJson.dependencies.hasOwnProperty(packageName)) ||
+                        (pkgJson.devDependencies && pkgJson.devDependencies.hasOwnProperty(packageName))
                     ) {
+                        logger.log(`package.json at ${packageRootUri} has dependency on "${packageName}", installing`)
+                        await ensureDependenciesForPackageRoot(new URL(packageRootUri), { tracer, span, token })
+                    }
+                })
+            )
+
+            const packageRootRelativePath = relativeUrl(packageRoot, incomingUri)
+
+            // Check if the file already exists somewhere in node_modules
+            // This is the case for non-generated declaration files (including @types/ packages) and packages that ship sources (e.g. ix)
+            {
+                const patternUrl = new URL(
+                    path.posix.join(`**/node_modules/${packageName}`, packageRootRelativePath),
+                    fileRootUri
+                )
+                const file: URL | undefined = (await pickResourceRetriever(patternUrl).glob(patternUrl))[0]
+                if (file) {
+                    const mappedParams = {
+                        position: params.position,
+                        textDocument: {
+                            uri: file.href,
+                        },
+                    }
+                    logger.log(`Found file ${incomingUri} in node_modules at ${file}`)
+                    logger.log('Mapped params', params, 'to', mappedParams)
+                    return mappedParams
+                }
+            }
+
+            // If the incoming URI is already a declaration file, abort
+            if (incomingUri.pathname.endsWith('.d.ts')) {
+                throw new Error(`Incoming declaration file ${incomingUri} does not exist in workspace's node_modules`)
+            }
+            // If the incoming URI is not a declaration file and does not exist in node_modules,
+            // it is a source file that needs to be mapped to a declaration file using a declaration map
+            // Find all .d.ts.map files in the package
+            logger.log(
+                `Looking for declaration maps to map source file ${incomingUri} to declaration file in node_modules`
+            )
+            const patternUrl = new URL(`**/node_modules/${packageName}/**/*.d.ts.map`, fileRootUri)
+            const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl)
+            logger.log(`Found ${declarationMapUrls.length} declaration maps in package "${packageName}"`)
+            const cancellation = new CancellationTokenSource()
+            const cancelDisposable = token.onCancellationRequested(() => cancellation.cancel())
+            let mappedParams: TextDocumentPositionParams | undefined
+            await Promise.all(
+                declarationMapUrls.map(async declarationMapUrl => {
+                    throwIfCancelled(cancellation.token)
+                    try {
+                        const declarationMap: RawSourceMap = JSON.parse(
+                            await pickResourceRetriever(declarationMapUrl).fetch(declarationMapUrl)
+                        )
+                        const packageRootPath = resolveDependencyRootDir(fileURLToPath(declarationMapUrl))
+                        const packageRootFileUrl = new URL(packageRootPath + '/', fileRootUri)
+                        const sourceFileUrl = new URL(packageRootRelativePath, packageRootFileUrl)
+                        // Check if any of the sources of this source file matches the source file we are looking for
+                        if (
+                            !declarationMap.sources.some(
+                                source => new URL(source, declarationMapUrl).href === sourceFileUrl.href
+                            )
+                        ) {
+                            return
+                        }
+                        logger.log(`Declaration map ${declarationMapUrl} matches source ${sourceFileUrl}`)
                         const declarationFile = new URL(declarationMap.file, declarationMapUrl)
                         throwIfCancelled(cancellation.token)
                         // Use the source map to match the location in the source file to the location in the .d.ts file
@@ -263,15 +329,14 @@ webSocketServer.on('connection', connection => {
                             throwIfCancelled(cancellation.token)
                             const declarationPosition = consumer.generatedPositionFor({
                                 source: sourceFileUrl.href,
-                                // LSP is 0-based, source maps are 1-based
+                                // LSP is 0-based, source maps are 1-based line numbers
                                 line: params.position.line + 1,
-                                column: params.position.character + 1,
+                                column: params.position.character,
                             })
                             if (declarationPosition.line === null || declarationPosition.column === null) {
+                                const { line, character } = params.position
                                 throw new Error(
-                                    `Could not map source position ${sourceFileUrl}:${params.position.line}:${
-                                        params.position.character
-                                    } to position in declaration file`
+                                    `Could not map source position ${sourceFileUrl}:${line}:${character} to position in declaration file`
                                 )
                             }
                             mappedParams = {
@@ -280,24 +345,24 @@ webSocketServer.on('connection', connection => {
                                 },
                                 position: {
                                     line: declarationPosition.line - 1,
-                                    character: declarationPosition.column - 1,
+                                    character: declarationPosition.column,
                                 },
                             }
                             cancellation.cancel() // Found a result, stop looking
                         } finally {
                             consumer.destroy()
                         }
+                    } catch (err) {
+                        logger.error(`Error processing declaration map ${declarationMapUrl}`, err)
                     }
-                } catch (err) {
-                    logger.error(`Error processing declaration map ${declarationMapUrl}`, err)
-                }
-            })
-        )
-        cancelDisposable.dispose()
-        if (!mappedParams) {
-            throw new Error(`Could not find out-of-workspace URI ${incomingUri} in workspace's dependencies`)
-        }
-        return mappedParams
+                })
+            )
+            cancelDisposable.dispose()
+            if (!mappedParams) {
+                throw new Error(`Could not find out-of-workspace URI ${incomingUri} in workspace's dependencies`)
+            }
+            return mappedParams
+        })
     }
     function mapHttpToFileUrlSimple(uri: URL): URL {
         const relative = relativeUrl(httpRootUri, uri)
@@ -314,6 +379,7 @@ webSocketServer.on('connection', connection => {
         if (!params.rootUri) {
             throw new Error('No rootUri given as initialize parameter')
         }
+        logger.log(`rootUri ${params.rootUri}`)
         if (params.workspaceFolders && params.workspaceFolders.length > 1) {
             throw new Error(
                 'More than one workspace folder given. The TypeScript server only supports a single workspace folder.'
@@ -369,7 +435,7 @@ webSocketServer.on('connection', connection => {
         const serverProcess = fork(
             path.resolve(__dirname, '..', '..', 'node_modules', 'typescript-language-server', 'lib', 'cli.js'),
             serverArgs,
-            { stdio: ['ipc', 'inherit'] }
+            { stdio: ['ipc', 'inherit'], execArgv: [] }
         )
         connectionDisposables.add({ dispose: () => serverProcess.kill() })
         serverProcess.on('error', err => {
@@ -520,6 +586,19 @@ webSocketServer.on('connection', connection => {
         })
     }
 
+    async function ensureDependenciesForPackageRoot(
+        packageRootUri: URL,
+        { tracer, span, token }: { tracer: Tracer; span?: Span; token: CancellationToken }
+    ): Promise<void> {
+        let installationPromise = dependencyInstallationPromises.get(packageRootUri.href)
+        if (!installationPromise) {
+            installationPromise = installDependenciesForPackage(packageRootUri, { tracer, span, token })
+            // Save Promise so requests can wait for the installation to finish
+            dependencyInstallationPromises.set(packageRootUri.href, installationPromise)
+        }
+        await installationPromise
+    }
+
     /**
      * Ensures dependencies for all package.jsons in parent directories of the given text document were installed.
      * Errors will be caught and logged.
@@ -527,7 +606,7 @@ webSocketServer.on('connection', connection => {
      * @param textDocumentUri The HTTP text document URI that dependencies should be installed for
      * @throws never
      */
-    async function ensureDependencies(
+    async function ensureDependenciesForDocument(
         textDocumentUri: URL,
         { tracer, span, token = CancellationToken.None }: { tracer: Tracer; span?: Span; token?: CancellationToken }
     ): Promise<void> {
@@ -540,14 +619,8 @@ webSocketServer.on('connection', connection => {
                 parentPackageRoots.map(String)
             )
             await Promise.all(
-                parentPackageRoots.map(async packageRootUri => {
-                    let installationPromise = dependencyInstallationPromises.get(packageRootUri.href)
-                    if (!installationPromise) {
-                        installationPromise = installDependenciesForPackage(packageRootUri, { tracer, span, token })
-                        // Save Promise so requests can wait for the installation to finish
-                        dependencyInstallationPromises.set(packageRootUri.href, installationPromise)
-                    }
-                    await installationPromise
+                parentPackageRoots.map(async packageRoot => {
+                    await ensureDependenciesForPackageRoot(packageRoot, { tracer, span, token })
                 })
             )
         })
@@ -562,7 +635,7 @@ webSocketServer.on('connection', connection => {
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
-            await ensureDependencies(httpResourceUri, { tracer, span, token })
+            await ensureDependenciesForDocument(httpResourceUri, { tracer, span, token })
             throwIfCancelled(token)
             return await serverMessageConnection.sendRequest(HoverRequest.type, mappedParams, token)
         }
@@ -599,7 +672,7 @@ webSocketServer.on('connection', connection => {
         // We return an HTTP URL to the client that the client can access
         if (relativeFilePath.includes('node_modules/')) {
             try {
-                const [, packageJson] = await findClosestPackageJson(uri, fileRootUri)
+                const [, packageJson] = await findClosestPackageJson(uri, pickResourceRetriever, fileRootUri)
                 if (!packageJson.repository) {
                     throw new Error(`Package ${packageJson.name} has no repository field`)
                 }
@@ -634,11 +707,11 @@ webSocketServer.on('connection', connection => {
                     try {
                         mappedStart = consumer.originalPositionFor({
                             line: location.range.start.line + 1,
-                            column: location.range.start.character + 1,
+                            column: location.range.start.character,
                         })
                         mappedEnd = consumer.originalPositionFor({
                             line: location.range.end.line + 1,
-                            column: location.range.end.character + 1,
+                            column: location.range.end.character,
                         })
                     } finally {
                         consumer.destroy()
@@ -659,16 +732,16 @@ webSocketServer.on('connection', connection => {
                     mappedRange = {
                         start: {
                             line: mappedStart.line - 1,
-                            character: mappedStart.column - 1,
+                            character: mappedStart.column,
                         },
                         end: {
                             line: mappedEnd.line - 1,
-                            character: mappedEnd.column - 1,
+                            character: mappedEnd.column,
                         },
                     }
                 } catch (err) {
                     if (err instanceof ResourceNotFoundError) {
-                        logger.warn(`No declaration map for ${uri}, using declaration file`)
+                        logger.log(`No declaration map for ${uri}, using declaration file`)
                     } else {
                         logger.error(`Source-mapping location failed`, location, err)
                     }
@@ -758,9 +831,23 @@ webSocketServer.on('connection', connection => {
         dispatcher.setRequestHandler(type, async (params, token, span) => {
             const httpTextDocumentUri = new URL(params.textDocument.uri)
             const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
+            const fileUri = new URL(mappedParams.textDocument.uri)
+            // The TypeScript language server cannot service requests for documents that were not opened first
+            if (!openTextDocuments.has(httpTextDocumentUri.href)) {
+                const didOpenParams: DidOpenTextDocumentParams = {
+                    textDocument: {
+                        uri: fileUri.href,
+                        version: 1,
+                        languageId: 'typescript',
+                        text: await pickResourceRetriever(fileUri).fetch(fileUri),
+                    },
+                }
+                serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+                openTextDocuments.add(httpTextDocumentUri.href)
+            }
             const result = await mapFileLocations(await serverMessageConnection.sendRequest(type, mappedParams, token))
             if (shouldLocationsWaitForDependencies(params, result)) {
-                await ensureDependencies(httpTextDocumentUri, { tracer, span, token })
+                await ensureDependenciesForDocument(httpTextDocumentUri, { tracer, span, token })
                 return await mapFileLocations(await serverMessageConnection.sendRequest(type, mappedParams, token))
             }
             return result
@@ -777,16 +864,18 @@ webSocketServer.on('connection', connection => {
             dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
                 try {
                     const uri = new URL(params.textDocument.uri)
+                    const fileUri = mapHttpToFileUrlSimple(uri)
                     const mappedParams: DidOpenTextDocumentParams = {
                         textDocument: {
                             ...params.textDocument,
-                            uri: mapHttpToFileUrlSimple(uri).href,
+                            uri: fileUri.href,
                         },
                     }
                     serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
+                    openTextDocuments.add(fileUri.href)
                     // Kick off installation in the background
                     // tslint:disable-next-line no-floating-promises
-                    ensureDependencies(uri, { tracer })
+                    ensureDependenciesForDocument(uri, { tracer })
                 } catch (err) {
                     logger.error('Error handling textDocument/didOpen notification', params, err)
                 }
