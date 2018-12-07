@@ -3,7 +3,7 @@ import { SourcegraphInstanceOptions } from './graphql'
 
 export async function fetchPackageMeta(packageName: string, version = 'latest'): Promise<PackageJson> {
     const response = await fetch(
-        `https://cors-anywhere.sourcegraph.com/https://registry.npmjs.org/${packageName}/${version}`
+        `https://cors-anywhere.sourcegraph.com/https://registry.npmjs.com/${packageName}/${version}`
     )
     if (!response.ok) {
         throw new Error(response.statusText)
