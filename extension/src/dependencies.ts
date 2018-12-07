@@ -6,7 +6,7 @@ export async function fetchPackageMeta(packageName: string, version = 'latest'):
         `https://cors-anywhere.sourcegraph.com/https://registry.npmjs.com/${packageName}/${version}`
     )
     if (!response.ok) {
-        throw new Error(response.statusText)
+        throw new Error(`${response.status} ${response.statusText}`)
     }
     const packageMeta = await response.json()
     return packageMeta
@@ -136,7 +136,7 @@ export async function findClosestPackageJson(
             parent = new URL('..', parent.href)
             continue
         } else if (!response.ok) {
-            throw new Error(response.statusText)
+            throw new Error(`${response.status} ${response.statusText}`)
         }
         return [packageJsonUri, await response.json()]
     }

@@ -29,7 +29,7 @@ export async function requestGraphQL(
         body: JSON.stringify({ query, variables }),
     })
     if (!response.ok) {
-        throw new Error(response.statusText)
+        throw new Error(`${response.status} ${response.statusText}`)
     }
     return await response.json()
 }
