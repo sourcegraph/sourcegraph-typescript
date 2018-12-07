@@ -365,10 +365,7 @@ export async function activate(): Promise<void> {
                             )
                         ),
                         // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
-                        scan<sourcegraph.Location[], sourcegraph.Location[]>(
-                            (allReferences, chunk) => allReferences.concat(chunk),
-                            []
-                        )
+                        scan((allReferences, chunk) => allReferences.concat(chunk), [])
                     )
                 })()
             ),
