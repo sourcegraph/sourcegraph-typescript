@@ -295,58 +295,74 @@ export async function activate(): Promise<void> {
 
                             yield* new MergeAsyncIterable(
                                 definitions.map(async function*(definition) {
-                                    console.log(`Getting external references for definition`, definition)
+                                    try {
+                                        console.log(`Getting external references for definition`, definition)
 
-                                    const definitionUri = new URL(definition.uri)
+                                        const definitionUri = new URL(definition.uri)
 
-                                    const referenceParams: ReferenceParams = {
-                                        textDocument: { uri: definitionUri.href },
-                                        position: definition.range.start,
-                                        context,
-                                    }
+                                        const referenceParams: ReferenceParams = {
+                                            textDocument: { uri: definitionUri.href },
+                                            position: definition.range.start,
+                                            context,
+                                        }
 
-                                    // Find containing package
-                                    const [, packageJson] = await findClosestPackageJson(definitionUri)
+                                        // Find containing package
+                                        const [packageJsonUrl, packageJson] = await findClosestPackageJson(
+                                            definitionUri
+                                        )
+                                        if (!packageJson.name) {
+                                            throw new Error(`package.json at ${packageJsonUrl} does not contain a name`)
+                                        }
 
-                                    // Find dependent packages on the package
-                                    const dependents = findDependents(packageJson.name, sgInstanceOptions)
+                                        // Find dependent packages on the package
+                                        const dependents = findDependents(packageJson.name, sgInstanceOptions)
 
-                                    // Search for references in each dependent
-                                    yield* AsyncIterableX.from(dependents).pipe(
-                                        flatMap(async function*(repoName) {
-                                            try {
-                                                const commitID = await resolveRev(repoName, 'HEAD', sgInstanceOptions)
-                                                const dependentRootUri = authenticateUri(
-                                                    new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
-                                                )
-                                                console.log(
-                                                    `Looking for external references in dependent repo ${repoName}`
-                                                )
-                                                const dependentConnection = await getOrCreateConnection(
-                                                    dependentRootUri
-                                                )
-                                                const referencesInDependent = asArray(
-                                                    await dependentConnection.sendRequest(
-                                                        ReferencesRequest.type,
-                                                        referenceParams
+                                        // Search for references in each dependent
+                                        yield* AsyncIterableX.from(dependents).pipe(
+                                            flatMap(async function*(repoName) {
+                                                try {
+                                                    const commitID = await resolveRev(
+                                                        repoName,
+                                                        'HEAD',
+                                                        sgInstanceOptions
                                                     )
-                                                )
-                                                console.log(
-                                                    `Found ${
-                                                        referencesInDependent.length
-                                                    } references in dependent repo ${repoName}`
-                                                )
-                                                yield* referencesInDependent
-                                            } catch (err) {
-                                                console.error(
-                                                    `Error searching dependent repo "${repoName}" for references`,
-                                                    err
-                                                )
-                                            }
-                                        })
-                                    )
-
-                                    console.log('Done going through dependents')
+                                                    const dependentRootUri = authenticateUri(
+                                                        new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
+                                                    )
+                                                    console.log(
+                                                        `Looking for external references in dependent repo ${repoName}`
+                                                    )
+                                                    const dependentConnection = await getOrCreateConnection(
+                                                        dependentRootUri
+                                                    )
+                                                    const referencesInDependent = asArray(
+                                                        await dependentConnection.sendRequest(
+                                                            ReferencesRequest.type,
+                                                            referenceParams
+                                                        )
+                                                    )
+                                                    console.log(
+                                                        `Found ${
+                                                            referencesInDependent.length
+                                                        } references in dependent repo ${repoName}`
+                                                    )
+                                                    yield* referencesInDependent
+                                                } catch (err) {
+                                                    console.error(
+                                                        `Error searching dependent repo "${repoName}" for references`,
+                                                        err
+                                                    )
+                                                }
+                                            })
+                                        )
+                                        console.log('Done going through dependents')
+                                    } catch (err) {
+                                        console.error(
+                                            `Error searching for external references for definition`,
+                                            definition,
+                                            err
+                                        )
+                                    }
                                 })
                             )
                         })()
