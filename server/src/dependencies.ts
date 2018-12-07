@@ -64,8 +64,8 @@ export async function filterDependencies(
         )
         span.setTag('excluded', excluded.length)
         span.setTag('included', included.length)
-        logger.log('Excluding dependencies', excluded.join(', '))
-        logger.log('Keeping dependencies', included.join(', '))
+        logger.log(`Excluding ${excluded.length} dependencies`)
+        logger.log(`Keeping ${included.length} dependencies`)
         // Only write if there is any change to dependencies
         if (included.length > 0 && excluded.length > 0) {
             await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2))
@@ -122,6 +122,36 @@ export async function findClosestPackageJson(
             throw err
         }
     }
+}
+
+export const isDefinitelyTyped = (uri: URL): boolean => uri.pathname.includes('DefinitelyTyped/DefinitelyTyped')
+
+/**
+ * Finds the package name and package root that the given URI belongs to.
+ * Handles special repositories like DefinitelyTyped.
+ */
+export async function findPackageRootAndName(
+    uri: URL,
+    pickResourceRetriever: ResourceRetrieverPicker
+): Promise<[URL, string]> {
+    // Special case: if the definition is in DefinitelyTyped, the package name is @types/<subfolder>[/<version>]
+    if (isDefinitelyTyped(uri)) {
+        const dtMatch = uri.pathname.match(/\/types\/([^\/]+)\//)
+        if (dtMatch) {
+            const packageRoot = new URL(uri.href)
+            // Strip everything after types/ (except the optional version directory)
+            packageRoot.pathname = packageRoot.pathname.replace(/\/types\/([^\/]+)\/(v[^\/]+\/)?.*$/, '/types/$1/$2')
+            const packageName = '@types/' + dtMatch[1]
+            return [packageRoot, packageName]
+        }
+    }
+    // Find containing package
+    const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri, pickResourceRetriever)
+    if (!packageJson.name) {
+        throw new Error(`package.json at ${packageJsonUrl} does not contain a name`)
+    }
+    const packageRoot = new URL('.', packageJsonUrl)
+    return [packageRoot, packageJson.name]
 }
 
 export async function readPackageJson(

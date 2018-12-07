@@ -31,11 +31,7 @@ import {
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
-import {
-    findClosestPackageJson,
-    findPackageDependentsWithNpm,
-    findPackageDependentsWithSourcegraph,
-} from './dependencies'
+import { findPackageDependentsWithNpm, findPackageDependentsWithSourcegraph, findPackageName } from './dependencies'
 import { resolveRev, SourcegraphInstanceOptions } from './graphql'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
@@ -270,7 +266,7 @@ export async function activate(): Promise<void> {
                                 })
                             )
                             console.log(`Found ${sameRepoReferences.length} same-repo references`)
-                            yield* sameRepoReferences
+                            yield sameRepoReferences
                         })(),
                         // Cross-repo references
                         // Find canonical source location
@@ -306,16 +302,10 @@ export async function activate(): Promise<void> {
                                             context,
                                         }
 
-                                        // Find containing package
-                                        const [packageJsonUrl, packageJson] = await findClosestPackageJson(
-                                            definitionUri
-                                        )
-                                        if (!packageJson.name) {
-                                            throw new Error(`package.json at ${packageJsonUrl} does not contain a name`)
-                                        }
+                                        const packageName = await findPackageName(definitionUri)
 
                                         // Find dependent packages on the package
-                                        const dependents = findDependents(packageJson.name, sgInstanceOptions)
+                                        const dependents = findDependents(packageName, sgInstanceOptions)
 
                                         // Search for references in each dependent
                                         yield* AsyncIterableX.from(dependents).pipe(
@@ -346,7 +336,7 @@ export async function activate(): Promise<void> {
                                                             referencesInDependent.length
                                                         } references in dependent repo ${repoName}`
                                                     )
-                                                    yield* referencesInDependent
+                                                    yield referencesInDependent
                                                 } catch (err) {
                                                     console.error(
                                                         `Error searching dependent repo "${repoName}" for references`,
@@ -367,16 +357,18 @@ export async function activate(): Promise<void> {
                             )
                         })()
                     ).pipe(
-                        // Rewrite URIs
-                        map(location => ({
-                            ...location,
-                            uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
-                        })),
-                        // Convert from LSP to Sourcegraph Location
-                        map(convertLocation),
-                        // Aggregate individual Locations into a growing array (which is what Sourcegraph expects)
-                        scan<sourcegraph.Location, sourcegraph.Location[]>(
-                            (references, reference) => [...references, reference],
+                        // Rewrite URIs and convert from LSP to Sourcegraph Location
+                        map(chunk =>
+                            chunk.map(location =>
+                                convertLocation({
+                                    ...location,
+                                    uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
+                                })
+                            )
+                        ),
+                        // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
+                        scan<sourcegraph.Location[], sourcegraph.Location[]>(
+                            (allReferences, chunk) => allReferences.concat(chunk),
                             []
                         )
                     )

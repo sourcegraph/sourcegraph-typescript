@@ -18,8 +18,8 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { tmpdir } from 'os'
 import fetchPackageMeta from 'package-json'
@@ -56,6 +56,7 @@ import { createAbortError, throwIfCancelled } from './cancellation'
 import {
     filterDependencies,
     findClosestPackageJson,
+    findPackageRootAndName,
     PackageJson,
     readPackageJson,
     resolveDependencyRootDir,
@@ -241,36 +242,63 @@ webSocketServer.on('connection', connection => {
                     position: params.position,
                 }
             }
+
             // URI is an out-of-workspace URI (a URI from a different project)
             // This external project may exist in the form of a dependency in node_modules
             // Find the closest package.json to it to figure out the package name
-            const [packageJsonUri, packageJson] = await findClosestPackageJson(incomingUri, pickResourceRetriever)
-            const packageRoot = new URL('.', packageJsonUri)
-            const packageRootRelativePath = decodeURIComponent(relativeUrl(packageRoot, incomingUri))
+            const [packageRoot, packageName] = await findPackageRootAndName(incomingUri, pickResourceRetriever)
             // Run yarn install for all package.jsons that contain the dependency we are looking for
-            logger.log(`Installing dependencies for all package.jsons that depend on "${packageJson.name}"`)
+            logger.log(`Installing dependencies for all package.jsons that depend on "${packageName}"`)
             await Promise.all(
                 [...packageRootUris].map(async packageRootUri => {
                     const pkgJsonUri = new URL('package.json', packageRootUri)
                     const pkgJson = await readPackageJson(pkgJsonUri, pickResourceRetriever)
                     if (
-                        (pkgJson.dependencies && pkgJson.dependencies.hasOwnProperty(packageJson.name)) ||
-                        (pkgJson.devDependencies && pkgJson.devDependencies.hasOwnProperty(packageJson.name))
+                        (pkgJson.dependencies && pkgJson.dependencies.hasOwnProperty(packageName)) ||
+                        (pkgJson.devDependencies && pkgJson.devDependencies.hasOwnProperty(packageName))
                     ) {
-                        logger.log(
-                            `package.json at ${packageRootUri} has dependency on "${packageJson.name}", installing`
-                        )
+                        logger.log(`package.json at ${packageRootUri} has dependency on "${packageName}", installing`)
                         await ensureDependenciesForPackageRoot(new URL(packageRootUri), { tracer, span, token })
                     }
                 })
             )
-            // Find all .d.ts.map files in the package
-            const patternUrl = new URL(`**/node_modules/${packageJson.name}/**/*.d.ts.map`, fileRootUri)
-            const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl)
-            logger.log(`Found ${declarationMapUrls.length} declaration maps in package "${packageJson.name}"`)
-            if (declarationMapUrls.length === 0) {
-                throw new Error(`Found no declaration map matching ${patternUrl}`)
+
+            const packageRootRelativePath = relativeUrl(packageRoot, incomingUri)
+
+            // Check if the file already exists somewhere in node_modules
+            // This is the case for non-generated declaration files (including @types/ packages) and packages that ship sources (e.g. ix)
+            {
+                const patternUrl = new URL(
+                    path.posix.join(`**/node_modules/${packageName}`, packageRootRelativePath),
+                    fileRootUri
+                )
+                const file: URL | undefined = (await pickResourceRetriever(patternUrl).glob(patternUrl))[0]
+                if (file) {
+                    const mappedParams = {
+                        position: params.position,
+                        textDocument: {
+                            uri: file.href,
+                        },
+                    }
+                    logger.log(`Found file ${incomingUri} in node_modules at ${file}`)
+                    logger.log('Mapped params', params, 'to', mappedParams)
+                    return mappedParams
+                }
             }
+
+            // If the incoming URI is already a declaration file, abort
+            if (incomingUri.pathname.endsWith('.d.ts')) {
+                throw new Error(`Incoming declaration file ${incomingUri} does not exist in workspace's node_modules`)
+            }
+            // If the incoming URI is not a declaration file and does not exist in node_modules,
+            // it is a source file that needs to be mapped to a declaration file using a declaration map
+            // Find all .d.ts.map files in the package
+            logger.log(
+                `Looking for declaration maps to map source file ${incomingUri} to declaration file in node_modules`
+            )
+            const patternUrl = new URL(`**/node_modules/${packageName}/**/*.d.ts.map`, fileRootUri)
+            const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl)
+            logger.log(`Found ${declarationMapUrls.length} declaration maps in package "${packageName}"`)
             const cancellation = new CancellationTokenSource()
             const cancelDisposable = token.onCancellationRequested(() => cancellation.cancel())
             let mappedParams: TextDocumentPositionParams | undefined
@@ -713,7 +741,7 @@ webSocketServer.on('connection', connection => {
                     }
                 } catch (err) {
                     if (err instanceof ResourceNotFoundError) {
-                        logger.warn(`No declaration map for ${uri}, using declaration file`)
+                        logger.log(`No declaration map for ${uri}, using declaration file`)
                     } else {
                         logger.error(`Source-mapping location failed`, location, err)
                     }

@@ -142,6 +142,27 @@ export async function findClosestPackageJson(
     }
 }
 
+/**
+ * Finds the package name that the given URI belongs to.
+ */
+export async function findPackageName(uri: URL): Promise<string> {
+    // Special case: if the definition is in DefinitelyTyped, the package name is @types/<subfolder>
+    if (uri.pathname.includes('DefinitelyTyped/DefinitelyTyped')) {
+        const dtMatch = uri.pathname.match(/\/types\/([^\/]+)\//)
+        if (dtMatch) {
+            return '@types/' + dtMatch[1]
+        } else {
+            console.warn(`Unexpected DefinitelyTyped URL ${uri}`)
+        }
+    }
+    // Find containing package
+    const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri)
+    if (!packageJson.name) {
+        throw new Error(`package.json at ${packageJsonUrl} does not contain a name`)
+    }
+    return packageJson.name
+}
+
 function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {
     if (!packageMeta.repository) {
         throw new Error('Package data does not contain repository field')
