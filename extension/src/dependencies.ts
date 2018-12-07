@@ -35,7 +35,9 @@ export async function* findPackageDependentsWithNpm(
     const limit = 100
     // Proxy through Sourcegraph because skimdb.npmjs.com does not send CORS headers
     // https://stackoverflow.com/questions/18796890/how-do-you-find-out-which-npm-modules-depend-on-yours
-    const url = new URL('https://cors-anywhere.sourcegraph.com/https://skimdb.npmjs.com/_design/app/_view/dependedUpon')
+    const url = new URL(
+        'https://cors-anywhere.sourcegraph.com/https://skimdb.npmjs.com/registry/_design/app/_view/dependedUpon'
+    )
     url.searchParams.set('group_level', '2')
     url.searchParams.set('startkey', JSON.stringify([packageName]))
     url.searchParams.set('endkey', JSON.stringify([packageName, {}]))
