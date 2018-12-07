@@ -37,7 +37,12 @@ export class FileResourceRetriever implements ResourceRetriever {
     public readonly protocols = new Set(['file:'])
 
     public async glob(pattern: URL): Promise<URL[]> {
-        const files = await globby(fileURLToPath(pattern), { absolute: true, markDirectories: true, onlyFiles: false })
+        const files = await globby(fileURLToPath(pattern), {
+            absolute: true,
+            markDirectories: true,
+            onlyFiles: false,
+            expandDirectories: false,
+        })
         return files.map(pathToFileURL)
     }
 
