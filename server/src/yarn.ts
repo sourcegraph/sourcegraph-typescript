@@ -1,5 +1,5 @@
 import { ChildProcess, spawn } from 'child_process'
-import { exec } from 'mz/child_process'
+// import { exec } from 'mz/child_process'
 import { Span, Tracer } from 'opentracing'
 import * as path from 'path'
 import { Readable } from 'stream'
@@ -185,8 +185,8 @@ export async function install({
         throwIfCancelled(token)
         const using: Disposable[] = []
         try {
-            const [stdout] = await exec(`node ${YARN_BIN_JS} config list`, { cwd })
-            logger.log('yarn config', stdout)
+            // const [stdout] = await exec(`node ${YARN_BIN_JS} config list`, { cwd })
+            // logger.log('yarn config', stdout)
             await new Promise<void>((resolve, reject) => {
                 const yarnProcess = spawnYarn({ ...spawnOptions, cwd, tracer, span, token, logger })
                 yarnProcess.on('success', resolve)
