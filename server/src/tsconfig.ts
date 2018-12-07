@@ -37,6 +37,7 @@ export async function sanitizeTsConfigs({
                         await writeFile(tsConfigPath, JSON.stringify(tsconfig))
                     }
                 } catch (err) {
+                    throwIfCancelled(token)
                     logger.error('Error sanitizing tsconfig.json at', tsConfigPath, json, err)
                     logErrorEvent(span, err)
                 }

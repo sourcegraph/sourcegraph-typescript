@@ -35,7 +35,7 @@ import { findPackageDependentsWithNpm, findPackageDependentsWithSourcegraph, fin
 import { resolveRev, SourcegraphInstanceOptions } from './graphql'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
-import { asArray, observableFromAsyncIterable } from './util'
+import { asArray, observableFromAsyncIterable, throwIfAbortError } from './util'
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
@@ -335,6 +335,7 @@ export async function activate(): Promise<void> {
                                                     )
                                                     yield referencesInDependent
                                                 } catch (err) {
+                                                    throwIfAbortError(err)
                                                     console.error(
                                                         `Error searching dependent repo "${repoName}" for references`,
                                                         err
@@ -344,6 +345,7 @@ export async function activate(): Promise<void> {
                                         )
                                         console.log('Done going through dependents')
                                     } catch (err) {
+                                        throwIfAbortError(err)
                                         console.error(
                                             `Error searching for external references for definition`,
                                             definition,

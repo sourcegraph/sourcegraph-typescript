@@ -55,6 +55,7 @@ export async function filterDependencies(
                                 dependencies[name] = undefined!
                             }
                         } catch (err) {
+                            throwIfCancelled(token)
                             logger.error(`Error inspecting dependency ${name}@${range} in ${packageJsonPath}`, err)
                             logErrorEvent(span, err)
                         }

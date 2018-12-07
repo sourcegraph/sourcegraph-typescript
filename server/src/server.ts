@@ -353,6 +353,7 @@ webSocketServer.on('connection', connection => {
                             consumer.destroy()
                         }
                     } catch (err) {
+                        throwIfCancelled(token)
                         logger.error(`Error processing declaration map ${declarationMapUrl}`, err)
                     }
                 })
@@ -579,6 +580,7 @@ webSocketServer.on('connection', connection => {
                     token,
                 })
             } catch (err) {
+                throwIfCancelled(token)
                 logger.error('Installation failed', err)
             } finally {
                 finishedDependencyInstallations.add(packageRootUri.href)
@@ -654,7 +656,7 @@ webSocketServer.on('connection', connection => {
      *
      * @param location A location on the file system (with a `file:` URI)
      */
-    async function mapFileLocation(location: Location): Promise<Location> {
+    async function mapFileLocation(location: Location, { token }: { token: CancellationToken }): Promise<Location> {
         const uri = new URL(location.uri)
         // Check if file path is in TypeScript lib
         // If yes, point to Microsoft/TypeScript GitHub repo
@@ -682,10 +684,6 @@ webSocketServer.on('connection', connection => {
                     version: packageJson.version,
                     fullMetadata: true,
                 })) as PackageJson
-                const commit = packageMeta.gitHead || 'HEAD'
-                if (commit === 'HEAD') {
-                    logger.warn(`Package ${packageJson.name} has no gitHead metadata, using latest HEAD`)
-                }
                 let subdir = ''
                 if (typeof packageJson.repository === 'object' && packageJson.repository.directory) {
                     subdir = packageJson.repository.directory
@@ -740,6 +738,7 @@ webSocketServer.on('connection', connection => {
                         },
                     }
                 } catch (err) {
+                    throwIfCancelled(token)
                     if (err instanceof ResourceNotFoundError) {
                         logger.log(`No declaration map for ${uri}, using declaration file`)
                     } else {
@@ -759,13 +758,19 @@ webSocketServer.on('connection', connection => {
                 const instanceUrl = new URL(configuration['sourcegraph.url'] || 'https://sourcegraph.com')
                 const accessToken = configuration['typescript.accessToken']
                 const repoName = await resolveRepository(cloneUrl, { instanceUrl, accessToken })
+                const commit = packageMeta.gitHead
+                if (!commit) {
+                    logger.warn(`Package ${packageJson.name} has no gitHead metadata, using latest HEAD`)
+                }
+                const repoRev = [repoName, commit].filter(Boolean).join('@')
                 const httpUrl = new URL(instanceUrl.href)
-                httpUrl.pathname = path.posix.join(`/${repoName}@${commit}/-/raw/`, mappedRepoRelativeFilePath)
+                httpUrl.pathname = path.posix.join(`/${repoRev}/-/raw/`, mappedRepoRelativeFilePath)
                 if (accessToken) {
                     httpUrl.username = accessToken
                 }
                 return { uri: httpUrl.href, range: mappedRange }
             } catch (err) {
+                throwIfCancelled(token)
                 logger.error(`Could not resolve location in dependency to an HTTP URL`, location, err)
                 // Return the file URI as an opaque identifier
                 return location
@@ -788,12 +793,15 @@ webSocketServer.on('connection', connection => {
      *
      * @param definition One or multiple locations on the file system.
      */
-    async function mapFileLocations(definition: Definition): Promise<Definition> {
+    async function mapFileLocations(
+        definition: Definition,
+        { token }: { token: CancellationToken }
+    ): Promise<Definition> {
         if (!definition) {
             return []
         }
         const arr = Array.isArray(definition) ? definition : [definition]
-        return await Promise.all(arr.map(mapFileLocation))
+        return await Promise.all(arr.map(location => mapFileLocation(location, { token })))
     }
 
     /**
@@ -845,10 +853,14 @@ webSocketServer.on('connection', connection => {
                 serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
                 openTextDocuments.add(httpTextDocumentUri.href)
             }
-            const result = await mapFileLocations(await serverMessageConnection.sendRequest(type, mappedParams, token))
+            const result = await mapFileLocations(
+                await serverMessageConnection.sendRequest(type, mappedParams, token),
+                { token }
+            )
             if (shouldLocationsWaitForDependencies(params, result)) {
                 await ensureDependenciesForDocument(httpTextDocumentUri, { tracer, span, token })
-                return await mapFileLocations(await serverMessageConnection.sendRequest(type, mappedParams, token))
+                const result = await serverMessageConnection.sendRequest(type, mappedParams, token)
+                return await mapFileLocations(result, { token })
             }
             return result
         })
