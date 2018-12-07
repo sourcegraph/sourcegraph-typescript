@@ -29,9 +29,9 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
         next()
         return () => {
             unsubscribed = true
-            if (!iteratorDone && iterator.return) {
+            if (!iteratorDone && iterator.throw) {
                 console.warn('Observable was unsubscribed from before Iterator finished')
-                iterator.return().catch(err => {
+                iterator.throw(createAbortError()).catch(err => {
                     // ignore
                 })
             }
