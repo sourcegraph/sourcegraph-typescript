@@ -41,6 +41,12 @@ const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
 
+const documentSelector: sourcegraph.DocumentSelector = [
+    { language: 'typescript' },
+    { language: 'javascript' },
+    { language: 'json' },
+]
+
 export async function activate(): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 10))
 
@@ -200,12 +206,9 @@ export async function activate(): Promise<void> {
     // git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
 
     // Hover
-    sourcegraph.languages.registerHoverProvider([{ pattern: '**/*.*' }], {
+    sourcegraph.languages.registerHoverProvider(documentSelector, {
         provideHover: async (textDocument, position) => {
             const textDocumentUri = new URL(textDocument.uri)
-            if (!isTypeScriptFile(textDocumentUri)) {
-                return undefined
-            }
             const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
             const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
             const connection = await getOrCreateConnection(serverRootUri)
@@ -219,12 +222,9 @@ export async function activate(): Promise<void> {
     })
 
     // Definition
-    sourcegraph.languages.registerDefinitionProvider([{ pattern: '**/*.*' }], {
+    sourcegraph.languages.registerDefinitionProvider(documentSelector, {
         provideDefinition: async (textDocument, position) => {
             const textDocumentUri = new URL(textDocument.uri)
-            if (!isTypeScriptFile(textDocumentUri)) {
-                return undefined
-            }
             const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
             const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
             const connection = await getOrCreateConnection(serverRootUri)
@@ -238,14 +238,11 @@ export async function activate(): Promise<void> {
     })
 
     // References
-    sourcegraph.languages.registerReferenceProvider([{ pattern: '**/*.*' }], {
+    sourcegraph.languages.registerReferenceProvider(documentSelector, {
         provideReferences: (textDocument, position) =>
             observableFromAsyncIterable(
                 (async function*() {
                     const textDocumentUri = new URL(textDocument.uri)
-                    if (!isTypeScriptFile(textDocumentUri)) {
-                        return
-                    }
                     const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
                     const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
                     const connection = await getOrCreateConnection(serverRootUri)
@@ -377,12 +374,9 @@ export async function activate(): Promise<void> {
     })
 
     // Implementations
-    sourcegraph.languages.registerImplementationProvider([{ pattern: '**/*.*' }], {
+    sourcegraph.languages.registerImplementationProvider(documentSelector, {
         provideImplementation: async (textDocument, position) => {
             const textDocumentUri = new URL(textDocument.uri)
-            if (!isTypeScriptFile(textDocumentUri)) {
-                return undefined
-            }
             const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
             const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
             const connection = await getOrCreateConnection(serverRootUri)
