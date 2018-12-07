@@ -39,9 +39,4 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
         }
     })
 
-/**
- * Converts an RxJS Observable to a Sourcegraph Suscribable that does not support error and complete callbacks.
- */
-export const observableToSubscribable = <T>(observable: Observable<T>) => observable as sourcegraph.Subscribable<T>
-
 export const asArray = <T>(val: T[] | T | null): T[] => (!val ? [] : Array.isArray(val) ? val : [val])
