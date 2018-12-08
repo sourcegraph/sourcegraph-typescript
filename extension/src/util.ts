@@ -47,3 +47,12 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
     })
 
 export const asArray = <T>(val: T[] | T | null): T[] => (!val ? [] : Array.isArray(val) ? val : [val])
+
+/**
+ * Throws an AbortError if the given AbortSignal is already aborted
+ */
+export function throwIfAborted(signal: AbortSignal): void {
+    if (signal.aborted) {
+        throw createAbortError()
+    }
+}

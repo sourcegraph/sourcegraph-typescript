@@ -1136,6 +1136,13 @@ abort-controller@^1.0.2:
   dependencies:
     event-target-shim "^3.0.0"
 
+abortable-rx@^1.0.9:
+  version "1.0.9"
+  resolved "https://registry.npmjs.org/abortable-rx/-/abortable-rx-1.0.9.tgz#0e05f4ab6b1eff8e4da9665020c5b226feb5803f"
+  integrity sha512-+lowxyuebPf07jOYk2zlna6TYXq97JyKUSZQPv+XpPMlvJd/U+vRdD/fcjbLxRAzn9UShn0yg22nr6z05+3/1g==
+  dependencies:
+    rxjs "^6.0.0"
+
 acorn@^5.0.0:
   version "5.7.3"
   resolved "https://registry.npmjs.org/acorn/-/acorn-5.7.3.tgz#67aa231bf8812974b85235a96771eb6bd07ea279"
@@ -7770,7 +7777,7 @@ rxjs-tslint-rules@^4.12.0:
     tslib "^1.8.0"
     tsutils "^3.0.0"
 
-rxjs@^6.3.3:
+rxjs@^6.0.0, rxjs@^6.3.3:
   version "6.3.3"
   resolved "https://registry.npmjs.org/rxjs/-/rxjs-6.3.3.tgz#3c6a7fa420e844a81390fb1158a9ec614f4bad55"
   integrity sha512-JTWmoY9tWCs7zvIk/CvRjhjGaOd+OVBM987mxFo+OW66cGpdKjZcpmc74ES1sB//7Kl/PAe8+wEakuhG4pcgOw==
@@ -7837,6 +7844,11 @@ semantic-release@^15.10.6:
     semver "^5.4.1"
     signale "^1.2.1"
     yargs "^12.0.0"
+
+semaphore-async-await@^1.5.1:
+  version "1.5.1"
+  resolved "https://registry.npmjs.org/semaphore-async-await/-/semaphore-async-await-1.5.1.tgz#857bef5e3644601ca4b9570b87e9df5ca12974fa"
+  integrity sha1-hXvvXjZEYBykuVcLh+nfXKEpdPo=
 
 semver-compare@^1.0.0:
   version "1.0.0"

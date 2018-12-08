@@ -11,10 +11,12 @@ import {
     WebSocketMessageReader,
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
+import { create } from 'abortable-rx'
 import { AsyncIterableX, merge } from 'ix/asynciterable/index'
 import { MergeAsyncIterable } from 'ix/asynciterable/merge'
-import { filter, flatMap, map, scan } from 'ix/asynciterable/pipe/index'
+import { _catch, _finally, filter, map, scan } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
+import Semaphore from 'semaphore-async-await'
 import * as sourcegraph from 'sourcegraph'
 import {
     DefinitionRequest,
@@ -24,6 +26,7 @@ import {
     ImplementationRequest,
     InitializeParams,
     InitializeRequest,
+    Location,
     LogMessageNotification,
     ReferenceContext,
     ReferenceParams,
@@ -35,7 +38,7 @@ import { findPackageDependentsWithNpm, findPackageDependentsWithSourcegraph, fin
 import { resolveRev, SourcegraphInstanceOptions } from './graphql'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
-import { asArray, observableFromAsyncIterable, throwIfAbortError } from './util'
+import { asArray, observableFromAsyncIterable, throwIfAborted, throwIfAbortError } from './util'
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
@@ -305,44 +308,64 @@ export async function activate(): Promise<void> {
                                         const dependents = findDependents(packageName, sgInstanceOptions)
 
                                         // Search for references in each dependent
-                                        yield* AsyncIterableX.from(dependents).pipe(
-                                            flatMap(async function*(repoName) {
-                                                try {
-                                                    const commitID = await resolveRev(
-                                                        repoName,
-                                                        'HEAD',
-                                                        sgInstanceOptions
-                                                    )
-                                                    const dependentRootUri = authenticateUri(
-                                                        new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
-                                                    )
-                                                    console.log(
-                                                        `Looking for external references in dependent repo ${repoName}`
-                                                    )
-                                                    const dependentConnection = await getOrCreateConnection(
-                                                        dependentRootUri
-                                                    )
-                                                    const referencesInDependent = asArray(
-                                                        await dependentConnection.sendRequest(
-                                                            ReferencesRequest.type,
-                                                            referenceParams
-                                                        )
-                                                    )
-                                                    console.log(
-                                                        `Found ${
-                                                            referencesInDependent.length
-                                                        } references in dependent repo ${repoName}`
-                                                    )
-                                                    yield referencesInDependent
-                                                } catch (err) {
-                                                    throwIfAbortError(err)
-                                                    console.error(
-                                                        `Error searching dependent repo "${repoName}" for references`,
-                                                        err
+                                        const referencesInDependents = create<Location[]>((observer, signal) => {
+                                            ;(async () => {
+                                                const concurrencyLimit = new Semaphore(7)
+                                                const waitGroup = new Set<Promise<void>>()
+                                                for await (const repoName of dependents) {
+                                                    throwIfAborted(signal)
+                                                    await concurrencyLimit.acquire()
+                                                    waitGroup.add(
+                                                        (async () => {
+                                                            try {
+                                                                const commitID = await resolveRev(
+                                                                    repoName,
+                                                                    'HEAD',
+                                                                    sgInstanceOptions
+                                                                )
+                                                                const dependentRootUri = authenticateUri(
+                                                                    new URL(
+                                                                        `${repoName}@${commitID}/-/raw/`,
+                                                                        instanceUrl
+                                                                    )
+                                                                )
+                                                                console.log(
+                                                                    `Looking for external references in dependent repo ${repoName}`
+                                                                )
+                                                                const dependentConnection = await getOrCreateConnection(
+                                                                    dependentRootUri
+                                                                )
+                                                                const referencesInDependent = asArray(
+                                                                    await dependentConnection.sendRequest(
+                                                                        ReferencesRequest.type,
+                                                                        referenceParams
+                                                                    )
+                                                                )
+                                                                console.log(
+                                                                    `Found ${
+                                                                        referencesInDependent.length
+                                                                    } references in dependent repo ${repoName}`
+                                                                )
+                                                                observer.next(referencesInDependent)
+                                                            } catch (err) {
+                                                                throwIfAbortError(err)
+                                                                console.error(
+                                                                    `Error searching dependent repo "${repoName}" for references`,
+                                                                    err
+                                                                )
+                                                            } finally {
+                                                                concurrencyLimit.release()
+                                                            }
+                                                        })()
                                                     )
                                                 }
-                                            })
-                                        )
+                                                await Promise.all(waitGroup)
+                                                observer.complete()
+                                            })().catch(err => observer.error(err))
+                                        })
+
+                                        yield* AsyncIterableX.from<Location[]>(referencesInDependents)
+
                                         console.log('Done going through dependents')
                                     } catch (err) {
                                         throwIfAbortError(err)
