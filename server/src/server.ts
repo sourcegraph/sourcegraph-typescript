@@ -436,7 +436,7 @@ webSocketServer.on('connection', connection => {
             await fs.writeFile(tsserverLogFile, '') // File needs to exist or else Tail will error
             const tsserverLogger = new PrefixedLogger(logger, 'tsserver')
             // Set up a tail -f on the tsserver logfile and forward the logs to the logger
-            const tsserverTail = new Tail(tsserverLogFile, { follow: true, fromBeginning: true })
+            const tsserverTail = new Tail(tsserverLogFile, { follow: true, fromBeginning: true, useWatchFile: true })
             connectionDisposables.add({ dispose: () => tsserverTail.unwatch() })
             tsserverTail.on('line', line => tsserverLogger.log(line + ''))
             tsserverTail.on('error', err => logger.error('Error tailing tsserver logs', err))
