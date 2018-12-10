@@ -685,6 +685,7 @@ webSocketServer.on('connection', connection => {
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
+            logger.log(`textDocument/hover result was not sufficient, waiting for dependency installation and retrying`)
             await ensureDependenciesForDocument(httpResourceUri, { tracer, span, token })
             throwIfCancelled(token)
             return await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
@@ -906,6 +907,7 @@ webSocketServer.on('connection', connection => {
                 { token }
             )
             if (shouldLocationsWaitForDependencies(params, result)) {
+                logger.log(`${type.method} result was not sufficient, waiting for dependency installation and retrying`)
                 await ensureDependenciesForDocument(httpTextDocumentUri, { tracer, span, token })
                 const result = await sendServerRequest(type, mappedParams, { tracer, span, token })
                 return await mapFileLocations(result, { token })
