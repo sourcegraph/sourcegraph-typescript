@@ -917,22 +917,18 @@ webSocketServer.on('connection', connection => {
 
     connectionDisposables.add(
         subscriptionToDisposable(
-            dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(async params => {
+            dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
                 try {
-                    await tracePromise('Handle textDocument/didOpen', tracer, undefined, async span => {
-                        span.addTags(onAllMessagesTags)
-                        const uri = new URL(params.textDocument.uri)
-                        const fileUri = mapHttpToFileUrlSimple(uri)
-                        const mappedParams: DidOpenTextDocumentParams = {
-                            textDocument: {
-                                ...params.textDocument,
-                                uri: fileUri.href,
-                            },
-                        }
-                        serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
-                        openTextDocuments.add(fileUri.href)
-                        await ensureDependenciesForDocument(uri, { tracer, span })
-                    })
+                    const uri = new URL(params.textDocument.uri)
+                    const fileUri = mapHttpToFileUrlSimple(uri)
+                    const mappedParams: DidOpenTextDocumentParams = {
+                        textDocument: {
+                            ...params.textDocument,
+                            uri: fileUri.href,
+                        },
+                    }
+                    serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
+                    openTextDocuments.add(fileUri.href)
                 } catch (err) {
                     logger.error('Error handling textDocument/didOpen notification', params, err)
                 }
