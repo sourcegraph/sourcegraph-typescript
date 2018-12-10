@@ -52,6 +52,33 @@
             "requestTime",
             "verbose"
           ]
+        },
+        "typescript.tsserver.env": {
+          "description": "Environment variables to give to tsserver",
+          "type": "object",
+          "properties": {
+            "TSC_WATCHFILE": {
+              "enum": [
+                "PriorityPollingInterval",
+                "DynamicPriorityPolling",
+                "UseFsEvents",
+                "UseFsEventsWithFallbackDynamicPolling",
+                "UseFsEventsOnParentDirectory"
+              ]
+            },
+            "TSC_NONPOLLING_WATCHER": {
+              "enum": ["true"]
+            },
+            "TSC_WATCHDIRECTORY": {
+              "enum": [
+                "RecursiveDirectoryUsingFsWatchFile",
+                "RecursiveDirectoryUsingDynamicPriorityPolling"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

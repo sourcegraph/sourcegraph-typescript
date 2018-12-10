@@ -127,6 +127,7 @@ let openConnections = 0
 interface Configuration {
     'typescript.langserver.log'?: false | 'log' | 'info' | 'warn' | 'error'
     'typescript.tsserver.log'?: false | 'terse' | 'normal' | 'requestTime' | 'verbose'
+    'typescript.tsserver.env'?: Record<string, string>
     'typescript.accessToken'?: string
     'sourcegraph.url'?: string
 }
@@ -455,6 +456,7 @@ webSocketServer.on('connection', connection => {
         }
         // Spawn language server
         const serverProcess = fork(TYPESCRIPT_LANGSERVER_JS_BIN, serverArgs, {
+            env: configuration['typescript.tsserver.env'],
             stdio: ['ipc', 'inherit'],
             execArgv: [],
         })
