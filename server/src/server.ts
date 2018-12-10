@@ -568,7 +568,7 @@ webSocketServer.on('connection', connection => {
         // URIs are rewritten by rewriteUris below, but it doesn't touch rootPath
         params = { ...params, rootPath: extractPath, rootUri: fileRootUri.href }
 
-        return await serverMessageConnection.sendRequest(InitializeRequest.type, params, token)
+        return await sendServerRequest(InitializeRequest.type, params, { tracer, span, token })
     })
 
     /**
@@ -900,12 +900,12 @@ webSocketServer.on('connection', connection => {
                 openTextDocuments.add(httpTextDocumentUri.href)
             }
             const result = await mapFileLocations(
-                await serverMessageConnection.sendRequest(type, mappedParams, token),
+                await sendServerRequest(type, mappedParams, { tracer, span, token }),
                 { token }
             )
             if (shouldLocationsWaitForDependencies(params, result)) {
                 await ensureDependenciesForDocument(httpTextDocumentUri, { tracer, span, token })
-                const result = await serverMessageConnection.sendRequest(type, mappedParams, token)
+                const result = await sendServerRequest(type, mappedParams, { tracer, span, token })
                 return await mapFileLocations(result, { token })
             }
             return result
