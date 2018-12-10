@@ -10,8 +10,13 @@ import { ERROR } from 'opentracing/lib/ext/tags'
  * @param childOf The parent span
  * @param operation The function to call
  */
-export function traceSync<T>(operationName: string, childOf: Span, operation: (span: Span) => T): T {
-    const span = childOf.tracer().startSpan(operationName, { childOf })
+export function traceSync<T>(
+    operationName: string,
+    tracer: Tracer,
+    childOf: Span | undefined,
+    operation: (span: Span) => T
+): T {
+    const span = tracer.startSpan(operationName, { childOf })
     try {
         return operation(span)
     } catch (err) {
