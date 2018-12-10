@@ -668,7 +668,9 @@ webSocketServer.on('connection', connection => {
     ): Promise<R> {
         return await tracePromise('Request ' + type.method, tracer, span, async span => {
             span.setTag(SPAN_KIND, SPAN_KIND_RPC_CLIENT)
-            return await serverMessageConnection.sendRequest(type, params, token)
+            const result = await serverMessageConnection.sendRequest(type, params, token)
+            logger.log(`Got result for ${type.method}`, params, result)
+            return result
         })
     }
 
