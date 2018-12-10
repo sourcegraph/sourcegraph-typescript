@@ -657,18 +657,32 @@ webSocketServer.on('connection', connection => {
         })
     }
 
+    /**
+     * Sends a request to the language server with support for OpenTracing (wrapping the request in a span)
+     */
+    async function sendServerRequest<P, R>(
+        type: RequestType<P, R>,
+        params: P,
+        { tracer, span, token }: { tracer: Tracer; span: Span; token: CancellationToken }
+    ): Promise<R> {
+        return await tracePromise('Request ' + type.method, tracer, span, async span => {
+            span.setTag(SPAN_KIND, SPAN_KIND_RPC_CLIENT)
+            return await serverMessageConnection.sendRequest(type, params, token)
+        })
+    }
+
     dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
         const httpResourceUri = new URL(params.textDocument.uri)
         // Map the http URI in params to file URIs
         const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
-        const hover = await serverMessageConnection.sendRequest(HoverRequest.type, mappedParams, token)
+        const hover = await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
         const contents = !hover ? [] : Array.isArray(hover.contents) ? hover.contents : [hover.contents]
         const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
         // Check if the type is `any` or the import is shown as the declaration
         if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
             await ensureDependenciesForDocument(httpResourceUri, { tracer, span, token })
             throwIfCancelled(token)
-            return await serverMessageConnection.sendRequest(HoverRequest.type, mappedParams, token)
+            return await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
         }
         // If any of the parent package.json roots is not finished installing, let the user know
         if (findParentPackageRoots(httpResourceUri).some(root => !finishedDependencyInstallations.has(root.href))) {
