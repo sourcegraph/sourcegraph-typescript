@@ -931,7 +931,7 @@ webSocketServer.on('connection', connection => {
                         }
                         serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
                         openTextDocuments.add(fileUri.href)
-                        await ensureDependenciesForDocument(uri, { tracer })
+                        await ensureDependenciesForDocument(uri, { tracer, span })
                     })
                 } catch (err) {
                     logger.error('Error handling textDocument/didOpen notification', params, err)
