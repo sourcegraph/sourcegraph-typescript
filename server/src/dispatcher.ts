@@ -52,10 +52,13 @@ export const createRequestDurationMetric = () =>
 export function createDispatcher(
     client: Connection,
     {
+        tags,
         tracer,
         logger,
         requestDurationMetric,
     }: {
+        /** Tags to set on every Span */
+        tags: Record<string, any>
         tracer: Tracer
         logger: Logger
         /**
@@ -85,7 +88,7 @@ export function createDispatcher(
         } else if (isRequestMessage(message)) {
             const stopTimer = requestDurationMetric && requestDurationMetric.startTimer()
             let success: boolean
-            const span = tracer.startSpan('Handle ' + message.method)
+            const span = tracer.startSpan('Handle ' + message.method, { tags })
             let lightstepTraceUrl: string | undefined
             // Log the trace URL for this request in the client
             if (span instanceof LightstepSpan) {

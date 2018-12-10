@@ -21,6 +21,7 @@ import mkdirp from 'mkdirp-promise'
 import * as fs from 'mz/fs'
 import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
+import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT, SPAN_KIND_RPC_SERVER } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import fetchPackageMeta from 'package-json'
 import * as path from 'path'
@@ -225,7 +226,15 @@ webSocketServer.on('connection', connection => {
     /** HTTP URIs of text documents that were sent didOpen for */
     const openTextDocuments = new Set<string>()
 
-    const dispatcher = createDispatcher(webSocketConnection, { tracer, logger, requestDurationMetric })
+    const dispatcher = createDispatcher(webSocketConnection, {
+        requestDurationMetric,
+        logger,
+        tracer,
+        tags: {
+            connectionId,
+            [SPAN_KIND]: SPAN_KIND_RPC_CLIENT,
+        },
+    })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
 
     /** Checks if the given URI is under the root URI */
@@ -466,8 +475,18 @@ webSocketServer.on('connection', connection => {
         // Forward log messages from the language server to the browser
         {
             const languageServerDispatcher = createDispatcher(
-                { reader: languageServerReader, writer: languageServerWriter },
-                { tracer, logger }
+                {
+                    reader: languageServerReader,
+                    writer: languageServerWriter,
+                },
+                {
+                    tracer,
+                    logger,
+                    tags: {
+                        connectionId,
+                        [SPAN_KIND]: [SPAN_KIND_RPC_SERVER],
+                    },
+                }
             )
             const languageServerLogger = new PrefixedLogger(logger, 'langserver')
             connectionDisposables.add(
@@ -487,7 +506,7 @@ webSocketServer.on('connection', connection => {
         await tracePromise('Fetch source archive', tracer, span, async span => {
             const using: Disposable[] = []
             try {
-                span.setTag('url', httpRootUri.href)
+                span.setTag(HTTP_URL, httpRootUri.href)
                 let bytes = 0
                 await new Promise<void>((resolve, reject) => {
                     const headers = {
