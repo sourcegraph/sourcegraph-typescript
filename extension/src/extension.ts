@@ -202,12 +202,31 @@ export async function activate(): Promise<void> {
         }
     })
 
-    // Example of a Sourcegraph textdocument URI:
-    // git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
+    /** Workaround for https://github.com/sourcegraph/sourcegraph/issues/1321 */
+    function distinctUntilChanged<P extends any[], R>(
+        compare: (a: P, b: P) => boolean,
+        fn: (...args: P) => R
+    ): ((...p: P) => R) {
+        let previousResult: R
+        let previousArgs: P
+        return (...args) => {
+            if (compare(previousArgs, args)) {
+                return previousResult
+            }
+            previousArgs = args
+            previousResult = fn(...args)
+            return previousResult
+        }
+    }
+
+    const areProviderParamsEqual = (
+        [doc1, pos1]: [sourcegraph.TextDocument, sourcegraph.Position],
+        [doc2, pos2]: [sourcegraph.TextDocument, sourcegraph.Position]
+    ): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
 
     // Hover
     sourcegraph.languages.registerHoverProvider(documentSelector, {
-        provideHover: async (textDocument, position) => {
+        provideHover: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
             const textDocumentUri = new URL(textDocument.uri)
             const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
             const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
@@ -218,12 +237,12 @@ export async function activate(): Promise<void> {
             })
             rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
             return convertHover(hoverResult)
-        },
+        }),
     })
 
     // Definition
     sourcegraph.languages.registerDefinitionProvider(documentSelector, {
-        provideDefinition: async (textDocument, position) => {
+        provideDefinition: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
             const textDocumentUri = new URL(textDocument.uri)
             const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
             const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
@@ -234,7 +253,7 @@ export async function activate(): Promise<void> {
             })
             rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
             return convertLocations(definitionResult)
-        },
+        }),
     })
 
     // References
