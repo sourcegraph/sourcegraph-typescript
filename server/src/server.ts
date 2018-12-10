@@ -226,14 +226,15 @@ webSocketServer.on('connection', connection => {
     /** HTTP URIs of text documents that were sent didOpen for */
     const openTextDocuments = new Set<string>()
 
+    const onAllMessagesTags = {
+        connectionId,
+        [SPAN_KIND]: SPAN_KIND_RPC_CLIENT,
+    }
     const dispatcher = createDispatcher(webSocketConnection, {
         requestDurationMetric,
         logger,
         tracer,
-        tags: {
-            connectionId,
-            [SPAN_KIND]: SPAN_KIND_RPC_CLIENT,
-        },
+        tags: onAllMessagesTags,
     })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
 
@@ -916,21 +917,22 @@ webSocketServer.on('connection', connection => {
 
     connectionDisposables.add(
         subscriptionToDisposable(
-            dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
+            dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(async params => {
                 try {
-                    const uri = new URL(params.textDocument.uri)
-                    const fileUri = mapHttpToFileUrlSimple(uri)
-                    const mappedParams: DidOpenTextDocumentParams = {
-                        textDocument: {
-                            ...params.textDocument,
-                            uri: fileUri.href,
-                        },
-                    }
-                    serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
-                    openTextDocuments.add(fileUri.href)
-                    // Kick off installation in the background
-                    // tslint:disable-next-line no-floating-promises
-                    ensureDependenciesForDocument(uri, { tracer })
+                    await tracePromise('Handle textDocument/didOpen', tracer, undefined, async span => {
+                        span.addTags(onAllMessagesTags)
+                        const uri = new URL(params.textDocument.uri)
+                        const fileUri = mapHttpToFileUrlSimple(uri)
+                        const mappedParams: DidOpenTextDocumentParams = {
+                            textDocument: {
+                                ...params.textDocument,
+                                uri: fileUri.href,
+                            },
+                        }
+                        serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
+                        openTextDocuments.add(fileUri.href)
+                        await ensureDependenciesForDocument(uri, { tracer })
+                    })
                 } catch (err) {
                     logger.error('Error handling textDocument/didOpen notification', params, err)
                 }
