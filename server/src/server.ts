@@ -133,12 +133,9 @@ interface Configuration {
 }
 
 // Send a ping frame every 10s to keep the browser connection alive
-const alive = new Set<WebSocket>()
 setInterval(() => {
     for (const client of webSocketServer.clients) {
-        if (!alive.has(client)) {
-            client.terminate()
-        } else if (client.readyState === client.OPEN) {
+        if (client.readyState === client.OPEN) {
             try {
                 client.ping()
             } catch (err) {
@@ -146,7 +143,6 @@ setInterval(() => {
             }
         }
     }
-    alive.clear()
 }, 10000)
 
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
@@ -193,10 +189,6 @@ webSocketServer.on('connection', connection => {
         connection.on('close', closeListener)
         connectionDisposables.add({ dispose: () => connection.removeListener('close', closeListener) })
     }
-
-    connection.on('pong', () => {
-        alive.add(connection)
-    })
 
     const webSocket: IWebSocket = {
         onMessage: handler => connection.on('message', handler),
