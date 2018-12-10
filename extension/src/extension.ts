@@ -25,6 +25,7 @@ import {
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
+    MessageType,
     ReferenceContext,
     ReferenceParams,
     ReferencesRequest,
@@ -46,6 +47,13 @@ const documentSelector: sourcegraph.DocumentSelector = [
     { language: 'javascript' },
     { language: 'json' },
 ]
+
+const logMethods: Record<MessageType, keyof Console> = {
+    1: 'error',
+    2: 'warn',
+    3: 'info',
+    4: 'log',
+}
 
 export async function activate(): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 10))
@@ -86,28 +94,14 @@ export async function activate(): Promise<void> {
         )
         connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
             // Blue background for the "TypeScript server" prefix
+            const method = logMethods[type]
             const args = [
-                // console.info() doesn't get a visual distinction or filter in Chrome anymore
-                (type === 3 ? 'ℹ️' : '') + '%cTypeScript backend%c %s',
+                new Date().toLocaleTimeString() + ' %cTypeScript backend%c %s',
                 'background-color: blue; color: white',
                 '',
                 message,
             ]
-            switch (type) {
-                case 1:
-                    console.error(...args)
-                    break
-                case 2:
-                    console.warn(...args)
-                    break
-                case 3:
-                    console.info(...args)
-                    break
-                case 4:
-                default:
-                    console.log(...args)
-                    break
-            }
+            console[method](...args)
         })
         connection.listen()
         const event = await new Promise<Event>(resolve => {
@@ -227,16 +221,21 @@ export async function activate(): Promise<void> {
     // Hover
     sourcegraph.languages.registerHoverProvider(documentSelector, {
         provideHover: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
-            const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-            const connection = await getOrCreateConnection(serverRootUri)
-            const hoverResult = await connection.sendRequest(HoverRequest.type, {
-                textDocument: { uri: serverTextDocumentUri.href },
-                position,
-            })
-            rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
-            return convertHover(hoverResult)
+            const startTime = Date.now()
+            try {
+                const textDocumentUri = new URL(textDocument.uri)
+                const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+                const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                const connection = await getOrCreateConnection(serverRootUri)
+                const hoverResult = await connection.sendRequest(HoverRequest.type, {
+                    textDocument: { uri: serverTextDocumentUri.href },
+                    position,
+                })
+                rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
+                return convertHover(hoverResult)
+            } finally {
+                console.log(`Hover result after ${((Date.now() - startTime) / 1000).toFixed(3)}s`)
+            }
         }),
     })
 
