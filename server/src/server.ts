@@ -52,7 +52,7 @@ import {
     TextDocumentPositionParams,
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
-import WebSocket, { Server } from 'ws'
+import { Server } from 'ws'
 import { createAbortError, throwIfCancelled } from './cancellation'
 import {
     filterDependencies,
