@@ -206,11 +206,11 @@ export async function activate(): Promise<void> {
     function distinctUntilChanged<P extends any[], R>(
         compare: (a: P, b: P) => boolean,
         fn: (...args: P) => R
-    ): ((...p: P) => R) {
+    ): ((...args: P) => R) {
         let previousResult: R
         let previousArgs: P
         return (...args) => {
-            if (compare(previousArgs, args)) {
+            if (previousArgs && compare(previousArgs, args)) {
                 return previousResult
             }
             previousArgs = args
