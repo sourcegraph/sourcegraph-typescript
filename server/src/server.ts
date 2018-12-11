@@ -12,25 +12,26 @@ import {
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
+import axios from 'axios'
 import { fork } from 'child_process'
 import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import * as fs from 'mz/fs'
 import { realpathSync } from 'mz/fs'
+import * as fs from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT, SPAN_KIND_RPC_SERVER } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import fetchPackageMeta from 'package-json'
 import * as path from 'path'
 import * as prometheus from 'prom-client'
-import request from 'request'
 import rmfr from 'rmfr'
 import { NullableMappedPosition, RawSourceMap, SourceMapConsumer } from 'source-map'
 import { Tail } from 'tail'
 import { extract, FileStat } from 'tar'
+import * as type from 'type-is'
 import { fileURLToPath, pathToFileURL } from 'url'
 import uuid = require('uuid')
 import {
@@ -53,7 +54,7 @@ import {
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
-import { createAbortError, throwIfCancelled } from './cancellation'
+import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
 import {
     filterDependencies,
     findClosestPackageJson,
@@ -63,7 +64,7 @@ import {
     resolveDependencyRootDir,
 } from './dependencies'
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
-import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
+import { AsyncDisposable, Disposable, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
 import {
     LOG_LEVEL_TO_LSP,
@@ -72,6 +73,7 @@ import {
     LSPLogger,
     MultiLogger,
     PrefixedLogger,
+    redact,
     RedactingLogger,
 } from './logging'
 import {
@@ -523,52 +525,39 @@ webSocketServer.on('connection', connection => {
         logger.info('Fetching archive from', httpRootUri.href)
         logger.log('Extracting to', extractPath)
         await tracePromise('Fetch source archive', tracer, span, async span => {
-            const using: Disposable[] = []
-            try {
-                span.setTag(HTTP_URL, httpRootUri.href)
-                let bytes = 0
-                await new Promise<void>((resolve, reject) => {
-                    const headers = {
-                        Accept: 'application/x-tar',
-                        'User-Agent': 'TypeScript language server',
-                    }
-                    span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
-                    const archiveRequest = request(httpRootUri.href, { headers })
-                    using.push(
-                        token.onCancellationRequested(() => {
-                            archiveRequest.abort()
-                            reject(createAbortError())
-                        })
-                    )
-                    archiveRequest
-                        .once('error', reject)
-                        .once('response', ({ statusCode, statusMessage }) => {
-                            if (statusCode >= 400) {
-                                archiveRequest.abort()
-                                reject(
-                                    new Error(
-                                        `Archive fetch of ${httpRootUri} failed with ${statusCode} ${statusMessage}`
-                                    )
-                                )
-                            }
-                        })
-                        .on('data', (chunk: Buffer) => {
-                            bytes += chunk.byteLength
-                        })
-                        .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
-                        .on('entry', (entry: FileStat) => {
-                            if (entry.header.path && entry.header.path.endsWith('package.json')) {
-                                packageJsonPaths.push(entry.header.path)
-                            }
-                        })
-                        .on('warn', warning => logger.warn(warning))
-                        .once('finish', resolve)
-                        .once('error', reject)
-                })
-                span.setTag('bytes', bytes)
-            } finally {
-                disposeAll(using, logger)
+            span.setTag(HTTP_URL, redact(httpRootUri.href))
+            const headers = {
+                Accept: 'application/x-tar',
+                'User-Agent': 'TypeScript language server',
             }
+            span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
+            const response = await axios.get<NodeJS.ReadableStream>(httpRootUri.href, {
+                headers,
+                responseType: 'stream',
+                cancelToken: toAxiosCancelToken(token),
+            })
+            const contentType = response.headers['content-type']
+            if (!type.is(contentType, 'application/*')) {
+                throw new Error(`Expected response to be of content type application/x-tar, was ${contentType}`)
+            }
+            let bytes = 0
+            await new Promise<void>((resolve, reject) => {
+                response.data
+                    .on('error', reject)
+                    .on('data', (chunk: Buffer) => {
+                        bytes += chunk.byteLength
+                    })
+                    .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
+                    .on('entry', (entry: FileStat) => {
+                        if (entry.header.path && entry.header.path.endsWith('package.json')) {
+                            packageJsonPaths.push(entry.header.path)
+                        }
+                    })
+                    .on('warn', warning => logger.warn(warning))
+                    .on('finish', resolve)
+                    .on('error', reject)
+            })
+            span.setTag('bytes', bytes)
         })
 
         // Find package.jsons to install
