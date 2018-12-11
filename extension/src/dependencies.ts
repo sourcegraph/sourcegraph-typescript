@@ -1,4 +1,4 @@
-import { resolveRepository, search } from './graphql'
+import { queryExtensions, resolveRepository, search } from './graphql'
 import { SourcegraphInstance } from './graphql'
 import { Logger } from './logging'
 
@@ -75,7 +75,7 @@ export async function* findPackageDependentsWithNpm(
 /**
  * @return AsyncIterable that yields Sourcegraph repository names
  */
-export async function* findPackageDependentsWithSourcegraph(
+export async function* findPackageDependentsWithSourcegraphSearch(
     packageName: string,
     sgInstance: SourcegraphInstance,
     { logger }: { logger: Logger }
@@ -88,6 +88,34 @@ export async function* findPackageDependentsWithSourcegraph(
         if (!seenRepos.has(repoName)) {
             seenRepos.add(repoName)
             yield repoName
+        }
+    }
+}
+
+/**
+ * @return AsyncIterable that yields Sourcegraph repository names
+ */
+export async function* findPackageDependentsWithSourcegraphExtensionRegistry(
+    sgInstance: SourcegraphInstance,
+    { logger }: { logger: Logger }
+): AsyncIterable<string> {
+    logger.log(`Searching for dependents to "sourcegraph" through Sourcegraph extension registry`)
+    const extensions = await queryExtensions(sgInstance)
+    logger.log(`Found ${extensions.length} extensions`)
+    const seenRepos = new Set<string>()
+    for (const extension of extensions) {
+        try {
+            if (!extension || !extension.manifest || !extension.manifest.raw) {
+                continue
+            }
+            const manifest = JSON.parse(extension.manifest.raw)
+            const repoName = await resolvePackageNameToRepoName(manifest, sgInstance)
+            if (!seenRepos.has(repoName)) {
+                seenRepos.add(repoName)
+                yield repoName
+            }
+        } catch (err) {
+            logger.error(`Error mapping extension "${extension.extensionID}" to Sourcegraph repo`, err)
         }
     }
 }

@@ -110,3 +110,31 @@ export async function resolveRepository(cloneUrl: string, options: SourcegraphIn
     }
     return data.repository.name
 }
+
+/**
+ * Returns all extensions on the Sourcegraph instance.
+ */
+export async function queryExtensions(options: SourcegraphInstance): Promise<any[]> {
+    const { data, errors } = await requestGraphQL(
+        gql`
+            query ExtensionManifests {
+                extensionRegistry {
+                    extensions {
+                        nodes {
+                            extensionID
+                            manifest {
+                                raw
+                            }
+                        }
+                    }
+                }
+            }
+        `,
+        {},
+        options
+    )
+    if (errors && errors.length > 0) {
+        throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
+    }
+    return data.extensionRegistry.extensions.nodes
+}

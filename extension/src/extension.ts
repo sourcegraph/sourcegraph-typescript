@@ -31,7 +31,12 @@ import {
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
-import { findPackageDependentsWithNpm, findPackageDependentsWithSourcegraph, findPackageName } from './dependencies'
+import {
+    findPackageDependentsWithNpm,
+    findPackageDependentsWithSourcegraphExtensionRegistry as findDependentsWithSourcegraphExtensionRegistry,
+    findPackageDependentsWithSourcegraphSearch,
+    findPackageName,
+} from './dependencies'
 import { resolveRev, SourcegraphInstance } from './graphql'
 import { LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
@@ -294,10 +299,10 @@ export async function activate(): Promise<void> {
                                 accessToken,
                                 instanceUrl,
                             }
-                            const findDependents =
+                            const findPackageDependents =
                                 instanceUrl.hostname === 'sourcegraph.com'
                                     ? findPackageDependentsWithNpm
-                                    : findPackageDependentsWithSourcegraph
+                                    : findPackageDependentsWithSourcegraphSearch
 
                             yield* new MergeAsyncIterable(
                                 definitions.map(async function*(definition) {
@@ -315,7 +320,12 @@ export async function activate(): Promise<void> {
                                         const packageName = await findPackageName(definitionUri, { logger })
 
                                         // Find dependent packages on the package
-                                        const dependents = findDependents(packageName, sgInstance, { logger })
+                                        const dependents =
+                                            packageName === 'sourcegraph'
+                                                ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
+                                                  // Extensions are not published to npm, so search the extension registry
+                                                  findDependentsWithSourcegraphExtensionRegistry(sgInstance, { logger })
+                                                : findPackageDependents(packageName, sgInstance, { logger })
 
                                         // Search for references in each dependent
                                         yield* AsyncIterableX.from(dependents).pipe(
