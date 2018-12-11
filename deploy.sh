@@ -3,7 +3,7 @@ set -ex
 cd $(dirname "${BASH_SOURCE[0]}")
 
 # Install dependencies
-yarn
+yarn --check-files
 
 # Compile TypeScript
 yarn run build
