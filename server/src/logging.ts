@@ -58,7 +58,7 @@ export const LSP_TO_LOG_LEVEL: Record<MessageType, LogLevel> = {
 /**
  * Removes auth info from URLs
  */
-export const redact = (message: string): string => message.replace(/([\w+]+:\/\/)[^@]+@([^\s$]+)/g, '$1$2')
+export const redact = (message: string): string => message.replace(/(https?:\/\/)[^@]+@([^\s$]+)/g, '$1$2')
 
 /**
  * Logger that formats the logged values and removes any auth info in URLs.

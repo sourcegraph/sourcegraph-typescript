@@ -48,7 +48,7 @@ const format = (value: any): string => (typeof value === 'string' ? value : insp
 /**
  * Removes auth info from URLs
  */
-const redact = (message: string): string => message.replace(/([\w+]+:\/\/)[^@\/]+@([^\s$]+)/g, '$1$2')
+const redact = (message: string): string => message.replace(/(https?:\/\/)[^@\/]+@([^\s$]+)/g, '$1$2')
 
 /**
  * Logger that formats the logged values and removes any auth info in URLs.
