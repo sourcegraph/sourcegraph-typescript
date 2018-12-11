@@ -2,11 +2,13 @@
 .editorconfig
 .git/
 .gitignore
+.prettierignore
 .vscode/
 .yarnrc
 *.log
 *.pem
 buildkite.yml
+deploy.sh
 dist/
 extension/
 kubernetes/
