@@ -10,9 +10,9 @@
 buildkite.yml
 deploy.sh
 dist/
+Dockerfile
 extension/
 kubernetes/
-node_modules/
 package.json
 prettier.config.js
 README.md
