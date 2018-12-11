@@ -25,6 +25,7 @@ import {
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
+    PublishDiagnosticsNotification,
     ReferenceContext,
     ReferenceParams,
     ReferencesRequest,
@@ -38,7 +39,7 @@ import {
     findPackageName,
 } from './dependencies'
 import { resolveRev, SourcegraphInstance } from './graphql'
-import { LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
+import { Logger, LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
 import { asArray, observableFromAsyncIterable, throwIfAbortError } from './util'
@@ -53,7 +54,7 @@ const documentSelector: sourcegraph.DocumentSelector = [
     { language: 'json' },
 ]
 
-const logger = new RedactingLogger(console)
+const logger: Logger = new RedactingLogger(console)
 
 export async function activate(): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 10))
@@ -152,6 +153,10 @@ export async function activate(): Promise<void> {
             }
             connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
         }
+        // Log diagnostics
+        connection.onNotification(PublishDiagnosticsNotification.type, params => {
+            logger.log('Diagnostics', params)
+        })
         return connection
     }
 

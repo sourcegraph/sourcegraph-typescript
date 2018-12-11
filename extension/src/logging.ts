@@ -58,7 +58,7 @@ export class RedactingLogger extends AbstractLogger {
         super()
     }
 
-    public logType(type: LogLevel, values: any[]): void {
+    protected logType(type: LogLevel, values: any[]): void {
         // TODO ideally this would not format the value to a string before redacting,
         // because that prevents expanding objects in devtools
         this.logger[type](...values.map(value => redact(format(value))))
