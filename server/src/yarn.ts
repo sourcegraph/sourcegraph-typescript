@@ -104,6 +104,7 @@ export function spawnYarn({
     if (options.verbose) {
         args.push('--verbose')
     }
+    logger.log(`Starting yarn install`)
     const yarn: YarnProcess = spawn(process.execPath, args, { cwd: options.cwd })
 
     /** Emitted error messages by yarn */
