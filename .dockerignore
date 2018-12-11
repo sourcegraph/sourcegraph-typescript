@@ -10,7 +10,6 @@
 buildkite.yml
 deploy.sh
 dist/
-Dockerfile
 extension/
 kubernetes/
 package.json
