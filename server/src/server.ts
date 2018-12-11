@@ -7,29 +7,26 @@ Object.assign(global, { AbortController })
 import {
     createMessageConnection,
     IWebSocket,
-    MessageConnection,
     WebSocketMessageReader,
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import axios from 'axios'
-import { fork } from 'child_process'
 import * as http from 'http'
 import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
-import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT, SPAN_KIND_RPC_SERVER } from 'opentracing/lib/ext/tags'
+import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import fetchPackageMeta from 'package-json'
 import * as path from 'path'
 import * as prometheus from 'prom-client'
 import rmfr from 'rmfr'
 import { NullableMappedPosition, RawSourceMap, SourceMapConsumer } from 'source-map'
-import { Tail } from 'tail'
 import { extract, FileStat } from 'tar'
 import * as type from 'type-is'
 import { fileURLToPath, pathToFileURL } from 'url'
@@ -44,10 +41,7 @@ import {
     HoverRequest,
     ImplementationRequest,
     InitializeRequest,
-    IPCMessageReader,
-    IPCMessageWriter,
     Location,
-    LogMessageNotification,
     Range,
     ReferencesRequest,
     TextDocumentPositionParams,
@@ -55,6 +49,7 @@ import {
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
 import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
+import { Configuration } from './config'
 import {
     filterDependencies,
     findClosestPackageJson,
@@ -66,16 +61,8 @@ import {
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
-import {
-    LOG_LEVEL_TO_LSP,
-    Logger,
-    LSP_TO_LOG_LEVEL,
-    LSPLogger,
-    MultiLogger,
-    PrefixedLogger,
-    redact,
-    RedactingLogger,
-} from './logging'
+import { LanguageServer, spawnLanguageServer } from './language-server'
+import { Logger, LSPLogger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from './logging'
 import {
     createResourceRetrieverPicker,
     FileResourceRetriever,
@@ -136,14 +123,6 @@ const requestDurationMetric = createRequestDurationMetric()
 prometheus.collectDefaultMetrics()
 let openConnections = 0
 
-interface Configuration {
-    'typescript.langserver.log'?: false | 'log' | 'info' | 'warn' | 'error'
-    'typescript.tsserver.log'?: false | 'terse' | 'normal' | 'requestTime' | 'verbose'
-    'typescript.tsserver.env'?: Record<string, string>
-    'typescript.accessToken'?: string
-    'sourcegraph.url'?: string
-}
-
 // Send a ping frame every 10s to keep the browser connection alive
 setInterval(() => {
     for (const client of webSocketServer.clients) {
@@ -158,17 +137,6 @@ setInterval(() => {
 }, 10000)
 
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
-
-const TYPESCRIPT_LANGSERVER_JS_BIN = path.resolve(
-    __dirname,
-    '..',
-    '..',
-    'node_modules',
-    '@sourcegraph',
-    'typescript-language-server',
-    'lib',
-    'cli.js'
-)
 
 const pickResourceRetriever = createResourceRetrieverPicker([new HttpResourceRetriever(), new FileResourceRetriever()])
 
@@ -227,7 +195,7 @@ webSocketServer.on('connection', connection => {
     const connectionLogger = logger
 
     // Connection state set on initialize
-    let serverMessageConnection: MessageConnection
+    let languageServer: LanguageServer
     let configuration: Configuration = {}
     let tempDir: string
     let httpRootUri: URL
@@ -451,75 +419,6 @@ webSocketServer.on('connection', connection => {
         globalFolderRoot = path.join(tempDir, 'global')
         await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolderRoot), fs.mkdir(globalFolderRoot)])
 
-        const serverArgs: string[] = [
-            '--node-ipc',
-            // Use local tsserver instead of the tsserver of the repo for security reasons
-            '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
-        ]
-        if (configuration['typescript.langserver.log']) {
-            serverArgs.push('--log-level=' + LOG_LEVEL_TO_LSP[configuration['typescript.langserver.log'] || 'log'])
-        }
-        if (configuration['typescript.tsserver.log']) {
-            // Prepare tsserver log file
-            const tsserverLogFile = path.resolve(tempDir, 'tsserver.log')
-            await fs.writeFile(tsserverLogFile, '') // File needs to exist or else Tail will error
-            const tsserverLogger = new PrefixedLogger(logger, 'tsserver')
-            // Set up a tail -f on the tsserver logfile and forward the logs to the logger
-            const tsserverTail = new Tail(tsserverLogFile, { follow: true, fromBeginning: true, useWatchFile: true })
-            connectionDisposables.add({ dispose: () => tsserverTail.unwatch() })
-            tsserverTail.on('line', line => tsserverLogger.log(line + ''))
-            tsserverTail.on('error', err => logger.error('Error tailing tsserver logs', err))
-            serverArgs.push('--tsserver-log-file', tsserverLogFile)
-            serverArgs.push('--tsserver-log-verbosity', configuration['typescript.tsserver.log'] || 'verbose')
-        }
-        // Spawn language server
-        const serverProcess = fork(TYPESCRIPT_LANGSERVER_JS_BIN, serverArgs, {
-            env: configuration['typescript.tsserver.env'],
-            stdio: ['ipc', 'inherit'],
-            execArgv: [],
-        })
-        connectionDisposables.add({ dispose: () => serverProcess.kill() })
-        serverProcess.on('error', err => {
-            logger.error('Launching language server failed', err)
-            connection.close()
-        })
-        // Log language server STDERR output
-        const languageServerLogger = new PrefixedLogger(logger, 'langserver')
-        serverProcess.stderr.on('data', chunk => languageServerLogger.log(chunk + ''))
-        const languageServerReader = new IPCMessageReader(serverProcess)
-        const languageServerWriter = new IPCMessageWriter(serverProcess)
-        connectionDisposables.add(languageServerWriter)
-        serverMessageConnection = createMessageConnection(languageServerReader, languageServerWriter, logger)
-        connectionDisposables.add(serverMessageConnection)
-        serverMessageConnection.listen()
-
-        // Forward log messages from the language server to the browser
-        {
-            const languageServerDispatcher = createDispatcher(
-                {
-                    reader: languageServerReader,
-                    writer: languageServerWriter,
-                },
-                {
-                    tracer,
-                    logger,
-                    tags: {
-                        connectionId,
-                        [SPAN_KIND]: [SPAN_KIND_RPC_SERVER],
-                    },
-                }
-            )
-            const languageServerLogger = new PrefixedLogger(logger, 'langserver')
-            connectionDisposables.add(
-                subscriptionToDisposable(
-                    languageServerDispatcher.observeNotification(LogMessageNotification.type).subscribe(params => {
-                        const type = LSP_TO_LOG_LEVEL[params.type]
-                        languageServerLogger[type](params.message)
-                    })
-                )
-            )
-        }
-
         // Fetch tar and extract into temp folder
         const packageJsonPaths: string[] = []
         logger.info('Fetching archive from', httpRootUri.href)
@@ -569,6 +468,18 @@ webSocketServer.on('connection', connection => {
 
         // Sanitize tsconfig.json files
         await sanitizeTsConfigs({ cwd: extractPath, logger, tracer, span, token })
+
+        // Spawn language server
+        languageServer = await spawnLanguageServer({ tempDir, configuration, connectionId, tracer, logger })
+        connectionDisposables.add(languageServer)
+        connectionDisposables.add(
+            subscriptionToDisposable(
+                languageServer.errors.subscribe(err => {
+                    logger.error('Launching language server failed', err)
+                    connection.close()
+                })
+            )
+        )
 
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
@@ -675,7 +586,7 @@ webSocketServer.on('connection', connection => {
     ): Promise<R> {
         return await tracePromise('Request ' + type.method, tracer, span, async span => {
             span.setTag(SPAN_KIND, SPAN_KIND_RPC_CLIENT)
-            const result = await serverMessageConnection.sendRequest(type, params, token)
+            const result = await languageServer.connection.sendRequest(type, params, token)
             logger.log(`Got result for ${type.method}`, params, result)
             return result
         })
@@ -904,7 +815,7 @@ webSocketServer.on('connection', connection => {
                         text: await pickResourceRetriever(fileUri).fetch(fileUri),
                     },
                 }
-                serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+                languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
                 openTextDocuments.add(httpTextDocumentUri.href)
             }
             const result = await mapFileLocations(
@@ -938,7 +849,7 @@ webSocketServer.on('connection', connection => {
                             uri: fileUri.href,
                         },
                     }
-                    serverMessageConnection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
+                    languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
                     openTextDocuments.add(fileUri.href)
                 } catch (err) {
                     logger.error('Error handling textDocument/didOpen notification', params, err)
