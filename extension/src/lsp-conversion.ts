@@ -35,7 +35,7 @@ export function convertHover(hover: Hover | null): sourcegraph.Hover | null {
 }
 
 export const convertLocation = (location: Location): sourcegraph.Location => ({
-    uri: sourcegraph.URI.parse(location.uri),
+    uri: new sourcegraph.URI(location.uri),
     range: convertRange(location.range),
 })
 
