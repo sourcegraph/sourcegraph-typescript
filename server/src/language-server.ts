@@ -70,6 +70,7 @@ export async function spawnLanguageServer({
         args.push('--tsserver-log-file', tsserverLogFile)
         args.push('--tsserver-log-verbosity', configuration['typescript.tsserver.log'] || 'verbose')
     }
+    logger.log('Spawning language server')
     const serverProcess = fork(TYPESCRIPT_LANGSERVER_JS_BIN, args, {
         env: configuration['typescript.tsserver.env'],
         stdio: ['ipc', 'inherit'],

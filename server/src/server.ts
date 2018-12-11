@@ -40,7 +40,9 @@ import {
     DidOpenTextDocumentParams,
     HoverRequest,
     ImplementationRequest,
+    InitializeParams,
     InitializeRequest,
+    InitializeResult,
     Location,
     Range,
     ReferencesRequest,
@@ -201,6 +203,8 @@ webSocketServer.on('connection', connection => {
 
     // Connection state set on initialize
     let languageServer: LanguageServer
+    /** The initialize params passed to the typescript language server */
+    let serverInitializeParams: InitializeParams
     let configuration: Configuration = {}
     let tempDir: string
     let httpRootUri: URL
@@ -215,8 +219,8 @@ webSocketServer.on('connection', connection => {
     const dependencyInstallationPromises = new Map<string, Promise<void>>()
     /** HTTP URIs of directories with package.jsons in the workspace that finished installation */
     const finishedDependencyInstallations = new Set<string>()
-    /** HTTP URIs of text documents that were sent didOpen for */
-    const openTextDocuments = new Set<string>()
+    /** Map from HTTP URIs of text documents that were sent didOpen for to mapped TextDocumentDidOpenParams */
+    const openTextDocuments = new Map<string, DidOpenTextDocumentParams>()
 
     const onAllMessagesTags = {
         connectionId,
@@ -389,6 +393,41 @@ webSocketServer.on('connection', connection => {
         return fileUri
     }
 
+    // tsserver often doesn't properly catch all files added by dependency installation.
+    // For safety, we restart it after dependencies were installed.
+    async function restartLanguageServer({
+        span,
+        token,
+    }: {
+        span: Span
+        token: CancellationToken
+    }): Promise<InitializeResult> {
+        // Kill old language server instance
+        if (languageServer) {
+            languageServer.dispose()
+        }
+        languageServer = await spawnLanguageServer({ tempDir, configuration, connectionId, tracer, logger })
+        connectionDisposables.add(
+            subscriptionToDisposable(
+                languageServer.errors.subscribe(err => {
+                    logger.error('Launching language server failed', err)
+                    connection.close()
+                })
+            )
+        )
+        // Initialize it again with same InitializeParams
+        const initializeResult = await sendServerRequest(InitializeRequest.type, serverInitializeParams, {
+            tracer,
+            span,
+            token,
+        })
+        // Replay didOpen notifications
+        for (const didOpenParams of openTextDocuments.values()) {
+            languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+        }
+        return initializeResult
+    }
+
     dispatcher.setRequestHandler(InitializeRequest.type, async (params, token, span) => {
         if (!params.rootUri) {
             throw new Error('No rootUri given as initialize parameter')
@@ -474,24 +513,13 @@ webSocketServer.on('connection', connection => {
         // Sanitize tsconfig.json files
         await sanitizeTsConfigs({ cwd: extractPath, logger, tracer, span, token })
 
-        // Spawn language server
-        languageServer = await spawnLanguageServer({ tempDir, configuration, connectionId, tracer, logger })
-        connectionDisposables.add(languageServer)
-        connectionDisposables.add(
-            subscriptionToDisposable(
-                languageServer.errors.subscribe(err => {
-                    logger.error('Launching language server failed', err)
-                    connection.close()
-                })
-            )
-        )
-
         // The trailing slash is important for resolving URL relatively to it
         fileRootUri = pathToFileURL(extractPath + '/')
         // URIs are rewritten by rewriteUris below, but it doesn't touch rootPath
-        params = { ...params, rootPath: extractPath, rootUri: fileRootUri.href }
+        serverInitializeParams = { ...params, rootPath: extractPath, rootUri: fileRootUri.href }
 
-        return await sendServerRequest(InitializeRequest.type, params, { tracer, span, token })
+        // Spawn language server
+        return await restartLanguageServer({ span, token })
     })
 
     /**
@@ -532,6 +560,9 @@ webSocketServer.on('connection', connection => {
                     span,
                     token,
                 })
+                if (configuration['typescript.restartAfterDependencyInstallation'] !== false) {
+                    await restartLanguageServer({ span, token })
+                }
             } catch (err) {
                 throwIfCancelled(token)
                 logger.error('Installation failed', err)
@@ -821,7 +852,7 @@ webSocketServer.on('connection', connection => {
                     },
                 }
                 languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
-                openTextDocuments.add(httpTextDocumentUri.href)
+                openTextDocuments.set(httpTextDocumentUri.href, didOpenParams)
             }
             const result = await mapFileLocations(
                 await sendServerRequest(type, mappedParams, { tracer, span, token }),
@@ -855,7 +886,7 @@ webSocketServer.on('connection', connection => {
                         },
                     }
                     languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
-                    openTextDocuments.add(fileUri.href)
+                    openTextDocuments.set(fileUri.href, mappedParams)
                 } catch (err) {
                     logger.error('Error handling textDocument/didOpen notification', params, err)
                 }
