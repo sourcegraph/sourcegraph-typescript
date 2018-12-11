@@ -76,6 +76,11 @@ import { install } from './yarn'
 
 const globalLogger = new RedactingLogger(console)
 
+process.on('uncaughtException', err => {
+    globalLogger.error('Uncaught exception:', err)
+    process.exit(1)
+})
+
 const CACHE_DIR = process.env.CACHE_DIR || realpathSync(tmpdir())
 globalLogger.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
