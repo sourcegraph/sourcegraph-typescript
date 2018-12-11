@@ -1,5 +1,6 @@
 import { resolveRepository, search } from './graphql'
-import { SourcegraphInstanceOptions } from './graphql'
+import { SourcegraphInstance } from './graphql'
+import { Logger } from './logging'
 
 export async function fetchPackageMeta(packageName: string, version = 'latest'): Promise<PackageJson> {
     const response = await fetch(
@@ -29,9 +30,10 @@ interface NpmCouchDBQueryResult {
  */
 export async function* findPackageDependentsWithNpm(
     packageName: string,
-    options: SourcegraphInstanceOptions
+    sgInstance: SourcegraphInstance,
+    { logger }: { logger: Logger }
 ): AsyncIterable<string> {
-    console.log(`Searching for dependents of package "${packageName}" through npm`)
+    logger.log(`Searching for dependents of package "${packageName}" through npm`)
     const limit = 100
     // Proxy through Sourcegraph because skimdb.npmjs.com does not send CORS headers
     // https://stackoverflow.com/questions/18796890/how-do-you-find-out-which-npm-modules-depend-on-yours
@@ -48,20 +50,20 @@ export async function* findPackageDependentsWithNpm(
         const response = await fetch(url.href)
         const result: NpmCouchDBQueryResult = await response.json()
         if (result.rows.length === 0) {
-            console.log(`Found ${seenRepos.size} dependent repos of "${packageName}"`)
+            logger.log(`Found ${seenRepos.size} dependent repos of "${packageName}"`)
             return
         }
         for (const row of result.rows) {
             const dependentPackageName = row.key[1]
             try {
                 const packageMeta = await fetchPackageMeta(dependentPackageName)
-                const repoName = await resolvePackageNameToRepoName(packageMeta, options)
+                const repoName = await resolvePackageNameToRepoName(packageMeta, sgInstance)
                 if (!seenRepos.has(repoName)) {
                     seenRepos.add(repoName)
                     yield repoName
                 }
             } catch (err) {
-                console.error(
+                logger.error(
                     `Error resolving "${packageName}" dependent "${dependentPackageName}" to Sourcegraph repo`,
                     err
                 )
@@ -75,10 +77,11 @@ export async function* findPackageDependentsWithNpm(
  */
 export async function* findPackageDependentsWithSourcegraph(
     packageName: string,
-    options: SourcegraphInstanceOptions
+    sgInstance: SourcegraphInstance,
+    { logger }: { logger: Logger }
 ): AsyncIterable<string> {
-    console.log(`Searching for dependents of ${packageName} through Sourcegraph`)
-    const results = await search(`file:package.json$ ${packageName} max:1000`, options)
+    logger.log(`Searching for dependents of ${packageName} through Sourcegraph`)
+    const results = await search(`file:package.json$ ${packageName} max:1000`, sgInstance)
     const seenRepos = new Set<string>()
     for (const result of results) {
         const repoName = result.repository.name
@@ -145,14 +148,14 @@ export async function findClosestPackageJson(
 /**
  * Finds the package name that the given URI belongs to.
  */
-export async function findPackageName(uri: URL): Promise<string> {
+export async function findPackageName(uri: URL, { logger }: { logger: Logger }): Promise<string> {
     // Special case: if the definition is in DefinitelyTyped, the package name is @types/<subfolder>
     if (uri.pathname.includes('DefinitelyTyped/DefinitelyTyped')) {
         const dtMatch = uri.pathname.match(/\/types\/([^\/]+)\//)
         if (dtMatch) {
             return '@types/' + dtMatch[1]
         } else {
-            console.warn(`Unexpected DefinitelyTyped URL ${uri}`)
+            logger.warn(`Unexpected DefinitelyTyped URL ${uri}`)
         }
     }
     // Find containing package
@@ -175,9 +178,9 @@ function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {
 
 export async function resolvePackageNameToRepoName(
     packageMeta: PackageJson,
-    sgInstanceOptions: SourcegraphInstanceOptions
+    sgInstance: SourcegraphInstance
 ): Promise<string> {
     const cloneUrl = cloneUrlFromPackageMeta(packageMeta)
-    const repoName = await resolveRepository(cloneUrl, sgInstanceOptions)
+    const repoName = await resolveRepository(cloneUrl, sgInstance)
     return repoName
 }

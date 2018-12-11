@@ -3,7 +3,8 @@
     "await-promise": [true, "Thenable"],
     "rxjs-no-wholesale": false,
     "typedef": false,
-    "return-undefined": false
+    "return-undefined": false,
+    "no-console": true
   },
   "extends": ["@sourcegraph/tslint-config"]
 }

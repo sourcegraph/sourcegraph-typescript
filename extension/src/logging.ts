@@ -1,6 +1,5 @@
 import { inspect } from 'util'
-import { MessageConnection } from 'vscode-jsonrpc'
-import { LogMessageNotification, MessageType } from 'vscode-languageserver-protocol'
+import { MessageType } from 'vscode-languageserver-protocol'
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'log'
 export type Logger = Record<LogLevel, (...values: any[]) => void>
@@ -34,26 +33,17 @@ export class NoopLogger extends AbstractLogger {
     }
 }
 
-/**
- * Formats values to a message by pretty-printing objects
- */
-function format(values: any[]): string {
-    return values.map(value => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))).join(' ')
-}
-
-export const LOG_LEVEL_TO_LSP: Record<LogLevel, MessageType> = {
-    log: MessageType.Log,
-    info: MessageType.Info,
-    warn: MessageType.Warning,
-    error: MessageType.Error,
-}
-
 export const LSP_TO_LOG_LEVEL: Record<MessageType, LogLevel> = {
     [MessageType.Log]: 'log',
     [MessageType.Info]: 'info',
     [MessageType.Warning]: 'warn',
     [MessageType.Error]: 'error',
 }
+
+/**
+ * Formats values to a message by pretty-printing objects
+ */
+const format = (value: any): string => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))
 
 /**
  * Removes auth info from URLs
@@ -71,30 +61,7 @@ export class RedactingLogger extends AbstractLogger {
     public logType(type: LogLevel, values: any[]): void {
         // TODO ideally this would not format the value to a string before redacting,
         // because that prevents expanding objects in devtools
-        this.logger[type](redact(format(values)))
-    }
-}
-
-/**
- * A logger implementation that sends window/logMessage notifications to an LSP client
- */
-export class LSPLogger extends AbstractLogger {
-    /**
-     * @param client The client to send window/logMessage notifications to
-     */
-    constructor(private client: MessageConnection) {
-        super()
-    }
-
-    protected logType(type: LogLevel, values: any[]): void {
-        try {
-            this.client.sendNotification(LogMessageNotification.type, {
-                type: LOG_LEVEL_TO_LSP[type],
-                message: format(values),
-            })
-        } catch (err) {
-            // ignore
-        }
+        this.logger[type](...values.map(value => redact(format(value))))
     }
 }
 
@@ -105,17 +72,5 @@ export class PrefixedLogger extends AbstractLogger {
 
     protected logType(type: LogLevel, values: any[]): void {
         this.logger[type](`[${this.prefix}]`, ...values)
-    }
-}
-
-export class MultiLogger extends AbstractLogger {
-    constructor(private loggers: Logger[]) {
-        super()
-    }
-
-    protected logType(type: LogLevel, values: any[]): void {
-        for (const logger of this.loggers) {
-            logger[type](...values)
-        }
     }
 }

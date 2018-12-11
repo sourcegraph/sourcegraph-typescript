@@ -1,6 +1,6 @@
 import gql from 'tagged-template-noop'
 
-export interface SourcegraphInstanceOptions {
+export interface SourcegraphInstance {
     instanceUrl: URL
     accessToken?: string
 }
@@ -14,7 +14,7 @@ export interface SourcegraphInstanceOptions {
 export async function requestGraphQL(
     query: string,
     variables: any = {},
-    { instanceUrl, accessToken }: SourcegraphInstanceOptions
+    { instanceUrl, accessToken }: SourcegraphInstance
 ): Promise<{ data?: any; errors?: { message: string; path: string }[] }> {
     const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -34,7 +34,7 @@ export async function requestGraphQL(
     return await response.json()
 }
 
-export async function search(query: string, sgInstanceOptions: SourcegraphInstanceOptions): Promise<any> {
+export async function search(query: string, sgInstance: SourcegraphInstance): Promise<any> {
     const { data, errors } = await requestGraphQL(
         gql`
             query Search($query: String!) {
@@ -52,7 +52,7 @@ export async function search(query: string, sgInstanceOptions: SourcegraphInstan
             }
         `,
         { query },
-        sgInstanceOptions
+        sgInstance
     )
     if (errors && errors.length > 0) {
         throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
@@ -64,11 +64,7 @@ export async function search(query: string, sgInstanceOptions: SourcegraphInstan
  * @param rev A revision (branch name, tag, "HEAD", ...)
  * @returns The commit ID of the given revision
  */
-export async function resolveRev(
-    repoName: string,
-    rev: string,
-    sgInstanceOptions: SourcegraphInstanceOptions
-): Promise<string> {
+export async function resolveRev(repoName: string, rev: string, sgInstance: SourcegraphInstance): Promise<string> {
     const { data, errors } = await requestGraphQL(
         gql`
             query ResolveRev($repoName: String!, $rev: String!) {
@@ -80,7 +76,7 @@ export async function resolveRev(
             }
         `,
         { repoName, rev },
-        sgInstanceOptions
+        sgInstance
     )
     if (errors && errors.length > 0) {
         throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
@@ -94,7 +90,7 @@ export async function resolveRev(
  * @param cloneUrl A git clone URL
  * @return The Sourcegraph repository name (can be used to construct raw API URLs)
  */
-export async function resolveRepository(cloneUrl: string, options: SourcegraphInstanceOptions): Promise<string> {
+export async function resolveRepository(cloneUrl: string, options: SourcegraphInstance): Promise<string> {
     const { data, errors } = await requestGraphQL(
         gql`
             query($cloneUrl: String!) {

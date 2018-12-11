@@ -65,7 +65,15 @@ import {
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAll, disposeAllAsync, subscriptionToDisposable } from './disposable'
 import { resolveRepository } from './graphql'
-import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, LSPLogger, MultiLogger, PrefixedLogger } from './logging'
+import {
+    LOG_LEVEL_TO_LSP,
+    Logger,
+    LSP_TO_LOG_LEVEL,
+    LSPLogger,
+    MultiLogger,
+    PrefixedLogger,
+    RedactingLogger,
+} from './logging'
 import {
     createResourceRetrieverPicker,
     FileResourceRetriever,
@@ -77,12 +85,14 @@ import { sanitizeTsConfigs } from './tsconfig'
 import { relativeUrl } from './uri'
 import { install } from './yarn'
 
+const globalLogger = new RedactingLogger(console)
+
 const CACHE_DIR = process.env.CACHE_DIR || realpathSync(tmpdir())
-console.log(`Using CACHE_DIR ${CACHE_DIR}`)
+globalLogger.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
 let tracer = new Tracer()
 if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
-    console.log('LightStep tracing enabled')
+    globalLogger.log('LightStep tracing enabled')
     tracer = new LightstepTracer({
         access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
         component_name: 'lang-typescript',
@@ -93,7 +103,7 @@ const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080
 
 let httpServer: http.Server | https.Server
 if (process.env.TLS_CERT && process.env.TLS_KEY) {
-    console.log('TLS encryption enabled')
+    globalLogger.log('TLS encryption enabled')
     httpServer = https.createServer({
         cert: process.env.TLS_CERT,
         key: process.env.TLS_KEY,
@@ -108,7 +118,7 @@ const globalDisposables = new Set<Disposable | AsyncDisposable>()
 // Cleanup when receiving signals
 for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
     process.once(signal, async () => {
-        console.log(`Received ${signal}, cleaning up`)
+        globalLogger.log(`Received ${signal}, cleaning up`)
         await disposeAllAsync(globalDisposables)
         process.exit(0)
     })
@@ -139,7 +149,7 @@ setInterval(() => {
             try {
                 client.ping()
             } catch (err) {
-                console.error('Error pinging WebSocket', err)
+                globalLogger.error('Error pinging WebSocket', err)
             }
         }
     }
@@ -164,13 +174,13 @@ const TYPESCRIPT_DIR_URI = pathToFileURL(path.resolve(__dirname, '..', '..', 'no
 const TYPESCRIPT_VERSION = JSON.parse(
     fs.readFileSync(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript', 'package.json'), 'utf-8')
 ).version
-console.log(`Using TypeScript version ${TYPESCRIPT_VERSION} from ${TYPESCRIPT_DIR_URI}`)
+globalLogger.log(`Using TypeScript version ${TYPESCRIPT_VERSION} from ${TYPESCRIPT_DIR_URI}`)
 
 webSocketServer.on('connection', connection => {
     const connectionId = uuid.v1()
     openConnectionsMetric.inc()
     openConnections++
-    console.log(`New WebSocket connection, ${openConnections} open`)
+    globalLogger.log(`New WebSocket connection, ${openConnections} open`)
 
     /** Functions to run when this connection is closed (or the server shuts down) */
     const connectionDisposables = new Set<AsyncDisposable | Disposable>()
@@ -183,7 +193,7 @@ webSocketServer.on('connection', connection => {
         const closeListener = async (code: number, reason: string) => {
             openConnections--
             openConnectionsMetric.dec()
-            console.log(`WebSocket closed, ${openConnections} open`, { code, reason })
+            globalLogger.log(`WebSocket closed, ${openConnections} open`, { code, reason })
             await connectionDisposable.disposeAsync()
         }
         connection.on('close', closeListener)
@@ -206,10 +216,10 @@ webSocketServer.on('connection', connection => {
     const webSocketMessageConnection = createMessageConnection(
         webSocketConnection.reader,
         webSocketConnection.writer,
-        console
+        globalLogger
     )
     const logger: Logger = new PrefixedLogger(
-        new MultiLogger([console, new LSPLogger(webSocketMessageConnection)]),
+        new MultiLogger([globalLogger, new RedactingLogger(new LSPLogger(webSocketMessageConnection))]),
         `conn ${connectionId}`
     )
     const connectionLogger = logger
@@ -430,7 +440,7 @@ webSocketServer.on('connection', connection => {
         await mkdirp(tempDir)
         connectionDisposables.add({
             disposeAsync: async () => {
-                console.log('Deleting temp dir ', tempDir)
+                globalLogger.log('Deleting temp dir ', tempDir)
                 await rmfr(tempDir)
             },
         })
@@ -950,7 +960,7 @@ webSocketServer.on('connection', connection => {
 })
 
 httpServer.listen(port, () => {
-    console.log(`WebSocket server listening on port ${port}`)
+    globalLogger.log(`WebSocket server listening on port ${port}`)
 })
 
 // Prometheus metrics
@@ -960,7 +970,7 @@ const metricsServer = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8')
     res.end(prometheus.register.metrics())
 })
-metricsServer.on('error', err => console.error('Metrics server error', err)) // don't crash on metrics
+metricsServer.on('error', err => globalLogger.error('Metrics server error', err)) // don't crash on metrics
 metricsServer.listen(metricsPort, () => {
-    console.log(`Prometheus metrics on http://localhost:${metricsPort}`)
+    globalLogger.log(`Prometheus metrics on http://localhost:${metricsPort}`)
 })

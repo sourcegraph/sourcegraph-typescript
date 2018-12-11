@@ -25,7 +25,6 @@ import {
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
-    MessageType,
     ReferenceContext,
     ReferenceParams,
     ReferencesRequest,
@@ -33,7 +32,8 @@ import {
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
 import { findPackageDependentsWithNpm, findPackageDependentsWithSourcegraph, findPackageName } from './dependencies'
-import { resolveRev, SourcegraphInstanceOptions } from './graphql'
+import { resolveRev, SourcegraphInstance } from './graphql'
+import { LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
 import { asArray, observableFromAsyncIterable, throwIfAbortError } from './util'
@@ -48,12 +48,7 @@ const documentSelector: sourcegraph.DocumentSelector = [
     { language: 'json' },
 ]
 
-const logMethods: Record<MessageType, keyof Console> = {
-    1: 'error',
-    2: 'warn',
-    3: 'info',
-    4: 'log',
-}
+const logger = new RedactingLogger(console)
 
 export async function activate(): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 10))
@@ -81,27 +76,27 @@ export async function activate(): Promise<void> {
         }
         const socket = new WebSocket(serverUrl)
         socket.addEventListener('close', event => {
-            console.warn('WebSocket connection to TypeScript backend closed', event)
+            logger.warn('WebSocket connection to TypeScript backend closed', event)
         })
         socket.addEventListener('error', event => {
-            console.error('WebSocket error', event)
+            logger.error('WebSocket error', event)
         })
         const rpcWebSocket = toSocket(socket)
         const connection = createMessageConnection(
             new WebSocketMessageReader(rpcWebSocket),
             new WebSocketMessageWriter(rpcWebSocket),
-            console
+            logger
         )
         connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
             // Blue background for the "TypeScript server" prefix
-            const method = logMethods[type]
+            const method = LSP_TO_LOG_LEVEL[type]
             const args = [
                 new Date().toLocaleTimeString() + ' %cTypeScript backend%c %s',
                 'background-color: blue; color: white',
                 '',
                 message,
             ]
-            console[method](...args)
+            logger[method](...args)
         })
         connection.listen()
         const event = await new Promise<Event>(resolve => {
@@ -111,7 +106,7 @@ export async function activate(): Promise<void> {
         if (event.type === 'error') {
             throw new Error(`The WebSocket to the TypeScript backend at ${serverUrl} could not not be opened`)
         }
-        console.log(`WebSocket connection to TypeScript backend at ${serverUrl} opened`)
+        logger.log(`WebSocket connection to TypeScript backend at ${serverUrl} opened`)
         const initializeParams: InitializeParams = {
             processId: 0,
             rootUri: rootUri.href,
@@ -130,9 +125,9 @@ export async function activate(): Promise<void> {
                 },
             },
         }
-        console.log('Initializing TypeScript backend...')
+        logger.log('Initializing TypeScript backend...')
         const initResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
-        console.log('TypeScript backend initialized', initResult)
+        logger.log('TypeScript backend initialized', initResult)
         // Tell language server about all currently open text documents under this root
         for (const textDocument of sourcegraph.workspace.textDocuments) {
             if (!isTypeScriptFile(new URL(textDocument.uri))) {
@@ -192,7 +187,7 @@ export async function activate(): Promise<void> {
             }
             connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
         } catch (err) {
-            console.error('Error handling didOpenTextDocument event', err)
+            logger.error('Error handling didOpenTextDocument event', err)
         }
     })
 
@@ -234,7 +229,7 @@ export async function activate(): Promise<void> {
                 rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
                 return convertHover(hoverResult)
             } finally {
-                console.log(`Hover result after ${((Date.now() - startTime) / 1000).toFixed(3)}s`)
+                logger.log(`Hover result after ${((Date.now() - startTime) / 1000).toFixed(3)}s`)
             }
         }),
     })
@@ -272,7 +267,7 @@ export async function activate(): Promise<void> {
                     yield* merge(
                         // Same-repo references
                         (async function*() {
-                            console.log('Searching for same-repo references')
+                            logger.log('Searching for same-repo references')
                             const sameRepoReferences = asArray(
                                 await connection.sendRequest(ReferencesRequest.type, {
                                     textDocument: { uri: serverTextDocumentUri.href },
@@ -280,22 +275,22 @@ export async function activate(): Promise<void> {
                                     context,
                                 })
                             )
-                            console.log(`Found ${sameRepoReferences.length} same-repo references`)
+                            logger.log(`Found ${sameRepoReferences.length} same-repo references`)
                             yield sameRepoReferences
                         })(),
                         // Cross-repo references
                         // Find canonical source location
                         (async function*() {
-                            console.log('Getting canonical definition for cross-repo references')
+                            logger.log('Getting canonical definition for cross-repo references')
                             const definitions = asArray(
                                 await connection.sendRequest(DefinitionRequest.type, {
                                     textDocument: { uri: serverTextDocumentUri.href },
                                     position,
                                 })
                             )
-                            console.log(`Got ${definitions.length} definitions`)
+                            logger.log(`Got ${definitions.length} definitions`)
                             const instanceUrl = new URL(sourcegraph.internal.sourcegraphURL.toString())
-                            const sgInstanceOptions: SourcegraphInstanceOptions = {
+                            const sgInstance: SourcegraphInstance = {
                                 accessToken,
                                 instanceUrl,
                             }
@@ -307,7 +302,7 @@ export async function activate(): Promise<void> {
                             yield* new MergeAsyncIterable(
                                 definitions.map(async function*(definition) {
                                     try {
-                                        console.log(`Getting external references for definition`, definition)
+                                        logger.log(`Getting external references for definition`, definition)
 
                                         const definitionUri = new URL(definition.uri)
 
@@ -317,24 +312,20 @@ export async function activate(): Promise<void> {
                                             context,
                                         }
 
-                                        const packageName = await findPackageName(definitionUri)
+                                        const packageName = await findPackageName(definitionUri, { logger })
 
                                         // Find dependent packages on the package
-                                        const dependents = findDependents(packageName, sgInstanceOptions)
+                                        const dependents = findDependents(packageName, sgInstance, { logger })
 
                                         // Search for references in each dependent
                                         yield* AsyncIterableX.from(dependents).pipe(
                                             flatMap(async function*(repoName) {
                                                 try {
-                                                    const commitID = await resolveRev(
-                                                        repoName,
-                                                        'HEAD',
-                                                        sgInstanceOptions
-                                                    )
+                                                    const commitID = await resolveRev(repoName, 'HEAD', sgInstance)
                                                     const dependentRootUri = authenticateUri(
                                                         new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
                                                     )
-                                                    console.log(
+                                                    logger.log(
                                                         `Looking for external references in dependent repo ${repoName}`
                                                     )
                                                     const dependentConnection = await getOrCreateConnection(
@@ -346,7 +337,7 @@ export async function activate(): Promise<void> {
                                                             referenceParams
                                                         )
                                                     )
-                                                    console.log(
+                                                    logger.log(
                                                         `Found ${
                                                             referencesInDependent.length
                                                         } references in dependent repo ${repoName}`
@@ -354,17 +345,17 @@ export async function activate(): Promise<void> {
                                                     yield referencesInDependent
                                                 } catch (err) {
                                                     throwIfAbortError(err)
-                                                    console.error(
+                                                    logger.error(
                                                         `Error searching dependent repo "${repoName}" for references`,
                                                         err
                                                     )
                                                 }
                                             })
                                         )
-                                        console.log('Done going through dependents')
+                                        logger.log('Done going through dependents')
                                     } catch (err) {
                                         throwIfAbortError(err)
-                                        console.error(
+                                        logger.error(
                                             `Error searching for external references for definition`,
                                             definition,
                                             err
