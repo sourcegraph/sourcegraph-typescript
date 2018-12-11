@@ -122,7 +122,7 @@
     "@types/source-map": "0.5.7",
     "@types/tail": "1.2.0",
     "@types/tar": "4.0.0",
-    "@types/type-is": "^1.6.2",
+    "@types/type-is": "1.6.2",
     "@types/uuid": "3.4.4",
     "@types/whatwg-url": "6.4.0",
     "@types/ws": "6.0.1",
