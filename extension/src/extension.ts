@@ -56,9 +56,7 @@ const documentSelector: sourcegraph.DocumentSelector = [
 
 const logger: Logger = new RedactingLogger(console)
 
-export async function activate(): Promise<void> {
-    await new Promise<void>(resolve => setTimeout(resolve, 10))
-
+export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void> {
     const accessToken = await getOrCreateAccessToken()
 
     /** Adds the access token to the given server raw HTTP API URI, if available */
@@ -81,6 +79,7 @@ export async function activate(): Promise<void> {
             )
         }
         const socket = new WebSocket(serverUrl)
+        ctx.subscriptions.add(() => socket.close())
         socket.addEventListener('close', event => {
             logger.warn('WebSocket connection to TypeScript backend closed', event)
         })
@@ -93,6 +92,7 @@ export async function activate(): Promise<void> {
             new WebSocketMessageWriter(rpcWebSocket),
             logger
         )
+        ctx.subscriptions.add(() => connection.dispose())
         connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
             // Blue background for the "TypeScript server" prefix
             const method = LSP_TO_LOG_LEVEL[type]
@@ -177,29 +177,31 @@ export async function activate(): Promise<void> {
     }
 
     // Forward didOpen notifications
-    sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
-        try {
-            const textDocumentUri = new URL(textDocument.uri)
-            if (!isTypeScriptFile(textDocumentUri)) {
-                return
-            }
+    ctx.subscriptions.add(
+        sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
+            try {
+                const textDocumentUri = new URL(textDocument.uri)
+                if (!isTypeScriptFile(textDocumentUri)) {
+                    return
+                }
 
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-            const connection = await getOrCreateConnection(serverRootUri)
-            const didOpenParams: DidOpenTextDocumentParams = {
-                textDocument: {
-                    uri: serverTextDocumentUri.href,
-                    languageId: textDocument.languageId,
-                    text: textDocument.text,
-                    version: 1,
-                },
+                const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+                const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                const connection = await getOrCreateConnection(serverRootUri)
+                const didOpenParams: DidOpenTextDocumentParams = {
+                    textDocument: {
+                        uri: serverTextDocumentUri.href,
+                        languageId: textDocument.languageId,
+                        text: textDocument.text,
+                        version: 1,
+                    },
+                }
+                connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+            } catch (err) {
+                logger.error('Error handling didOpenTextDocument event', err)
             }
-            connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
-        } catch (err) {
-            logger.error('Error handling didOpenTextDocument event', err)
-        }
-    })
+        })
+    )
 
     /** Workaround for https://github.com/sourcegraph/sourcegraph/issues/1321 */
     function distinctUntilChanged<P extends any[], R>(
@@ -224,195 +226,208 @@ export async function activate(): Promise<void> {
     ): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
 
     // Hover
-    sourcegraph.languages.registerHoverProvider(documentSelector, {
-        provideHover: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
-            const startTime = Date.now()
-            try {
-                const textDocumentUri = new URL(textDocument.uri)
-                const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-                const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-                const connection = await getOrCreateConnection(serverRootUri)
-                const hoverResult = await connection.sendRequest(HoverRequest.type, {
-                    textDocument: { uri: serverTextDocumentUri.href },
-                    position,
-                })
-                rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
-                return convertHover(hoverResult)
-            } finally {
-                logger.log(`Hover result after ${((Date.now() - startTime) / 1000).toFixed(3)}s`)
-            }
-        }),
-    })
-
-    // Definition
-    sourcegraph.languages.registerDefinitionProvider(documentSelector, {
-        provideDefinition: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
-            const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-            const connection = await getOrCreateConnection(serverRootUri)
-            const definitionResult = await connection.sendRequest(DefinitionRequest.type, {
-                textDocument: { uri: serverTextDocumentUri.href },
-                position,
-            })
-            rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
-            return convertLocations(definitionResult)
-        }),
-    })
-
-    // References
-    sourcegraph.languages.registerReferenceProvider(documentSelector, {
-        provideReferences: (textDocument, position) =>
-            observableFromAsyncIterable(
-                (async function*() {
+    ctx.subscriptions.add(
+        sourcegraph.languages.registerHoverProvider(documentSelector, {
+            provideHover: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
+                const startTime = Date.now()
+                try {
                     const textDocumentUri = new URL(textDocument.uri)
                     const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
                     const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
                     const connection = await getOrCreateConnection(serverRootUri)
+                    const hoverResult = await connection.sendRequest(HoverRequest.type, {
+                        textDocument: { uri: serverTextDocumentUri.href },
+                        position,
+                    })
+                    rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
+                    return convertHover(hoverResult)
+                } finally {
+                    logger.log(`Hover result after ${((Date.now() - startTime) / 1000).toFixed(3)}s`)
+                }
+            }),
+        })
+    )
 
-                    const context: ReferenceContext = {
-                        includeDeclaration: false,
-                    }
+    // Definition
+    ctx.subscriptions.add(
+        sourcegraph.languages.registerDefinitionProvider(documentSelector, {
+            provideDefinition: distinctUntilChanged(areProviderParamsEqual, async (textDocument, position) => {
+                const textDocumentUri = new URL(textDocument.uri)
+                const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+                const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                const connection = await getOrCreateConnection(serverRootUri)
+                const definitionResult = await connection.sendRequest(DefinitionRequest.type, {
+                    textDocument: { uri: serverTextDocumentUri.href },
+                    position,
+                })
+                rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
+                return convertLocations(definitionResult)
+            }),
+        })
+    )
 
-                    yield* merge(
-                        // Same-repo references
-                        (async function*() {
-                            logger.log('Searching for same-repo references')
-                            const sameRepoReferences = asArray(
-                                await connection.sendRequest(ReferencesRequest.type, {
-                                    textDocument: { uri: serverTextDocumentUri.href },
-                                    position,
-                                    context,
-                                })
-                            )
-                            logger.log(`Found ${sameRepoReferences.length} same-repo references`)
-                            yield sameRepoReferences
-                        })(),
-                        // Cross-repo references
-                        // Find canonical source location
-                        (async function*() {
-                            logger.log('Getting canonical definition for cross-repo references')
-                            const definitions = asArray(
-                                await connection.sendRequest(DefinitionRequest.type, {
-                                    textDocument: { uri: serverTextDocumentUri.href },
-                                    position,
-                                })
-                            )
-                            logger.log(`Got ${definitions.length} definitions`)
-                            const instanceUrl = new URL(sourcegraph.internal.sourcegraphURL.toString())
-                            const sgInstance: SourcegraphInstance = {
-                                accessToken,
-                                instanceUrl,
-                            }
-                            const findPackageDependents =
-                                instanceUrl.hostname === 'sourcegraph.com'
-                                    ? findPackageDependentsWithNpm
-                                    : findPackageDependentsWithSourcegraphSearch
+    // References
+    ctx.subscriptions.add(
+        sourcegraph.languages.registerReferenceProvider(documentSelector, {
+            provideReferences: (textDocument, position) =>
+                observableFromAsyncIterable(
+                    (async function*() {
+                        const textDocumentUri = new URL(textDocument.uri)
+                        const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+                        const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                        const connection = await getOrCreateConnection(serverRootUri)
 
-                            yield* new MergeAsyncIterable(
-                                definitions.map(async function*(definition) {
-                                    try {
-                                        logger.log(`Getting external references for definition`, definition)
+                        const context: ReferenceContext = {
+                            includeDeclaration: false,
+                        }
 
-                                        const definitionUri = new URL(definition.uri)
+                        yield* merge(
+                            // Same-repo references
+                            (async function*() {
+                                logger.log('Searching for same-repo references')
+                                const sameRepoReferences = asArray(
+                                    await connection.sendRequest(ReferencesRequest.type, {
+                                        textDocument: { uri: serverTextDocumentUri.href },
+                                        position,
+                                        context,
+                                    })
+                                )
+                                logger.log(`Found ${sameRepoReferences.length} same-repo references`)
+                                yield sameRepoReferences
+                            })(),
+                            // Cross-repo references
+                            // Find canonical source location
+                            (async function*() {
+                                logger.log('Getting canonical definition for cross-repo references')
+                                const definitions = asArray(
+                                    await connection.sendRequest(DefinitionRequest.type, {
+                                        textDocument: { uri: serverTextDocumentUri.href },
+                                        position,
+                                    })
+                                )
+                                logger.log(`Got ${definitions.length} definitions`)
+                                const instanceUrl = new URL(sourcegraph.internal.sourcegraphURL.toString())
+                                const sgInstance: SourcegraphInstance = {
+                                    accessToken,
+                                    instanceUrl,
+                                }
+                                const findPackageDependents =
+                                    instanceUrl.hostname === 'sourcegraph.com'
+                                        ? findPackageDependentsWithNpm
+                                        : findPackageDependentsWithSourcegraphSearch
 
-                                        const referenceParams: ReferenceParams = {
-                                            textDocument: { uri: definitionUri.href },
-                                            position: definition.range.start,
-                                            context,
-                                        }
+                                yield* new MergeAsyncIterable(
+                                    definitions.map(async function*(definition) {
+                                        try {
+                                            logger.log(`Getting external references for definition`, definition)
 
-                                        const packageName = await findPackageName(definitionUri, { logger })
+                                            const definitionUri = new URL(definition.uri)
 
-                                        // Find dependent packages on the package
-                                        const dependents =
-                                            packageName === 'sourcegraph'
-                                                ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
-                                                  // Extensions are not published to npm, so search the extension registry
-                                                  findDependentsWithSourcegraphExtensionRegistry(sgInstance, { logger })
-                                                : findPackageDependents(packageName, sgInstance, { logger })
+                                            const referenceParams: ReferenceParams = {
+                                                textDocument: { uri: definitionUri.href },
+                                                position: definition.range.start,
+                                                context,
+                                            }
 
-                                        // Search for references in each dependent
-                                        yield* AsyncIterableX.from(dependents).pipe(
-                                            flatMap(async function*(repoName) {
-                                                try {
-                                                    const commitID = await resolveRev(repoName, 'HEAD', sgInstance)
-                                                    const dependentRootUri = authenticateUri(
-                                                        new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
-                                                    )
-                                                    logger.log(
-                                                        `Looking for external references in dependent repo ${repoName}`
-                                                    )
-                                                    const dependentConnection = await getOrCreateConnection(
-                                                        dependentRootUri
-                                                    )
-                                                    const referencesInDependent = asArray(
-                                                        await dependentConnection.sendRequest(
-                                                            ReferencesRequest.type,
-                                                            referenceParams
+                                            const packageName = await findPackageName(definitionUri, { logger })
+
+                                            // Find dependent packages on the package
+                                            const dependents =
+                                                packageName === 'sourcegraph'
+                                                    ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
+                                                      // Extensions are not published to npm, so search the extension registry
+                                                      findDependentsWithSourcegraphExtensionRegistry(sgInstance, {
+                                                          logger,
+                                                      })
+                                                    : findPackageDependents(packageName, sgInstance, { logger })
+
+                                            // Search for references in each dependent
+                                            yield* AsyncIterableX.from(dependents).pipe(
+                                                flatMap(async function*(repoName) {
+                                                    try {
+                                                        const commitID = await resolveRev(repoName, 'HEAD', sgInstance)
+                                                        const dependentRootUri = authenticateUri(
+                                                            new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
                                                         )
-                                                    )
-                                                    logger.log(
-                                                        `Found ${
-                                                            referencesInDependent.length
-                                                        } references in dependent repo ${repoName}`
-                                                    )
-                                                    yield referencesInDependent
-                                                } catch (err) {
-                                                    throwIfAbortError(err)
-                                                    logger.error(
-                                                        `Error searching dependent repo "${repoName}" for references`,
-                                                        err
-                                                    )
-                                                }
-                                            })
-                                        )
-                                        logger.log('Done going through dependents')
-                                    } catch (err) {
-                                        throwIfAbortError(err)
-                                        logger.error(
-                                            `Error searching for external references for definition`,
-                                            definition,
-                                            err
-                                        )
-                                    }
-                                })
-                            )
-                        })()
-                    ).pipe(
-                        filter(chunk => chunk.length > 0),
-                        // Rewrite URIs and convert from LSP to Sourcegraph Location
-                        map(chunk =>
-                            chunk.map(location =>
-                                convertLocation({
-                                    ...location,
-                                    uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
-                                })
-                            )
-                        ),
-                        // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
-                        scan((allReferences, chunk) => allReferences.concat(chunk), [])
-                    )
-                })()
-            ),
-    })
+                                                        logger.log(
+                                                            `Looking for external references in dependent repo ${repoName}`
+                                                        )
+                                                        const dependentConnection = await getOrCreateConnection(
+                                                            dependentRootUri
+                                                        )
+                                                        const referencesInDependent = asArray(
+                                                            await dependentConnection.sendRequest(
+                                                                ReferencesRequest.type,
+                                                                referenceParams
+                                                            )
+                                                        )
+                                                        logger.log(
+                                                            `Found ${
+                                                                referencesInDependent.length
+                                                            } references in dependent repo ${repoName}`
+                                                        )
+                                                        yield referencesInDependent
+                                                    } catch (err) {
+                                                        throwIfAbortError(err)
+                                                        logger.error(
+                                                            `Error searching dependent repo "${repoName}" for references`,
+                                                            err
+                                                        )
+                                                    }
+                                                })
+                                            )
+                                            logger.log('Done going through dependents')
+                                        } catch (err) {
+                                            throwIfAbortError(err)
+                                            logger.error(
+                                                `Error searching for external references for definition`,
+                                                definition,
+                                                err
+                                            )
+                                        }
+                                    })
+                                )
+                            })()
+                        ).pipe(
+                            filter(chunk => chunk.length > 0),
+                            // Rewrite URIs and convert from LSP to Sourcegraph Location
+                            map(chunk =>
+                                chunk.map(location =>
+                                    convertLocation({
+                                        ...location,
+                                        uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
+                                    })
+                                )
+                            ),
+                            // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
+                            scan((allReferences, chunk) => allReferences.concat(chunk), [])
+                        )
+                    })()
+                ),
+        })
+    )
 
     // Implementations
-    sourcegraph.languages.registerImplementationProvider(documentSelector, {
-        provideImplementation: async (textDocument, position) => {
-            const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-            const connection = await getOrCreateConnection(serverRootUri)
-            const implementationParams: TextDocumentPositionParams = {
-                textDocument: { uri: serverTextDocumentUri.href },
-                position,
-            }
-            const implementationResult = await connection.sendRequest(ImplementationRequest.type, implementationParams)
-            rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
-            return convertLocations(implementationResult)
-        },
-    })
+    ctx.subscriptions.add(
+        sourcegraph.languages.registerImplementationProvider(documentSelector, {
+            provideImplementation: async (textDocument, position) => {
+                const textDocumentUri = new URL(textDocument.uri)
+                const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+                const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                const connection = await getOrCreateConnection(serverRootUri)
+                const implementationParams: TextDocumentPositionParams = {
+                    textDocument: { uri: serverTextDocumentUri.href },
+                    position,
+                }
+                const implementationResult = await connection.sendRequest(
+                    ImplementationRequest.type,
+                    implementationParams
+                )
+                rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
+                return convertLocations(implementationResult)
+            },
+        })
+    )
 }
 
 // Learn what else is possible by visiting the [Sourcegraph extension documentation](https://github.com/sourcegraph/sourcegraph-extension-docs)
