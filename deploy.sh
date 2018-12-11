@@ -3,13 +3,13 @@ set -ex
 cd $(dirname "${BASH_SOURCE[0]}")
 
 # Install dependencies
-yarn --check-files
+yarn
 
-# Compile TypeScript
-yarn run build
-
-# Publish extension
+# Build & publish extension
 src ext publish
+
+# Compile Server
+yarn run build-server
 
 # Build image
 VERSION=$(printf "%05d" $BUILDKITE_BUILD_NUMBER)_$(date +%Y-%m-%d)_$(git rev-parse --short HEAD)
