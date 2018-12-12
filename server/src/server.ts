@@ -143,7 +143,7 @@ globalLogger.log(`Using TypeScript version ${TYPESCRIPT_VERSION} from ${TYPESCRI
 webSocketServer.on('connection', connection => {
     const connectionId = uuid.v1()
     openConnectionsMetric.set(webSocketServer.clients.size)
-    globalLogger.log(`New WebSocket connection, ${webSocketServer.clients.size} open`)
+    globalLogger.log(`New WebSocket connection ${connectionId}, ${webSocketServer.clients.size} open`)
 
     /** Functions to run when this connection is closed (or the server shuts down) */
     const connectionDisposables = new Set<AsyncDisposable | Disposable | Unsubscribable>()
@@ -155,7 +155,10 @@ webSocketServer.on('connection', connection => {
         connectionDisposables.add({ dispose: () => globalDisposables.delete(connectionDisposable) })
         const closeListener = async (code: number, reason: string) => {
             openConnectionsMetric.set(webSocketServer.clients.size)
-            globalLogger.log(`WebSocket closed, ${webSocketServer.clients.size} open`, { code, reason })
+            globalLogger.log(`WebSocket closed: ${connectionId}, ${webSocketServer.clients.size} open`, {
+                code,
+                reason,
+            })
             await connectionDisposable.disposeAsync()
         }
         connection.on('close', closeListener)
