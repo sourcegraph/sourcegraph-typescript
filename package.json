@@ -146,7 +146,7 @@
   "dependencies": {
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
-    "@types/ini": "^1.3.30",
+    "@types/ini": "1.3.30",
     "abort-controller": "^1.0.2",
     "axios": "^0.18.0",
     "globby": "^8.0.1",
