@@ -396,9 +396,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                                     .map(location => {
                                         try {
                                             return convertLocation({
-                                        ...location,
-                                        uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
-                                    })
+                                                ...location,
+                                                uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
+                                            })
                                         } catch (err) {
                                             return undefined
                                         }
