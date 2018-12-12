@@ -205,7 +205,9 @@ webSocketServer.on('connection', connection => {
                     connection.terminate()
                 }
                 alive = false
-                connection.ping()
+                if (connection.readyState === connection.OPEN) {
+                    connection.ping()
+                }
             } catch (err) {
                 logger.error('Ping error', err)
             }
