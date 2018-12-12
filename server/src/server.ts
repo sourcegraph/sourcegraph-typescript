@@ -742,16 +742,24 @@ webSocketServer.on('connection', connection => {
                 if (!packageJson.repository) {
                     throw new Error(`Package ${packageJson.name} has no repository field`)
                 }
-                const cloneUrl = cloneUrlFromPackageMeta(packageJson)
-                const npmConfig = configuration['typescript.npmrc'] || {}
-                const packageMeta = await fetchPackageMeta(packageJson.name, packageJson.version, npmConfig)
+                let cloneUrl = cloneUrlFromPackageMeta(packageJson)
                 let subdir = ''
+                // Handle GitHub tree URLs
+                const treeMatch = cloneUrl.match(
+                    /^(?:https?:\/\/)?(?:www\.)?github.com\/[^\/]+\/[^\/]+\/tree\/[^\/]+\/(.+)$/
+                )
+                if (treeMatch) {
+                    subdir = treeMatch[1]
+                    cloneUrl = cloneUrl.replace(/(\/tree\/[^\/]+)\/.+/, '$1')
+                }
                 if (typeof packageJson.repository === 'object' && packageJson.repository.directory) {
                     subdir = packageJson.repository.directory
                 } else if (packageJson.name.startsWith('@types/')) {
                     // Special-case DefinitelyTyped
                     subdir = packageJson.name.substr(1)
                 }
+                const npmConfig = configuration['typescript.npmrc'] || {}
+                const packageMeta = await fetchPackageMeta(packageJson.name, packageJson.version, npmConfig)
 
                 // fileUri is usually a .d.ts file that does not exist in the repo, only in node_modules
                 // Check if a source map exists to map it to the .ts source file that is checked into the repo
