@@ -11,16 +11,23 @@ export interface AsyncDisposable {
 export const isAsyncDisposable = (val: any): val is AsyncDisposable =>
     typeof val === 'object' && val !== null && typeof val.disposeAsync === 'function'
 
+export const isUnsubscribable = (val: any): val is Unsubscribable =>
+    typeof val === 'object' && val !== null && typeof val.unsubscribe === 'function'
+
 /**
  * Disposes all provided Disposables, sequentially, in order.
  * Disposal is best-effort, meaning if any Disposable fails to dispose, the error is logged and the function proceeds to the next one.
  *
  * @throws never
  */
-export function disposeAll(disposables: Iterable<Disposable>, logger: Logger = console): void {
+export function disposeAll(disposables: Iterable<Disposable | Unsubscribable>, logger: Logger = console): void {
     for (const disposable of disposables) {
         try {
-            disposable.dispose()
+            if (isUnsubscribable(disposable)) {
+                disposable.unsubscribe()
+            } else {
+                disposable.dispose()
+            }
         } catch (err) {
             logger.error('Error disposing', disposable, err)
         }
@@ -35,7 +42,7 @@ export function disposeAll(disposables: Iterable<Disposable>, logger: Logger = c
  * @throws never
  */
 export async function disposeAllAsync(
-    disposables: Iterable<Disposable | AsyncDisposable>,
+    disposables: Iterable<Disposable | AsyncDisposable | Unsubscribable>,
     { logger = console, timeout = 20000 }: { logger?: Logger; timeout?: number } = {}
 ): Promise<void> {
     for (const disposable of disposables) {
@@ -50,6 +57,8 @@ export async function disposeAllAsync(
                         )
                     ),
                 ])
+            } else if (isUnsubscribable(disposable)) {
+                disposable.unsubscribe()
             } else {
                 disposable.dispose()
             }

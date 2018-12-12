@@ -17,8 +17,8 @@ import * as https from 'https'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import * as fs from 'mz/fs'
 import { realpathSync } from 'mz/fs'
+import * as fs from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
@@ -26,6 +26,7 @@ import fetchPackageMeta from 'package-json'
 import * as path from 'path'
 import * as prometheus from 'prom-client'
 import rmfr from 'rmfr'
+import { interval, Unsubscribable } from 'rxjs'
 import { NullableMappedPosition, RawSourceMap, SourceMapConsumer } from 'source-map'
 import { extract, FileStat } from 'tar'
 import * as type from 'type-is'
@@ -130,19 +131,6 @@ const requestDurationMetric = createRequestDurationMetric()
 prometheus.collectDefaultMetrics()
 let openConnections = 0
 
-// Send a ping frame every 10s to keep the browser connection alive
-setInterval(() => {
-    for (const client of webSocketServer.clients) {
-        if (client.readyState === client.OPEN) {
-            try {
-                client.ping()
-            } catch (err) {
-                globalLogger.error('Error pinging WebSocket', err)
-            }
-        }
-    }
-}, 10000)
-
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
 
 const pickResourceRetriever = createResourceRetrieverPicker([new HttpResourceRetriever(), new FileResourceRetriever()])
@@ -160,7 +148,7 @@ webSocketServer.on('connection', connection => {
     globalLogger.log(`New WebSocket connection, ${openConnections} open`)
 
     /** Functions to run when this connection is closed (or the server shuts down) */
-    const connectionDisposables = new Set<AsyncDisposable | Disposable>()
+    const connectionDisposables = new Set<AsyncDisposable | Disposable | Unsubscribable>()
     {
         const connectionDisposable: AsyncDisposable = {
             disposeAsync: async () => await disposeAllAsync([...connectionDisposables].reverse()),
@@ -176,6 +164,31 @@ webSocketServer.on('connection', connection => {
         connection.on('close', closeListener)
         connectionDisposables.add({ dispose: () => connection.removeListener('close', closeListener) })
     }
+
+    // Periodically send ping/pong messages
+    // to check if connection is still alive
+    let alive = false
+    connection.on('pong', () => {
+        logger.log('Got pong')
+        alive = true
+    })
+    connection.once('open', () => {
+        connectionDisposables.add(
+            interval(30000).subscribe(() => {
+                try {
+                    if (!alive) {
+                        logger.log('Terminating WebSocket')
+                        connection.terminate()
+                    }
+                    alive = false
+                    connection.ping()
+                } catch (err) {
+                    logger.error('Ping error', err)
+                }
+            })
+        )
+        connection.ping()
+    })
 
     const webSocket: IWebSocket = {
         onMessage: handler => connection.on('message', handler),
