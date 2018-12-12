@@ -186,6 +186,10 @@ export async function findPackageName(uri: URL, { logger }: { logger: Logger }):
             logger.warn(`Unexpected DefinitelyTyped URL ${uri}`)
         }
     }
+    // Special case: vscode.d.ts
+    if (uri.pathname.endsWith('/vscode.d.ts')) {
+        return 'vscode'
+    }
     // Find containing package
     const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri)
     if (!packageJson.name) {
