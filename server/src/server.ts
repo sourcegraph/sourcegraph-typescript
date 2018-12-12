@@ -154,7 +154,7 @@ webSocketServer.on('connection', connection => {
         globalDisposables.add(connectionDisposable)
         connectionDisposables.add({ dispose: () => globalDisposables.delete(connectionDisposable) })
         const closeListener = async (code: number, reason: string) => {
-            openConnectionsMetric.dec()
+            openConnectionsMetric.set(webSocketServer.clients.size)
             globalLogger.log(`WebSocket closed, ${webSocketServer.clients.size} open`, { code, reason })
             await connectionDisposable.disposeAsync()
         }
