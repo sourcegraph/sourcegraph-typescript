@@ -14,7 +14,7 @@ import {
 } from 'vscode-jsonrpc'
 import { LogMessageNotification } from 'vscode-languageserver-protocol'
 import { Configuration } from './config'
-import { createDispatcher } from './dispatcher'
+import { createDispatcher, Dispatcher } from './dispatcher'
 import { disposeAll, subscriptionToDisposable } from './disposable'
 import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, PrefixedLogger } from './logging'
 
@@ -31,6 +31,7 @@ const TYPESCRIPT_LANGSERVER_JS_BIN = path.resolve(
 
 export interface LanguageServer extends Disposable {
     connection: MessageConnection
+    dispatcher: Dispatcher
     /** Error events from the process (e.g. spawning failed) */
     errors: Observable<any>
 }
@@ -112,6 +113,7 @@ export async function spawnLanguageServer({
     )
     return {
         connection,
+        dispatcher,
         errors: fromEvent<any>(serverProcess, 'error'),
         dispose: () => disposeAll(disposables),
     }

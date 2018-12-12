@@ -46,6 +46,8 @@ import {
     InitializeRequest,
     InitializeResult,
     Location,
+    PublishDiagnosticsNotification,
+    PublishDiagnosticsParams,
     Range,
     ReferencesRequest,
     TextDocumentPositionParams,
@@ -407,6 +409,24 @@ webSocketServer.on('connection', connection => {
         }
         return fileUri
     }
+    /**
+     * Converts the given `file:` URI to an HTTP URI rooted at the `rootUri`.
+     *
+     * @throws If resource is in node_modules
+     */
+    function mapFileToHttpUrlSimple(uri: URL): URL {
+        const relativePath = relativeUrl(fileRootUri, uri)
+        if (relativePath.includes('node_modules/')) {
+            throw new Error(`Can't map URI ${uri} to HTTP URL because it is in node_modules`)
+        }
+        const httpUri = new URL(relativePath, httpRootUri.href)
+        if (!httpUri.href.startsWith(httpRootUri.href)) {
+            // Should never happen, since these are outgoing URIs
+            // Sanity check against bugs (e.g. not realpath()ing the temp dir)
+            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
+        }
+        return httpUri
+    }
 
     // tsserver often doesn't properly catch all files added by dependency installation.
     // For safety, we restart it after dependencies were installed.
@@ -429,6 +449,24 @@ webSocketServer.on('connection', connection => {
                     connection.close()
                 })
             )
+        )
+        // Forward diagnostics
+        connectionDisposables.add(
+            languageServer.dispatcher.observeNotification(PublishDiagnosticsNotification.type).subscribe(params => {
+                try {
+                    const mappedParams: PublishDiagnosticsParams = {
+                        ...params,
+                        uri: mapFileToHttpUrlSimple(new URL(params.uri)).href,
+                    }
+                    webSocketMessageConnection.sendNotification(PublishDiagnosticsNotification.type, mappedParams)
+                } catch (err) {
+                    logger.error(
+                        `Error handling ${PublishDiagnosticsNotification.type.method} notification`,
+                        params,
+                        err
+                    )
+                }
+            })
         )
         // Initialize it again with same InitializeParams
         const initializeResult = await sendServerRequest(InitializeRequest.type, serverInitializeParams, {
@@ -803,12 +841,7 @@ webSocketServer.on('connection', connection => {
         }
 
         // Not in node_modules, do not map to external repo, don't apply source maps.
-        const httpUri = new URL(relativeFilePath, httpRootUri.href)
-        if (!httpUri.href.startsWith(httpRootUri.href)) {
-            // Should never happen, since these are outgoing URIs
-            // Sanity check against bugs (e.g. not realpath()ing the temp dir)
-            throw new Error(`URI ${httpUri} is not under rootUri ${httpRootUri}`)
-        }
+        const httpUri = mapFileToHttpUrlSimple(uri)
         return { uri: httpUri.href, range: location.range }
     }
 
@@ -898,24 +931,22 @@ webSocketServer.on('connection', connection => {
     forwardLocationRequests(ImplementationRequest.type)
 
     connectionDisposables.add(
-        subscriptionToDisposable(
-            dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
-                try {
-                    const uri = new URL(params.textDocument.uri)
-                    const fileUri = mapHttpToFileUrlSimple(uri)
-                    const mappedParams: DidOpenTextDocumentParams = {
-                        textDocument: {
-                            ...params.textDocument,
-                            uri: fileUri.href,
-                        },
-                    }
-                    languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
-                    openTextDocuments.set(fileUri.href, mappedParams)
-                } catch (err) {
-                    logger.error('Error handling textDocument/didOpen notification', params, err)
+        dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
+            try {
+                const uri = new URL(params.textDocument.uri)
+                const fileUri = mapHttpToFileUrlSimple(uri)
+                const mappedParams: DidOpenTextDocumentParams = {
+                    textDocument: {
+                        ...params.textDocument,
+                        uri: fileUri.href,
+                    },
                 }
-            })
-        )
+                languageServer.connection.sendNotification(DidOpenTextDocumentNotification.type, mappedParams)
+                openTextDocuments.set(fileUri.href, mappedParams)
+            } catch (err) {
+                logger.error('Error handling textDocument/didOpen notification', params, err)
+            }
+        })
     )
 })
 

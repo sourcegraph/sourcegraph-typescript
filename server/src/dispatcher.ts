@@ -32,7 +32,7 @@ type RequestHandler<P, R> = (params: P, token: CancellationToken, span: Span) =>
 export type RequestType<P, R> = RequestType1<P, R, any, any>
 export type NotificationType<P> = NotificationType1<P, any>
 
-interface Dispatcher {
+export interface Dispatcher {
     observeNotification<P>(type: NotificationType<P>): Observable<P>
     setRequestHandler<P, R>(type: RequestType<P, R>, handler: RequestHandler<P, R>): void
     dispose(): void
