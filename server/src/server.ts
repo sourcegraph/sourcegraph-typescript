@@ -18,8 +18,8 @@ import * as ini from 'ini'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import * as fs from 'mz/fs'
 import { realpathSync } from 'mz/fs'
+import * as fs from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
@@ -56,6 +56,7 @@ import { Server } from 'ws'
 import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
 import { Configuration } from './config'
 import {
+    cloneUrlFromPackageMeta,
     fetchPackageMeta,
     filterDependencies,
     findClosestPackageJson,
@@ -741,8 +742,7 @@ webSocketServer.on('connection', connection => {
                 if (!packageJson.repository) {
                     throw new Error(`Package ${packageJson.name} has no repository field`)
                 }
-                const cloneUrl =
-                    typeof packageJson.repository === 'string' ? packageJson.repository : packageJson.repository.url
+                const cloneUrl = cloneUrlFromPackageMeta(packageJson)
                 const npmConfig = configuration['typescript.npmrc'] || {}
                 const packageMeta = await fetchPackageMeta(packageJson.name, packageJson.version, npmConfig)
                 let subdir = ''

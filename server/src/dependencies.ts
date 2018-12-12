@@ -201,6 +201,18 @@ export async function readPackageJson(
     return JSON.parse(await pickResourceRetriever(pkgJsonUri).fetch(pkgJsonUri))
 }
 
+export function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {
+    if (!packageMeta.repository) {
+        throw new Error('Package data does not contain repository field')
+    }
+    let repoUrl = typeof packageMeta.repository === 'string' ? packageMeta.repository : packageMeta.repository.url
+    // GitHub shorthand
+    if (/^[^\/]+\/[^\/]+$/.test(repoUrl)) {
+        repoUrl = 'https://github.com/' + repoUrl
+    }
+    return repoUrl
+}
+
 /**
  * @param filePath e.g. `/foo/node_modules/pkg/dist/bar.ts`
  * @returns e.g. `foo/node_modules/pkg`
