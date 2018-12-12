@@ -129,7 +129,6 @@ const openConnectionsMetric = new prometheus.Gauge({
 })
 const requestDurationMetric = createRequestDurationMetric()
 prometheus.collectDefaultMetrics()
-let openConnections = 0
 
 const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.test(path)
 
@@ -143,9 +142,8 @@ globalLogger.log(`Using TypeScript version ${TYPESCRIPT_VERSION} from ${TYPESCRI
 
 webSocketServer.on('connection', connection => {
     const connectionId = uuid.v1()
-    openConnectionsMetric.inc()
-    openConnections++
-    globalLogger.log(`New WebSocket connection, ${openConnections} open`)
+    openConnectionsMetric.set(webSocketServer.clients.size)
+    globalLogger.log(`New WebSocket connection, ${webSocketServer.clients.size} open`)
 
     /** Functions to run when this connection is closed (or the server shuts down) */
     const connectionDisposables = new Set<AsyncDisposable | Disposable | Unsubscribable>()
@@ -156,9 +154,8 @@ webSocketServer.on('connection', connection => {
         globalDisposables.add(connectionDisposable)
         connectionDisposables.add({ dispose: () => globalDisposables.delete(connectionDisposable) })
         const closeListener = async (code: number, reason: string) => {
-            openConnections--
             openConnectionsMetric.dec()
-            globalLogger.log(`WebSocket closed, ${openConnections} open`, { code, reason })
+            globalLogger.log(`WebSocket closed, ${webSocketServer.clients.size} open`, { code, reason })
             await connectionDisposable.disposeAsync()
         }
         connection.on('close', closeListener)
@@ -197,6 +194,7 @@ webSocketServer.on('connection', connection => {
         alive = true
     })
     connection.once('open', () => {
+        logger.log('WebSocket open')
         connectionDisposables.add(
             interval(30000).subscribe(() => {
                 try {
