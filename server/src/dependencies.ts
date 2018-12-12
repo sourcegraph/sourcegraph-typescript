@@ -1,6 +1,6 @@
 import * as fs from 'mz/fs'
+import npmFetch, { NpmOptions } from 'npm-registry-fetch'
 import { Span, Tracer } from 'opentracing'
-import fetchPackageJson from 'package-json'
 import * as semver from 'semver'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
@@ -8,15 +8,39 @@ import { Logger } from './logging'
 import { ResourceNotFoundError, ResourceRetrieverPicker } from './resources'
 import { logErrorEvent, tracePromise } from './tracing'
 
+export async function fetchPackageMeta(
+    packageName: string,
+    versionSpec = 'latest',
+    npmConfig: NpmOptions
+): Promise<PackageJson> {
+    const options = { ...npmConfig, spec: packageName }
+    if (!packageName.startsWith('@') && (versionSpec === 'latest' || semver.valid(versionSpec))) {
+        // Request precise version
+        const result = await npmFetch.json(`/${packageName}/${versionSpec}`, options)
+        return result
+    }
+    // Resolve version
+    const result = await npmFetch.json(`/${packageName}`, options)
+    if (result.versions[result['dist-tags'][versionSpec]]) {
+        return result.versions[result['dist-tags'][versionSpec]]
+    }
+    const versions = Object.keys(result.versions)
+    const version = semver.maxSatisfying(versions, versionSpec)
+    if (!version) {
+        throw new Error(`Version ${packageName}@${versionSpec} does not exist`)
+    }
+    return result.versions[version]
+}
+
 /**
  * Checks if a dependency from a package.json should be installed or not by checking whether it contains TypeScript typings.
  */
-function hasTypes(name: string, range: string, tracer: Tracer, span?: Span): Promise<boolean> {
+function hasTypes(name: string, range: string, npmConfig: NpmOptions, tracer: Tracer, span?: Span): Promise<boolean> {
     return tracePromise('Fetch package metadata', tracer, span, async span => {
         span.setTag('name', name)
         const version = semver.validRange(range) || 'latest'
         span.setTag('version', version)
-        const dependencyPackageJson: any = await fetchPackageJson(name, { version, fullMetadata: true })
+        const dependencyPackageJson = await fetchPackageMeta(name, version, npmConfig)
         // Keep packages only if they have a types or typings field
         return !!dependencyPackageJson.typings || !!dependencyPackageJson.types
     })
@@ -30,7 +54,19 @@ function hasTypes(name: string, range: string, tracer: Tracer, span?: Span): Pro
  */
 export async function filterDependencies(
     packageJsonPath: string,
-    { logger, tracer, span, token }: { logger: Logger; tracer: Tracer; span?: Span; token: CancellationToken }
+    {
+        npmConfig,
+        logger,
+        tracer,
+        span,
+        token,
+    }: {
+        npmConfig: NpmOptions
+        logger: Logger
+        tracer: Tracer
+        span?: Span
+        token: CancellationToken
+    }
 ): Promise<boolean> {
     return await tracePromise('Filter dependencies', tracer, span, async span => {
         span.setTag('packageJsonPath', packageJsonPath)
@@ -48,7 +84,7 @@ export async function filterDependencies(
                     Object.entries(dependencies).map(async ([name, range]) => {
                         throwIfCancelled(token)
                         try {
-                            if (name.startsWith('@types/') || (await hasTypes(name, range, tracer, span))) {
+                            if (name.startsWith('@types/') || (await hasTypes(name, range, npmConfig, tracer, span))) {
                                 included.push(name)
                             } else {
                                 excluded.push(name)
@@ -92,6 +128,8 @@ export interface PackageJson {
           }
     /** Commit SHA1 of the repo at the time of publishing */
     gitHead?: string
+    types?: string
+    typings?: string
     dependencies?: Record<string, string>
     devDependencies?: Record<string, string>
 }

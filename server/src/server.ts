@@ -18,12 +18,11 @@ import * as ini from 'ini'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
-import fetchPackageMeta from 'package-json'
 import * as path from 'path'
 import * as prometheus from 'prom-client'
 import rmfr from 'rmfr'
@@ -57,10 +56,10 @@ import { Server } from 'ws'
 import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
 import { Configuration } from './config'
 import {
+    fetchPackageMeta,
     filterDependencies,
     findClosestPackageJson,
     findPackageRootAndName,
-    PackageJson,
     readPackageJson,
     resolveDependencyRootDir,
 } from './dependencies'
@@ -605,7 +604,8 @@ webSocketServer.on('connection', connection => {
             const logger = new PrefixedLogger(connectionLogger, 'install ' + relPackageRoot)
             try {
                 const absPackageJsonPath = path.join(extractPath, relPackageRoot, 'package.json')
-                const hasDeps = await filterDependencies(absPackageJsonPath, { logger, tracer, span, token })
+                const npmConfig = configuration['typescript.npmrc'] || {}
+                const hasDeps = await filterDependencies(absPackageJsonPath, { npmConfig, logger, tracer, span, token })
                 if (!hasDeps) {
                     return
                 }
@@ -743,10 +743,8 @@ webSocketServer.on('connection', connection => {
                 }
                 const cloneUrl =
                     typeof packageJson.repository === 'string' ? packageJson.repository : packageJson.repository.url
-                const packageMeta = (await fetchPackageMeta(packageJson.name, {
-                    version: packageJson.version,
-                    fullMetadata: true,
-                })) as PackageJson
+                const npmConfig = configuration['typescript.npmrc'] || {}
+                const packageMeta = await fetchPackageMeta(packageJson.name, packageJson.version, npmConfig)
                 let subdir = ''
                 if (typeof packageJson.repository === 'object' && packageJson.repository.directory) {
                     subdir = packageJson.repository.directory
