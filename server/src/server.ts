@@ -165,6 +165,30 @@ webSocketServer.on('connection', connection => {
         connectionDisposables.add({ dispose: () => connection.removeListener('close', closeListener) })
     }
 
+    const webSocket: IWebSocket = {
+        onMessage: handler => connection.on('message', handler),
+        onClose: handler => connection.on('close', handler),
+        onError: handler => connection.on('error', handler),
+        send: content => connection.send(content),
+        dispose: () => connection.close(),
+    }
+    connectionDisposables.add(webSocket)
+    const webSocketReader = new WebSocketMessageReader(webSocket)
+    connectionDisposables.add(webSocketReader)
+    const webSocketWriter = new WebSocketMessageWriter(webSocket)
+    connectionDisposables.add(webSocketWriter)
+    const webSocketConnection = rpcServer.createConnection(webSocketReader, webSocketWriter, noop)
+    const webSocketMessageConnection = createMessageConnection(
+        webSocketConnection.reader,
+        webSocketConnection.writer,
+        globalLogger
+    )
+    const logger: Logger = new PrefixedLogger(
+        new MultiLogger([globalLogger, new RedactingLogger(new LSPLogger(webSocketMessageConnection))]),
+        `conn ${connectionId}`
+    )
+    const connectionLogger = logger
+
     // Periodically send ping/pong messages
     // to check if connection is still alive
     let alive = false
@@ -189,30 +213,6 @@ webSocketServer.on('connection', connection => {
         )
         connection.ping()
     })
-
-    const webSocket: IWebSocket = {
-        onMessage: handler => connection.on('message', handler),
-        onClose: handler => connection.on('close', handler),
-        onError: handler => connection.on('error', handler),
-        send: content => connection.send(content),
-        dispose: () => connection.close(),
-    }
-    connectionDisposables.add(webSocket)
-    const webSocketReader = new WebSocketMessageReader(webSocket)
-    connectionDisposables.add(webSocketReader)
-    const webSocketWriter = new WebSocketMessageWriter(webSocket)
-    connectionDisposables.add(webSocketWriter)
-    const webSocketConnection = rpcServer.createConnection(webSocketReader, webSocketWriter, noop)
-    const webSocketMessageConnection = createMessageConnection(
-        webSocketConnection.reader,
-        webSocketConnection.writer,
-        globalLogger
-    )
-    const logger: Logger = new PrefixedLogger(
-        new MultiLogger([globalLogger, new RedactingLogger(new LSPLogger(webSocketMessageConnection))]),
-        `conn ${connectionId}`
-    )
-    const connectionLogger = logger
 
     // Connection state set on initialize
     let languageServer: LanguageServer
