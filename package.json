@@ -24,6 +24,13 @@
           "type": "string",
           "format": "url"
         },
+        "typescript.npmrc": {
+          "description": "Settings to be written into an npmrc in key/value format. Can be used to specify custom registries and tokens.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "typescript.restartAfterDependencyInstallation": {
           "description": "Whether to restart the language server after dependencies were installed (default true)",
           "type": "boolean"
@@ -139,10 +146,12 @@
   "dependencies": {
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
+    "@types/ini": "^1.3.30",
     "abort-controller": "^1.0.2",
     "axios": "^0.18.0",
     "globby": "^8.0.1",
     "got": "^9.3.2",
+    "ini": "^1.3.5",
     "ix": "^2.3.5",
     "json5": "^2.1.0",
     "lightstep-tracer": "^0.20.13",

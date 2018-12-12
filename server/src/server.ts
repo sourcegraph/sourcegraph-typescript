@@ -14,6 +14,7 @@ import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import axios from 'axios'
 import * as http from 'http'
 import * as https from 'https'
+import * as ini from 'ini'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
@@ -475,7 +476,16 @@ webSocketServer.on('connection', connection => {
         extractPath = path.join(tempDir, 'repo')
         cacheFolderRoot = path.join(tempDir, 'cache')
         globalFolderRoot = path.join(tempDir, 'global')
-        await Promise.all([fs.mkdir(extractPath), fs.mkdir(cacheFolderRoot), fs.mkdir(globalFolderRoot)])
+        await Promise.all([
+            fs.mkdir(extractPath),
+            fs.mkdir(cacheFolderRoot),
+            fs.mkdir(globalFolderRoot),
+            (async () => {
+                if (configuration['typescript.npmrc']) {
+                    await fs.writeFile(path.join(tempDir, '.npmrc'), ini.stringify(configuration['typescript.npmrc']))
+                }
+            })(),
+        ])
 
         // Fetch tar and extract into temp folder
         const packageJsonPaths: string[] = []

@@ -972,6 +972,11 @@
     "@types/node" "*"
     "@types/tough-cookie" "*"
 
+"@types/ini@^1.3.30":
+  version "1.3.30"
+  resolved "https://registry.npmjs.org/@types/ini/-/ini-1.3.30.tgz#d1485459c9fad84e937414b832a2adb649eab379"
+  integrity sha512-2+iF8zPSbpU83UKE+PNd4r/MhwNAdyGpk3H+VMgEH3EhjFZq1kouLgRoZrmIcmoGX97xFvqdS44DkICR5Nz3tQ==
+
 "@types/json5@0.0.30":
   version "0.0.30"
   resolved "https://registry.npmjs.org/@types/json5/-/json5-0.0.30.tgz#44cb52f32a809734ca562e685c6473b5754a7818"
