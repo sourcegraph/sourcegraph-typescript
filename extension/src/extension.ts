@@ -392,12 +392,18 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             filter(chunk => chunk.length > 0),
                             // Rewrite URIs and convert from LSP to Sourcegraph Location
                             map(chunk =>
-                                chunk.map(location =>
-                                    convertLocation({
+                                chunk
+                                    .map(location => {
+                                        try {
+                                            return convertLocation({
                                         ...location,
                                         uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
                                     })
-                                )
+                                        } catch (err) {
+                                            return undefined
+                                        }
+                                    })
+                                    .filter((location): location is Exclude<typeof location, undefined> => !!location)
                             ),
                             // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
                             scan((allReferences, chunk) => allReferences.concat(chunk), [])
