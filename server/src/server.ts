@@ -191,29 +191,27 @@ webSocketServer.on('connection', connection => {
 
     // Periodically send ping/pong messages
     // to check if connection is still alive
-    let alive = false
+    let alive = true
     connection.on('pong', () => {
         logger.log('Got pong')
         alive = true
     })
-    connection.once('open', () => {
-        logger.log('WebSocket open')
-        connectionDisposables.add(
-            interval(30000).subscribe(() => {
-                try {
-                    if (!alive) {
-                        logger.log('Terminating WebSocket')
-                        connection.terminate()
-                    }
-                    alive = false
-                    connection.ping()
-                } catch (err) {
-                    logger.error('Ping error', err)
+    logger.log('WebSocket open')
+    connectionDisposables.add(
+        interval(30000).subscribe(() => {
+            try {
+                if (!alive) {
+                    logger.log('Terminating WebSocket')
+                    connection.terminate()
                 }
-            })
-        )
-        connection.ping()
-    })
+                alive = false
+                connection.ping()
+            } catch (err) {
+                logger.error('Ping error', err)
+            }
+        })
+    )
+    connection.ping()
 
     // Connection state set on initialize
     let languageServer: LanguageServer
