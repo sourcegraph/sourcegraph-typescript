@@ -19,6 +19,8 @@ docker build -t sourcegraph/lang-typescript:$VERSION .
 docker push sourcegraph/lang-typescript:$VERSION
 docker tag sourcegraph/lang-typescript:$VERSION sourcegraph/lang-typescript:latest
 docker push sourcegraph/lang-typescript:latest
+docker tag sourcegraph/lang-typescript:$VERSION sourcegraph/lang-typescript:insiders
+docker push sourcegraph/lang-typescript:insiders
 
 # Deploy to prod
 # CONTEXT=gke_sourcegraph-dev_us-central1-f_main-cluster-5
