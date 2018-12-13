@@ -17,8 +17,9 @@ docker build -t sourcegraph/lang-typescript:$VERSION .
 
 # Upload to Docker Hub
 docker push sourcegraph/lang-typescript:$VERSION
-docker tag sourcegraph/lang-typescript:$VERSION sourcegraph/lang-typescript:latest sourcegraph/lang-typescript:insiders
+docker tag sourcegraph/lang-typescript:$VERSION sourcegraph/lang-typescript:latest
 docker push sourcegraph/lang-typescript:latest
+docker tag sourcegraph/lang-typescript:$VERSION sourcegraph/lang-typescript:insiders
 docker push sourcegraph/lang-typescript:insiders
 
 # Deploy to prod
