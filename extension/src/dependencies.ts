@@ -56,6 +56,7 @@ export async function* findPackageDependentsWithNpm(
     url.searchParams.set('limit', limit + '')
     const seenRepos = new Set<string>()
     for (let skip = 0; true; skip += limit) {
+        span.log({ event: 'page', skip: 0 })
         url.searchParams.set('skip', skip + '')
         const response = await tracedFetch(url, { tracer, span })
         const result: NpmCouchDBQueryResult = await response.json()

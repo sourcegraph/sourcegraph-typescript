@@ -14,7 +14,7 @@ import {
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import { AsyncIterableX, merge } from 'ix/asynciterable/index'
 import { MergeAsyncIterable } from 'ix/asynciterable/merge'
-import { filter, flatMap, map, scan } from 'ix/asynciterable/pipe/index'
+import { filter, flatMap, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
 import * as sourcegraph from 'sourcegraph'
@@ -511,6 +511,11 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 // Cross-repo references
                 // Find canonical source location
                 filter(chunk => chunk.length > 0),
+                tap({
+                    next: chunk => {
+                        span.log({ event: 'chunk', count: chunk.length })
+                    },
+                }),
                 // Rewrite URIs and convert from LSP to Sourcegraph Location
                 map(chunk =>
                     chunk
