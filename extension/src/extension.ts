@@ -13,7 +13,6 @@ import {
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import { AsyncIterableX, merge } from 'ix/asynciterable/index'
-import { MergeAsyncIterable } from 'ix/asynciterable/merge'
 import { filter, flatMap, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
@@ -389,7 +388,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             const findExternalReferences = () =>
                 traceAsyncGenerator('Find external references', tracer, span, async function*(span) {
                     logger.log('Getting canonical definition for cross-repo references')
-                    const definitions = asArray(
+                    const definition: Location | undefined = asArray(
                         await sendTracedRequest(
                             connection,
                             DefinitionRequest.type,
@@ -399,8 +398,13 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             },
                             { span, tracer, token }
                         )
-                    )
-                    logger.log(`Got ${definitions.length} definitions`)
+                    )[0]
+                    if (!definition) {
+                        return
+                    }
+                    span.setTag('uri', redact(definition.uri))
+                    span.setTag('line', definition.range.start.line)
+
                     const instanceUrl = new URL(sourcegraph.internal.sourcegraphURL.toString())
                     const sgInstance: SourcegraphInstance = {
                         accessToken,
@@ -411,99 +415,85 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             ? findPackageDependentsWithNpm
                             : findPackageDependentsWithSourcegraphSearch
 
-                    const findExternalReferencesForDefinition = (definition: Location) =>
-                        traceAsyncGenerator('Find external references for definition', tracer, span, async function*(
-                            span
-                        ) {
-                            span.setTag('uri', redact(definition.uri))
-                            span.setTag('line', definition.range.start.line)
-                            try {
-                                logger.log(`Getting external references for definition`, definition)
+                    logger.log(`Getting external references for definition`, definition)
 
-                                const definitionUri = new URL(definition.uri)
+                    const definitionUri = new URL(definition.uri)
 
-                                const referenceParams: ReferenceParams = {
-                                    textDocument: { uri: definitionUri.href },
-                                    position: definition.range.start,
-                                    context,
-                                }
+                    const referenceParams: ReferenceParams = {
+                        textDocument: { uri: definitionUri.href },
+                        position: definition.range.start,
+                        context,
+                    }
 
-                                const packageName = await findPackageName(definitionUri, { logger, tracer, span })
+                    const packageName = await findPackageName(definitionUri, { logger, tracer, span })
 
-                                // Find dependent packages on the package
-                                const dependents =
-                                    packageName === 'sourcegraph'
-                                        ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
-                                          // Extensions are not published to npm, so search the extension registry
-                                          findDependentsWithSourcegraphExtensionRegistry(sgInstance, {
-                                              logger,
-                                              tracer,
-                                              span,
-                                          })
-                                        : findPackageDependents(packageName, sgInstance, { logger, tracer, span })
+                    // Find dependent packages on the package
+                    const dependents =
+                        packageName === 'sourcegraph'
+                            ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
+                              // Extensions are not published to npm, so search the extension registry
+                              findDependentsWithSourcegraphExtensionRegistry(sgInstance, {
+                                  logger,
+                                  tracer,
+                                  span,
+                              })
+                            : findPackageDependents(packageName, sgInstance, { logger, tracer, span })
 
-                                const findExternalReferencesInDependent = (repoName: string) =>
-                                    traceAsyncGenerator(
-                                        'Find external references in dependent',
-                                        tracer,
+                    // Search for references in each dependent
+                    if (!sourcegraph.app.activeWindow) {
+                        return
+                    }
+                    const reporter = await sourcegraph.app.activeWindow.showProgress({
+                        title: 'Searching dependents for references',
+                    })
+                    try {
+                        const findExternalReferencesInDependent = (repoName: string) =>
+                            traceAsyncGenerator('Find external references in dependent', tracer, span, async function*(
+                                span
+                            ) {
+                                try {
+                                    reporter.next({ message: repoName })
+                                    span.setTag('repoName', repoName)
+                                    const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
                                         span,
-                                        async function*(span) {
-                                            span.setTag('repoName', repoName)
-                                            try {
-                                                const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
-                                                    span,
-                                                    tracer,
-                                                })
-                                                const dependentRootUri = authenticateUri(
-                                                    new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
-                                                )
-                                                logger.log(
-                                                    `Looking for external references in dependent repo ${repoName}`
-                                                )
-                                                const dependentConnection = await getOrCreateConnection(
-                                                    dependentRootUri,
-                                                    { span, token }
-                                                )
-                                                const referencesInDependent = asArray(
-                                                    await sendTracedRequest(
-                                                        dependentConnection,
-                                                        ReferencesRequest.type,
-                                                        referenceParams,
-                                                        {
-                                                            span,
-                                                            tracer,
-                                                            token,
-                                                        }
-                                                    )
-                                                )
-                                                logger.log(
-                                                    `Found ${
-                                                        referencesInDependent.length
-                                                    } references in dependent repo ${repoName}`
-                                                )
-                                                yield referencesInDependent
-                                            } catch (err) {
-                                                throwIfAbortError(err)
-                                                logErrorEvent(span, err)
-                                                logger.error(
-                                                    `Error searching dependent repo "${repoName}" for references`,
-                                                    err
-                                                )
-                                            }
-                                        }
+                                        tracer,
+                                    })
+                                    const dependentRootUri = authenticateUri(
+                                        new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
                                     )
-
-                                // Search for references in each dependent
-                                yield* AsyncIterableX.from(dependents).pipe(flatMap(findExternalReferencesInDependent))
-                                logger.log('Done going through dependents')
-                            } catch (err) {
-                                throwIfAbortError(err)
-                                logErrorEvent(span, err)
-                                logger.error(`Error searching for external references for definition`, definition, err)
-                            }
-                        })
-
-                    yield* new MergeAsyncIterable(definitions.map(findExternalReferencesForDefinition))
+                                    logger.log(`Looking for external references in dependent repo ${repoName}`)
+                                    const dependentConnection = await getOrCreateConnection(dependentRootUri, {
+                                        span,
+                                        token,
+                                    })
+                                    const referencesInDependent = asArray(
+                                        await sendTracedRequest(
+                                            dependentConnection,
+                                            ReferencesRequest.type,
+                                            referenceParams,
+                                            {
+                                                span,
+                                                tracer,
+                                                token,
+                                            }
+                                        )
+                                    )
+                                    logger.log(
+                                        `Found ${referencesInDependent.length} references in dependent repo ${repoName}`
+                                    )
+                                    yield referencesInDependent
+                                } catch (err) {
+                                    throwIfAbortError(err)
+                                    logErrorEvent(span, err)
+                                    logger.error(`Error searching dependent repo "${repoName}" for references`, err)
+                                }
+                            })
+                        yield* AsyncIterableX.from(dependents).pipe(flatMap(findExternalReferencesInDependent))
+                        reporter.complete()
+                    } catch (e) {
+                        reporter.error(e)
+                    }
+                    logger.log('Done going through dependents')
                 })
 
             yield* merge(findLocalReferences(), findExternalReferences()).pipe(
