@@ -8035,10 +8035,10 @@ source-map@^0.5.0, source-map@^0.5.3, source-map@^0.5.6:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.5.7.tgz#8a039d2d1021d22d1ea14c80d8ea468ba2ef3fcc"
   integrity sha1-igOdLRAh0i0eoUyA2OpGi6LvP8w=
 
-sourcegraph@^19.4.1:
-  version "19.4.1"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-19.4.1.tgz#c36a71f58040e84114f7547867df9e937eac2515"
-  integrity sha512-utBHSFMHBWfCRWol+TpgMRTU0wnbNHrZVRuQvdFGhP/yT0y/MwHCs+D9Gk16A/F2tU05Jd+beBPhqoF57IHpyA==
+sourcegraph@^19.5.0:
+  version "19.5.0"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-19.5.0.tgz#114ab03590ca9aac1f349b34ae7678a3e08a86fd"
+  integrity sha512-yV0jjmbLnGRS/pt95Fk61JQ2jo4yiZnLxb+Ol+LeD4O7PXJInSvlvrCtD5GxHM52FCzXs429uJ1EKD5ZZSLJ6g==
 
 spawn-error-forwarder@~1.0.0:
   version "1.0.0"
