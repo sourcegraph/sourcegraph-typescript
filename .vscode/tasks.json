@@ -10,6 +10,22 @@
     },
     {
       "type": "npm",
+      "script": "watch-server",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": true
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "type": "npm",
       "script": "serve-ext",
       "problemMatcher": []
     }
