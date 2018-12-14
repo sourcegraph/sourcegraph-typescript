@@ -1,11 +1,15 @@
 {
   "name": "lang-typescript",
-  "title": "Code intelligence for TypeScript",
+  "title": "WIP: Code intelligence for TypeScript",
   "description": "Provides code intelligence for TypeScript",
   "private": true,
   "publisher": "sourcegraph",
   "engines": {
     "node": ">=11.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sourcegraph/lang-typescript"
   },
   "activationEvents": [
     "onLanguage:typescript",
@@ -117,7 +121,8 @@
     "tslint": "tslint -p extension/tsconfig.json && tslint -p server/tsconfig.json",
     "build": "npm run build-ext && npm run build-server",
     "build-server": "tsc -p ./server/tsconfig.json",
-    "build-ext": "parcel build --out-file extension.js extension/src/extension.ts",
+    "watch-server": "tsc -w -p ./server/tsconfig.json",
+    "build-ext": "parcel build --no-minify --out-file extension.js extension/src/extension.ts",
     "serve-ext": "parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
     "typecheck-ext": "tsc -p ./extension/tsconfig.json",
     "sourcegraph:prepublish": "npm run build-ext"
