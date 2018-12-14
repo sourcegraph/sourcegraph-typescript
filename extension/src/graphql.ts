@@ -1,4 +1,6 @@
+import { Span, Tracer } from 'opentracing'
 import gql from 'tagged-template-noop'
+import { tracedFetch, tracePromise } from './tracing'
 
 export interface SourcegraphInstance {
     instanceUrl: URL
@@ -14,7 +16,8 @@ export interface SourcegraphInstance {
 export async function requestGraphQL(
     query: string,
     variables: any = {},
-    { instanceUrl, accessToken }: SourcegraphInstance
+    { accessToken, instanceUrl }: SourcegraphInstance,
+    { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<{ data?: any; errors?: { message: string; path: string }[] }> {
     const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -23,10 +26,12 @@ export async function requestGraphQL(
     if (accessToken) {
         headers.Authorization = 'token ' + accessToken
     }
-    const response = await fetch(new URL('/.api/graphql', instanceUrl).href, {
+    const response = await tracedFetch(new URL('/.api/graphql', instanceUrl), {
         method: 'POST',
         headers,
         body: JSON.stringify({ query, variables }),
+        span,
+        tracer,
     })
     if (!response.ok) {
         throw new Error(`${response.status} ${response.statusText}`)
@@ -34,54 +39,69 @@ export async function requestGraphQL(
     return await response.json()
 }
 
-export async function search(query: string, sgInstance: SourcegraphInstance): Promise<any> {
-    const { data, errors } = await requestGraphQL(
-        gql`
-            query Search($query: String!) {
-                search(query: $query) {
-                    results {
+export async function search(
+    query: string,
+    sgInstance: SourcegraphInstance,
+    { tracer, span }: { span: Span; tracer: Tracer }
+): Promise<any> {
+    return await tracePromise('Sourcegraph search', tracer, span, async span => {
+        const { data, errors } = await requestGraphQL(
+            gql`
+                query Search($query: String!) {
+                    search(query: $query) {
                         results {
-                            ... on FileMatch {
-                                repository {
-                                    name
+                            results {
+                                ... on FileMatch {
+                                    repository {
+                                        name
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        `,
-        { query },
-        sgInstance
-    )
-    if (errors && errors.length > 0) {
-        throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
-    }
-    return data.search.results.results
+            `,
+            { query },
+            sgInstance,
+            { tracer, span }
+        )
+        if (errors && errors.length > 0) {
+            throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
+        }
+        return data.search.results.results
+    })
 }
 
 /**
  * @param rev A revision (branch name, tag, "HEAD", ...)
  * @returns The commit ID of the given revision
  */
-export async function resolveRev(repoName: string, rev: string, sgInstance: SourcegraphInstance): Promise<string> {
-    const { data, errors } = await requestGraphQL(
-        gql`
-            query ResolveRev($repoName: String!, $rev: String!) {
-                repository(name: $repoName) {
-                    commit(rev: $rev) {
-                        oid
+export async function resolveRev(
+    repoName: string,
+    rev: string,
+    sgInstance: SourcegraphInstance,
+    { span, tracer }: { span: Span; tracer: Tracer }
+): Promise<string> {
+    return await tracePromise('Resolve rev', tracer, span, async span => {
+        const { data, errors } = await requestGraphQL(
+            gql`
+                query ResolveRev($repoName: String!, $rev: String!) {
+                    repository(name: $repoName) {
+                        commit(rev: $rev) {
+                            oid
+                        }
                     }
                 }
-            }
-        `,
-        { repoName, rev },
-        sgInstance
-    )
-    if (errors && errors.length > 0) {
-        throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
-    }
-    return data.repository.commit.oid
+            `,
+            { repoName, rev },
+            sgInstance,
+            { span, tracer }
+        )
+        if (errors && errors.length > 0) {
+            throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
+        }
+        return data.repository.commit.oid
+    })
 }
 
 /**
@@ -90,7 +110,11 @@ export async function resolveRev(repoName: string, rev: string, sgInstance: Sour
  * @param cloneUrl A git clone URL
  * @return The Sourcegraph repository name (can be used to construct raw API URLs)
  */
-export async function resolveRepository(cloneUrl: string, options: SourcegraphInstance): Promise<string> {
+export async function resolveRepository(
+    cloneUrl: string,
+    sgInstance: SourcegraphInstance,
+    { span, tracer }: { span: Span; tracer: Tracer }
+): Promise<string> {
     const { data, errors } = await requestGraphQL(
         gql`
             query($cloneUrl: String!) {
@@ -100,13 +124,14 @@ export async function resolveRepository(cloneUrl: string, options: SourcegraphIn
             }
         `,
         { cloneUrl },
-        options
+        sgInstance,
+        { span, tracer }
     )
     if (errors && errors.length > 0) {
         throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
     }
     if (!data.repository) {
-        throw new Error(`No repository found for clone URL ${cloneUrl} on instance ${options.instanceUrl}`)
+        throw new Error(`No repository found for clone URL ${cloneUrl} on instance ${sgInstance.instanceUrl}`)
     }
     return data.repository.name
 }
@@ -114,27 +139,33 @@ export async function resolveRepository(cloneUrl: string, options: SourcegraphIn
 /**
  * Returns all extensions on the Sourcegraph instance.
  */
-export async function queryExtensions(options: SourcegraphInstance): Promise<any[]> {
-    const { data, errors } = await requestGraphQL(
-        gql`
-            query ExtensionManifests {
-                extensionRegistry {
-                    extensions {
-                        nodes {
-                            extensionID
-                            manifest {
-                                raw
+export async function queryExtensions(
+    sgInstance: SourcegraphInstance,
+    { span, tracer }: { span: Span; tracer: Tracer }
+): Promise<any[]> {
+    return await tracePromise('Query extensions', tracer, span, async span => {
+        const { data, errors } = await requestGraphQL(
+            gql`
+                query ExtensionManifests {
+                    extensionRegistry {
+                        extensions {
+                            nodes {
+                                extensionID
+                                manifest {
+                                    raw
+                                }
                             }
                         }
                     }
                 }
-            }
-        `,
-        {},
-        options
-    )
-    if (errors && errors.length > 0) {
-        throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
-    }
-    return data.extensionRegistry.extensions.nodes
+            `,
+            {},
+            sgInstance,
+            { span, tracer }
+        )
+        if (errors && errors.length > 0) {
+            throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
+        }
+        return data.extensionRegistry.extensions.nodes
+    })
 }

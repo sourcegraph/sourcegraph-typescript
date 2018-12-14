@@ -46,3 +46,20 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
     })
 
 export const asArray = <T>(val: T[] | T | null): T[] => (!val ? [] : Array.isArray(val) ? val : [val])
+
+/** Workaround for https://github.com/sourcegraph/sourcegraph/issues/1321 */
+export function distinctUntilChanged<P extends any[], R>(
+    compare: (a: P, b: P) => boolean,
+    fn: (...args: P) => R
+): ((...args: P) => R) {
+    let previousResult: R
+    let previousArgs: P
+    return (...args) => {
+        if (previousArgs && compare(previousArgs, args)) {
+            return previousResult
+        }
+        previousArgs = args
+        previousResult = fn(...args)
+        return previousResult
+    }
+}

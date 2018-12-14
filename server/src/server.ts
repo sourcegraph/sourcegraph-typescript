@@ -23,7 +23,7 @@ import mkdirp from 'mkdirp-promise'
 import * as fs from 'mz/fs'
 import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
-import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
+import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT, SPAN_KIND_RPC_SERVER } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import prettyBytes from 'pretty-bytes'
@@ -246,15 +246,14 @@ webSocketServer.on('connection', connection => {
     /** Map from HTTP URIs of text documents that were sent didOpen for to mapped TextDocumentDidOpenParams */
     const openTextDocuments = new Map<string, DidOpenTextDocumentParams>()
 
-    const onAllMessagesTags = {
-        connectionId,
-        [SPAN_KIND]: SPAN_KIND_RPC_CLIENT,
-    }
     const dispatcher = createDispatcher(webSocketConnection, {
         requestDurationMetric,
         logger,
         tracer,
-        tags: onAllMessagesTags,
+        tags: {
+            connectionId,
+            [SPAN_KIND]: SPAN_KIND_RPC_SERVER,
+        },
     })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
 
@@ -289,13 +288,16 @@ webSocketServer.on('connection', connection => {
             // URI is an out-of-workspace URI (a URI from a different project)
             // This external project may exist in the form of a dependency in node_modules
             // Find the closest package.json to it to figure out the package name
-            const [packageRoot, packageName] = await findPackageRootAndName(incomingUri, pickResourceRetriever)
+            const [packageRoot, packageName] = await findPackageRootAndName(incomingUri, pickResourceRetriever, {
+                span,
+                tracer,
+            })
             // Run yarn install for all package.jsons that contain the dependency we are looking for
             logger.log(`Installing dependencies for all package.jsons that depend on "${packageName}"`)
             await Promise.all(
                 [...packageRootUris].map(async packageRootUri => {
                     const pkgJsonUri = new URL('package.json', packageRootUri)
-                    const pkgJson = await readPackageJson(pkgJsonUri, pickResourceRetriever)
+                    const pkgJson = await readPackageJson(pkgJsonUri, pickResourceRetriever, { span, tracer })
                     if (
                         (pkgJson.dependencies && pkgJson.dependencies.hasOwnProperty(packageName)) ||
                         (pkgJson.devDependencies && pkgJson.devDependencies.hasOwnProperty(packageName))
@@ -315,7 +317,10 @@ webSocketServer.on('connection', connection => {
                     path.posix.join(`**/node_modules/${packageName}`, packageRootRelativePath),
                     fileRootUri
                 )
-                const file: URL | undefined = (await pickResourceRetriever(patternUrl).glob(patternUrl))[0]
+                const file: URL | undefined = (await pickResourceRetriever(patternUrl).glob(patternUrl, {
+                    span,
+                    tracer,
+                }))[0]
                 if (file) {
                     const mappedParams = {
                         position: params.position,
@@ -340,7 +345,7 @@ webSocketServer.on('connection', connection => {
                 `Looking for declaration maps to map source file ${incomingUri} to declaration file in node_modules`
             )
             const patternUrl = new URL(`**/node_modules/${packageName}/**/*.d.ts.map`, fileRootUri)
-            const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl)
+            const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl, { span, tracer })
             logger.log(`Found ${declarationMapUrls.length} declaration maps in package "${packageName}"`)
             const cancellation = new CancellationTokenSource()
             const cancelDisposable = token.onCancellationRequested(() => cancellation.cancel())
@@ -350,7 +355,7 @@ webSocketServer.on('connection', connection => {
                     throwIfCancelled(cancellation.token)
                     try {
                         const declarationMap: RawSourceMap = JSON.parse(
-                            await pickResourceRetriever(declarationMapUrl).fetch(declarationMapUrl)
+                            await pickResourceRetriever(declarationMapUrl).fetch(declarationMapUrl, { span, tracer })
                         )
                         const packageRootPath = resolveDependencyRootDir(fileURLToPath(declarationMapUrl))
                         const packageRootFileUrl = new URL(packageRootPath + '/', fileRootUri)
@@ -707,7 +712,7 @@ webSocketServer.on('connection', connection => {
         return await tracePromise('Request ' + type.method, tracer, span, async span => {
             span.setTag(SPAN_KIND, SPAN_KIND_RPC_CLIENT)
             const result = await languageServer.connection.sendRequest(type, params, token)
-            logger.log(`Got result for ${type.method}`, params, result)
+            // logger.log(`Got result for ${type.method}`, params, result)
             return result
         })
     }

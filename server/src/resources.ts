@@ -1,6 +1,7 @@
 import globby = require('globby')
 import got from 'got'
 import { readFile } from 'mz/fs'
+import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { fileURLToPath, pathToFileURL } from 'url'
 
 export interface ResourceRetriever {
@@ -11,7 +12,7 @@ export interface ResourceRetriever {
      * Fetches the content of the resource and returns it as an UTF8 string.
      * If the resource does not exist, will reject with a `ResourceNotFoundError`.
      */
-    fetch(resource: URL): Promise<string>
+    fetch(resource: URL, options?: { span?: Span; tracer?: Tracer }): Promise<string>
 
     /**
      * Finds resources (files and directories) by a glob pattern URL.
@@ -20,7 +21,7 @@ export interface ResourceRetriever {
      * @param pattern
      * @returns Matching absolute URLs
      */
-    glob(pattern: URL): Promise<URL[]>
+    glob(pattern: URL, options?: { span?: Span; tracer?: Tracer }): Promise<URL[]>
 }
 
 export class ResourceNotFoundError extends Error {
@@ -76,14 +77,17 @@ export class HttpResourceRetriever implements ResourceRetriever {
         // return response.body.split('\n').map(url => new URL(url, pattern))
     }
 
-    public async fetch(resource: URL): Promise<string> {
+    public async fetch(
+        resource: URL,
+        { span = new Span(), tracer = new Tracer() }: { span?: Span; tracer?: Tracer } = {}
+    ): Promise<string> {
         try {
-            const response = await got.get(resource, {
-                headers: {
-                    Accept: 'text/plain',
-                    'User-Agent': USER_AGENT,
-                },
-            })
+            const headers = {
+                Accept: 'text/plain',
+                'User-Agent': USER_AGENT,
+            }
+            tracer.inject(span, FORMAT_HTTP_HEADERS, headers)
+            const response = await got.get(resource, { headers })
             return response.body
         } catch (err) {
             if (err.statusCode === 404) {

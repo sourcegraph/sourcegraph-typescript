@@ -143,25 +143,39 @@ export interface PackageJson {
 export async function findClosestPackageJson(
     resource: URL,
     pickResourceRetriever: ResourceRetrieverPicker,
-    rootUri: URL = Object.assign(new URL(resource.href), { pathname: '' })
+    rootUri = Object.assign(new URL(resource.href), { pathname: '' }),
+    {
+        span = new Span(),
+        tracer = new Tracer(),
+    }: {
+        span?: Span
+        tracer?: Tracer
+    } = {}
 ): Promise<[URL, PackageJson]> {
-    let parent = resource
-    while (true) {
-        if (!parent.href.startsWith(rootUri.href)) {
-            throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
-        }
-        const packageJsonUri = new URL('package.json', parent.href)
-        try {
-            const packageJson = await readPackageJson(packageJsonUri, pickResourceRetriever)
-            return [packageJsonUri, packageJson]
-        } catch (err) {
-            if (err instanceof ResourceNotFoundError) {
-                parent = new URL('..', parent.href)
-                continue
+    return await tracePromise(
+        'Find closest package.json',
+        tracer,
+        span,
+        async (span): Promise<[URL, PackageJson]> => {
+            let parent = resource
+            while (true) {
+                if (!parent.href.startsWith(rootUri.href)) {
+                    throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
+                }
+                const packageJsonUri = new URL('package.json', parent.href)
+                try {
+                    const packageJson = await readPackageJson(packageJsonUri, pickResourceRetriever, { span, tracer })
+                    return [packageJsonUri, packageJson]
+                } catch (err) {
+                    if (err instanceof ResourceNotFoundError) {
+                        parent = new URL('..', parent.href)
+                        continue
+                    }
+                    throw err
+                }
             }
-            throw err
         }
-    }
+    )
 }
 
 export const isDefinitelyTyped = (uri: URL): boolean => uri.pathname.includes('DefinitelyTyped/DefinitelyTyped')
@@ -172,7 +186,8 @@ export const isDefinitelyTyped = (uri: URL): boolean => uri.pathname.includes('D
  */
 export async function findPackageRootAndName(
     uri: URL,
-    pickResourceRetriever: ResourceRetrieverPicker
+    pickResourceRetriever: ResourceRetrieverPicker,
+    { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<[URL, string]> {
     // Special case: if the definition is in DefinitelyTyped, the package name is @types/<subfolder>[/<version>]
     if (isDefinitelyTyped(uri)) {
@@ -186,7 +201,10 @@ export async function findPackageRootAndName(
         }
     }
     // Find containing package
-    const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri, pickResourceRetriever)
+    const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri, pickResourceRetriever, undefined, {
+        span,
+        tracer,
+    })
     if (!packageJson.name) {
         throw new Error(`package.json at ${packageJsonUrl} does not contain a name`)
     }
@@ -196,9 +214,10 @@ export async function findPackageRootAndName(
 
 export async function readPackageJson(
     pkgJsonUri: URL,
-    pickResourceRetriever: ResourceRetrieverPicker
+    pickResourceRetriever: ResourceRetrieverPicker,
+    options: { span: Span; tracer: Tracer }
 ): Promise<PackageJson> {
-    return JSON.parse(await pickResourceRetriever(pkgJsonUri).fetch(pkgJsonUri))
+    return JSON.parse(await pickResourceRetriever(pkgJsonUri).fetch(pkgJsonUri, options))
 }
 
 export function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {

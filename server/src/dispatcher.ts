@@ -1,5 +1,4 @@
-import LightstepSpan from 'lightstep-tracer/lib/imp/span_imp'
-import { Span, Tracer } from 'opentracing'
+import { FORMAT_TEXT_MAP, Span, Tracer } from 'opentracing'
 import { ERROR } from 'opentracing/lib/ext/tags'
 import * as prometheus from 'prom-client'
 import { Observable, Subject } from 'rxjs'
@@ -88,13 +87,8 @@ export function createDispatcher(
         } else if (isRequestMessage(message)) {
             const stopTimer = requestDurationMetric && requestDurationMetric.startTimer()
             let success: boolean
-            const span = tracer.startSpan('Handle ' + message.method, { tags })
-            let lightstepTraceUrl: string | undefined
-            // Log the trace URL for this request in the client
-            if (span instanceof LightstepSpan) {
-                lightstepTraceUrl = span.generateTraceURL()
-                logger.log(`Trace ${message.method} ${lightstepTraceUrl}`)
-            }
+            const childOf = tracer.extract(FORMAT_TEXT_MAP, message.params) || undefined
+            const span = tracer.startSpan('Handle ' + message.method, { tags, childOf })
             span.setTag('method', message.method)
             if (isRequestMessage(message)) {
                 span.setTag('id', message.id)
@@ -149,9 +143,6 @@ export function createDispatcher(
                 span.finish()
             }
             if (response) {
-                if (lightstepTraceUrl) {
-                    ;(response as any)._trace = lightstepTraceUrl
-                }
                 client.writer.write(response)
             }
             if (stopTimer) {

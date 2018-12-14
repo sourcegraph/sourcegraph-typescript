@@ -1,10 +1,17 @@
+import { Span, Tracer } from 'opentracing'
 import { queryExtensions, resolveRepository, search } from './graphql'
 import { SourcegraphInstance } from './graphql'
 import { Logger } from './logging'
+import { logErrorEvent, tracedFetch, tracePromise } from './tracing'
 
-export async function fetchPackageMeta(packageName: string, version = 'latest'): Promise<PackageJson> {
-    const response = await fetch(
-        `https://cors-anywhere.sourcegraph.com/https://registry.npmjs.com/${packageName}/${version}`
+export async function fetchPackageMeta(
+    packageName: string,
+    version = 'latest',
+    { span, tracer }: { span: Span; tracer: Tracer }
+): Promise<PackageJson> {
+    const response = await tracedFetch(
+        `https://cors-anywhere.sourcegraph.com/https://registry.npmjs.com/${packageName}/${version}`,
+        { tracer, span }
     )
     if (!response.ok) {
         throw new Error(`${response.status} ${response.statusText}`)
@@ -31,7 +38,7 @@ interface NpmCouchDBQueryResult {
 export async function* findPackageDependentsWithNpm(
     packageName: string,
     sgInstance: SourcegraphInstance,
-    { logger }: { logger: Logger }
+    { logger, tracer, span }: { logger: Logger; span: Span; tracer: Tracer }
 ): AsyncIterable<string> {
     logger.log(`Searching for dependents of package "${packageName}" through npm`)
     const limit = 100
@@ -47,7 +54,7 @@ export async function* findPackageDependentsWithNpm(
     const seenRepos = new Set<string>()
     for (let skip = 0; true; skip += limit) {
         url.searchParams.set('skip', skip + '')
-        const response = await fetch(url.href)
+        const response = await tracedFetch(url, { tracer, span })
         const result: NpmCouchDBQueryResult = await response.json()
         if (result.rows.length === 0) {
             logger.log(`Found ${seenRepos.size} dependent repos of "${packageName}"`)
@@ -56,13 +63,14 @@ export async function* findPackageDependentsWithNpm(
         for (const row of result.rows) {
             const dependentPackageName = row.key[1]
             try {
-                const packageMeta = await fetchPackageMeta(dependentPackageName)
-                const repoName = await resolvePackageNameToRepoName(packageMeta, sgInstance)
+                const packageMeta = await fetchPackageMeta(dependentPackageName, undefined, { tracer, span })
+                const repoName = await resolvePackageNameToRepoName(packageMeta, sgInstance, { tracer, span })
                 if (!seenRepos.has(repoName)) {
                     seenRepos.add(repoName)
                     yield repoName
                 }
             } catch (err) {
+                logErrorEvent(span, err)
                 logger.error(
                     `Error resolving "${packageName}" dependent "${dependentPackageName}" to Sourcegraph repo`,
                     err
@@ -78,10 +86,10 @@ export async function* findPackageDependentsWithNpm(
 export async function* findPackageDependentsWithSourcegraphSearch(
     packageName: string,
     sgInstance: SourcegraphInstance,
-    { logger }: { logger: Logger }
+    { logger, span, tracer }: { logger: Logger; span: Span; tracer: Tracer }
 ): AsyncIterable<string> {
     logger.log(`Searching for dependents of ${packageName} through Sourcegraph`)
-    const results = await search(`file:package.json$ ${packageName} max:1000`, sgInstance)
+    const results = await search(`file:package.json$ ${packageName} max:1000`, sgInstance, { span, tracer })
     const seenRepos = new Set<string>()
     for (const result of results) {
         const repoName = result.repository.name
@@ -97,10 +105,10 @@ export async function* findPackageDependentsWithSourcegraphSearch(
  */
 export async function* findPackageDependentsWithSourcegraphExtensionRegistry(
     sgInstance: SourcegraphInstance,
-    { logger }: { logger: Logger }
+    { logger, tracer, span }: { logger: Logger; tracer: Tracer; span: Span }
 ): AsyncIterable<string> {
     logger.log(`Searching for dependents to "sourcegraph" through Sourcegraph extension registry`)
-    const extensions = await queryExtensions(sgInstance)
+    const extensions = await queryExtensions(sgInstance, { span, tracer })
     logger.log(`Found ${extensions.length} extensions`)
     const seenRepos = new Set<string>()
     for (const extension of extensions) {
@@ -109,12 +117,13 @@ export async function* findPackageDependentsWithSourcegraphExtensionRegistry(
                 continue
             }
             const manifest = JSON.parse(extension.manifest.raw)
-            const repoName = await resolvePackageNameToRepoName(manifest, sgInstance)
+            const repoName = await resolvePackageNameToRepoName(manifest, sgInstance, { span, tracer })
             if (!seenRepos.has(repoName)) {
                 seenRepos.add(repoName)
                 yield repoName
             }
         } catch (err) {
+            logErrorEvent(span, err)
             logger.error(`Error mapping extension "${extension.extensionID}" to Sourcegraph repo`, err)
         }
     }
@@ -146,37 +155,55 @@ export interface PackageJson {
  */
 export async function findClosestPackageJson(
     resource: URL,
-    rootUri: URL = Object.assign(new URL(resource.href), { pathname: '' })
+    {
+        rootUri = Object.assign(new URL(resource.href), { pathname: '' }),
+        tracer,
+        span,
+    }: {
+        rootUri?: URL
+        tracer: Tracer
+        span: Span
+    }
 ): Promise<[URL, PackageJson]> {
-    let parent = new URL(resource.href)
-    const headers = new Headers()
-    // Browsers don't allow using fetch on URLs with auth info in the URL
-    if (parent.username) {
-        headers.set('Authorization', 'token ' + parent.username)
-    }
-    parent.username = ''
-    rootUri = new URL(rootUri.href)
-    rootUri.username = ''
-    while (true) {
-        if (!parent.href.startsWith(rootUri.href)) {
-            throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
+    return await tracePromise(
+        'Find closest package.json',
+        tracer,
+        span,
+        async (span): Promise<[URL, PackageJson]> => {
+            let parent = new URL(resource.href)
+            const headers: Record<string, string> = {}
+            // Browsers don't allow using fetch on URLs with auth info in the URL
+            if (parent.username) {
+                headers.Authorization = 'token ' + parent.username
+            }
+            parent.username = ''
+            rootUri = new URL(rootUri.href)
+            rootUri.username = ''
+            while (true) {
+                if (!parent.href.startsWith(rootUri.href)) {
+                    throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
+                }
+                const packageJsonUri = new URL('package.json', parent.href)
+                const response = await tracedFetch(packageJsonUri, { headers, tracer, span })
+                if (response.status === 404) {
+                    parent = new URL('..', parent.href)
+                    continue
+                } else if (!response.ok) {
+                    throw new Error(`${response.status} ${response.statusText}`)
+                }
+                return [packageJsonUri, await response.json()]
+            }
         }
-        const packageJsonUri = new URL('package.json', parent.href)
-        const response = await fetch(packageJsonUri.href)
-        if (response.status === 404) {
-            parent = new URL('..', parent.href)
-            continue
-        } else if (!response.ok) {
-            throw new Error(`${response.status} ${response.statusText}`)
-        }
-        return [packageJsonUri, await response.json()]
-    }
+    )
 }
 
 /**
  * Finds the package name that the given URI belongs to.
  */
-export async function findPackageName(uri: URL, { logger }: { logger: Logger }): Promise<string> {
+export async function findPackageName(
+    uri: URL,
+    { logger, tracer, span }: { logger: Logger; tracer: Tracer; span: Span }
+): Promise<string> {
     // Special case: if the definition is in DefinitelyTyped, the package name is @types/<subfolder>
     if (uri.pathname.includes('DefinitelyTyped/DefinitelyTyped')) {
         const dtMatch = uri.pathname.match(/\/types\/([^\/]+)\//)
@@ -191,7 +218,7 @@ export async function findPackageName(uri: URL, { logger }: { logger: Logger }):
         return 'vscode'
     }
     // Find containing package
-    const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri)
+    const [packageJsonUrl, packageJson] = await findClosestPackageJson(uri, { tracer, span })
     if (!packageJson.name) {
         throw new Error(`package.json at ${packageJsonUrl} does not contain a name`)
     }
@@ -210,9 +237,10 @@ function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {
 
 export async function resolvePackageNameToRepoName(
     packageMeta: PackageJson,
-    sgInstance: SourcegraphInstance
+    sgInstance: SourcegraphInstance,
+    { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
     const cloneUrl = cloneUrlFromPackageMeta(packageMeta)
-    const repoName = await resolveRepository(cloneUrl, sgInstance)
+    const repoName = await resolveRepository(cloneUrl, sgInstance, { span, tracer })
     return repoName
 }
