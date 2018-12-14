@@ -51,11 +51,7 @@ const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
 
-const documentSelector: sourcegraph.DocumentSelector = [
-    { language: 'typescript' },
-    { language: 'javascript' },
-    { language: 'json' },
-]
+const documentSelector: sourcegraph.DocumentSelector = [{ language: 'typescript' }, { language: 'javascript' }]
 
 const logger: Logger = new RedactingLogger(console)
 
