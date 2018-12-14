@@ -26,6 +26,9 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
     const subject = new Subject<Progress>()
     subject
         .pipe(
+            // Convert a next() with percentage >= 100 to a complete() for safety
+            // Apply this first because throttleTime() can drop emissions
+            takeWhile(progress => !progress.percentage || progress.percentage < 100),
             // Merge progress updates with previous values because otherwise it would not be safe to throttle below (it may drop updates)
             // This way, every message contains the full state and does not depend on the previous state
             scan<Progress, Progress>(
@@ -33,8 +36,7 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
                 {}
             ),
             distinctUntilChanged((a, b) => isEqual(a, b)),
-            throttleTime(100, undefined, { leading: true, trailing: true }),
-            takeWhile(progress => !progress.percentage || progress.percentage < 100)
+            throttleTime(100, undefined, { leading: true, trailing: true })
         )
         .subscribe({
             next: progress => {
@@ -50,6 +52,8 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
             },
             error: err => {
                 try {
+                    // window/progress doesn't support erroring the progress,
+                    // but we can emulate by hiding the progress and showing an error
                     connection.sendNotification(WindowProgressNotification.type, { id, done: true })
                     connection.sendNotification(ShowMessageNotification.type, {
                         message: err.message,
