@@ -1,6 +1,6 @@
 import { isEqual } from 'lodash'
 import { Observer, Subject } from 'rxjs'
-import { distinctUntilChanged, takeWhile, throttleTime } from 'rxjs/operators'
+import { distinctUntilChanged, scan, takeWhile, throttleTime } from 'rxjs/operators'
 import { MessageConnection } from 'vscode-jsonrpc'
 import { MessageType, ShowMessageNotification } from 'vscode-languageserver-protocol'
 import { Logger } from './logging'
@@ -26,6 +26,12 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
     const subject = new Subject<Progress>()
     subject
         .pipe(
+            // Merge progress updates with previous values because otherwise it would not be safe to throttle below (it may drop updates)
+            // This way, every message contains the full state and does not depend on the previous state
+            scan<Progress, Progress>(
+                (state, { percentage = state.percentage, message = state.message }) => ({ percentage, message }),
+                {}
+            ),
             distinctUntilChanged((a, b) => isEqual(a, b)),
             throttleTime(100, undefined, { leading: true, trailing: true }),
             takeWhile(progress => !progress.percentage || progress.percentage < 100)
