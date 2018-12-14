@@ -2,20 +2,41 @@ import { ChildProcess, spawn } from 'child_process'
 // import { exec } from 'mz/child_process'
 import { Span, Tracer } from 'opentracing'
 import * as path from 'path'
+import { combineLatest, concat, fromEvent, merge, Unsubscribable } from 'rxjs'
+import { filter, map, switchMap, withLatestFrom } from 'rxjs/operators'
 import { Readable } from 'stream'
 import { CancellationToken, Disposable } from 'vscode-jsonrpc'
 import { createAbortError, throwIfCancelled } from './cancellation'
 import { disposeAll } from './disposable'
 import { Logger, NoopLogger } from './logging'
+import { Progress, ProgressProvider } from './progress'
 import { tracePromise } from './tracing'
 
-/**
- * Emitted value for a `step` event
- */
 export interface YarnStep {
     message: string
     current: number
     total: number
+}
+export interface YarnProgressStart {
+    id: number
+    total: number
+}
+export interface YarnProgressTick {
+    id: number
+    current: number
+}
+export interface YarnProgressFinish {
+    id: number
+}
+export interface YarnActivityStart {
+    id: number
+}
+export interface YarnActivityTick {
+    id: number
+    name: string
+}
+export interface YarnActivityEnd {
+    id: number
 }
 
 /**
@@ -26,6 +47,15 @@ export interface YarnProcess extends ChildProcess {
     on(event: 'verbose', listener: (log: string) => void): this
     /** Emitted on a yarn step (e.g. Resolving, Fetching, Linking) */
     on(event: 'step', listener: (step: YarnStep) => void): this
+
+    on(event: 'activityStart', listener: (step: YarnActivityStart) => void): this
+    on(event: 'activityTick', listener: (step: YarnActivityTick) => void): this
+    on(event: 'activityEnd', listener: (step: YarnActivityEnd) => void): this
+
+    on(event: 'progressStart', listener: (step: YarnProgressStart) => void): this
+    on(event: 'progressTick', listener: (step: YarnProgressTick) => void): this
+    on(event: 'progressFinish', listener: (step: YarnProgressFinish) => void): this
+
     /** Emitted if the process exited successfully */
     on(event: 'success', listener: () => void): this
     /** Emitted on error event or non-zero exit code */
@@ -37,6 +67,15 @@ export interface YarnProcess extends ChildProcess {
     once(event: 'verbose', listener: (log: string) => void): this
     /** Emitted on a yarn step (e.g. Resolving, Fetching, Linking) */
     once(event: 'step', listener: (step: YarnStep) => void): this
+
+    once(event: 'activityStart', listener: (step: YarnActivityStart) => void): this
+    once(event: 'activityTick', listener: (step: YarnActivityTick) => void): this
+    once(event: 'activityEnd', listener: (step: YarnActivityEnd) => void): this
+
+    once(event: 'progressStart', listener: (step: YarnProgressStart) => void): this
+    once(event: 'progressTick', listener: (step: YarnProgressTick) => void): this
+    once(event: 'progressFinish', listener: (step: YarnProgressFinish) => void): this
+
     /** Emitted if the process exited successfully */
     once(event: 'success', listener: () => void): this
     /** Emitted on error event or non-zero exit code */
@@ -77,11 +116,7 @@ const YARN_BIN_JS = path.resolve(__dirname, '..', '..', 'node_modules', 'yarn', 
  *
  * @param options
  */
-export function spawnYarn({
-    span = new Span(),
-    logger = new NoopLogger(),
-    ...options
-}: YarnInstallOptions): YarnProcess {
+export function spawnYarn({ span = new Span(), logger = new NoopLogger(), ...options }: YarnSpawnOptions): YarnProcess {
     const args = [
         YARN_BIN_JS,
         '--ignore-scripts', // Don't run package.json scripts
@@ -90,7 +125,6 @@ export function spawnYarn({
         '--no-bin-links', // Don't create bin symlinks
         '--no-emoji', // Don't use emojis in output
         '--non-interactive', // Don't ask for any user input
-        '--no-progress', // Don't report progress events
         '--json', // Output a newline-delimited JSON stream
         '--link-duplicates', // Use hardlinks instead of copying
 
@@ -119,16 +153,12 @@ export function spawnYarn({
                 buffer = lines.pop()!
                 for (const line of lines) {
                     const event = JSON.parse(line)
-                    switch (event.type) {
-                        case 'error':
-                            // Only emit error event if non-zero exit code
-                            logger.error('yarn: ', event.data)
-                            errors.push(event.data)
-                            break
-                        case 'step':
-                        case 'verbose':
-                            yarn.emit(event.type, event.data)
-                            break
+                    if (event.type === 'error') {
+                        // Only emit error event if non-zero exit code
+                        logger.error('yarn: ', event.data)
+                        errors.push(event.data)
+                    } else if (event.type !== 'success') {
+                        yarn.emit(event.type, event.data)
                     }
                 }
             } catch (err) {
@@ -168,6 +198,7 @@ export function spawnYarn({
 }
 
 interface YarnInstallOptions extends YarnSpawnOptions {
+    withProgress: ProgressProvider
     token: CancellationToken
 }
 
@@ -180,28 +211,60 @@ export async function install({
     span,
     token,
     cwd,
+    withProgress,
     ...spawnOptions
 }: YarnInstallOptions): Promise<void> {
+    throwIfCancelled(token)
     await tracePromise('yarn install', tracer, span, async span => {
-        throwIfCancelled(token)
-        const using: Disposable[] = []
-        try {
-            // const [stdout] = await exec(`node ${YARN_BIN_JS} config list`, { cwd })
-            // logger.log('yarn config', stdout)
-            await new Promise<void>((resolve, reject) => {
-                const yarnProcess = spawnYarn({ ...spawnOptions, cwd, tracer, span, token, logger })
-                yarnProcess.on('success', resolve)
-                yarnProcess.on('error', reject)
-                using.push(
-                    token.onCancellationRequested(() => {
-                        logger.log('Killing yarn process in ', cwd)
-                        yarnProcess.kill()
-                        reject(createAbortError())
-                    })
-                )
-            })
-        } finally {
-            disposeAll(using)
-        }
+        await withProgress(undefined, async reporter => {
+            const using: (Disposable | Unsubscribable)[] = []
+            try {
+                // const [stdout] = await exec(`node ${YARN_BIN_JS} config list`, { cwd })
+                // logger.log('yarn config', stdout)
+                await new Promise<void>((resolve, reject) => {
+                    const yarn = spawnYarn({ ...spawnOptions, cwd, tracer, span, logger })
+                    const steps = fromEvent<YarnStep>(yarn, 'step')
+                    using.push(
+                        merge<Progress>(
+                            combineLatest(
+                                concat([''], fromEvent<YarnActivityTick>(yarn, 'activityTick').pipe(map(a => a.name))),
+                                steps
+                            ).pipe(
+                                map(([activityName, step]) => ({
+                                    message: step.message + '  \n' + activityName,
+                                    percentage: Math.round(((step.current - 1) / step.total) * 100),
+                                }))
+                            ),
+                            // Only listen to the latest progress
+                            fromEvent<YarnProgressStart>(yarn, 'progressStart').pipe(
+                                withLatestFrom(steps),
+                                switchMap(([{ total, id }, step]) =>
+                                    fromEvent<YarnProgressTick>(yarn, 'progressTick').pipe(
+                                        filter(progress => progress.id === id),
+                                        map(progress => ({
+                                            percentage: Math.round(
+                                                ((step.current - 1 + progress.current / total) / step.total) * 100
+                                            ),
+                                        }))
+                                    )
+                                )
+                            )
+                        ).subscribe(reporter)
+                    )
+
+                    yarn.on('success', resolve)
+                    yarn.on('error', reject)
+                    using.push(
+                        token.onCancellationRequested(() => {
+                            logger.log('Killing yarn process in ', cwd)
+                            yarn.kill()
+                            reject(createAbortError())
+                        })
+                    )
+                })
+            } finally {
+                disposeAll(using)
+            }
+        })
     })
 }

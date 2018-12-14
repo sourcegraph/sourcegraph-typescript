@@ -18,12 +18,13 @@ import * as ini from 'ini'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
 import * as path from 'path'
+import prettyBytes from 'pretty-bytes'
 import * as prometheus from 'prom-client'
 import rmfr from 'rmfr'
 import { interval, Unsubscribable } from 'rxjs'
@@ -35,6 +36,7 @@ import uuid = require('uuid')
 import {
     CancellationToken,
     CancellationTokenSource,
+    ClientCapabilities,
     Definition,
     DefinitionRequest,
     DidOpenTextDocumentNotification,
@@ -69,6 +71,8 @@ import { AsyncDisposable, Disposable, disposeAllAsync, subscriptionToDisposable 
 import { resolveRepository } from './graphql'
 import { LanguageServer, spawnLanguageServer } from './language-server'
 import { Logger, LSPLogger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from './logging'
+import { createProgressProvider, noopProgressProvider, ProgressProvider } from './progress'
+import { WindowProgressClientCapabilities } from './protocol.progress.proposed'
 import {
     createResourceRetrieverPicker,
     FileResourceRetriever,
@@ -250,6 +254,8 @@ webSocketServer.on('connection', connection => {
         tags: onAllMessagesTags,
     })
     connectionDisposables.add({ dispose: () => dispatcher.dispose() })
+
+    let withProgress: ProgressProvider = noopProgressProvider
 
     /** Checks if the given URI is under the root URI */
     const isInWorkspace = (resource: URL): boolean => resource.href.startsWith(httpRootUri.href)
@@ -502,6 +508,12 @@ webSocketServer.on('connection', connection => {
             configuration = params.initializationOptions.configuration
         }
 
+        const capabilities = params.capabilities as ClientCapabilities & WindowProgressClientCapabilities
+        if (capabilities.experimental && capabilities.experimental.progress) {
+            // Client supports reporting progress
+            withProgress = createProgressProvider(webSocketMessageConnection, logger)
+        }
+
         // Create temp folders
         tempDir = path.join(CACHE_DIR, connectionId)
         await mkdirp(tempDir)
@@ -530,39 +542,42 @@ webSocketServer.on('connection', connection => {
         logger.info('Fetching archive from', httpRootUri.href)
         logger.log('Extracting to', extractPath)
         await tracePromise('Fetch source archive', tracer, span, async span => {
-            span.setTag(HTTP_URL, redact(httpRootUri.href))
-            const headers = {
-                Accept: 'application/x-tar',
-                'User-Agent': 'TypeScript language server',
-            }
-            span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
-            const response = await axios.get<NodeJS.ReadableStream>(httpRootUri.href, {
-                headers,
-                responseType: 'stream',
-                cancelToken: toAxiosCancelToken(token),
+            await withProgress('Downloading source archive', async reporter => {
+                span.setTag(HTTP_URL, redact(httpRootUri.href))
+                const headers = {
+                    Accept: 'application/x-tar',
+                    'User-Agent': 'TypeScript language server',
+                }
+                span.tracer().inject(span, FORMAT_HTTP_HEADERS, headers)
+                const response = await axios.get<NodeJS.ReadableStream>(httpRootUri.href, {
+                    headers,
+                    responseType: 'stream',
+                    cancelToken: toAxiosCancelToken(token),
+                })
+                const contentType = response.headers['content-type']
+                if (!type.is(contentType, 'application/*')) {
+                    throw new Error(`Expected response to be of content type application/x-tar, was ${contentType}`)
+                }
+                let bytes = 0
+                await new Promise<void>((resolve, reject) => {
+                    response.data
+                        .on('error', reject)
+                        .on('data', (chunk: Buffer) => {
+                            bytes += chunk.byteLength
+                            reporter.next({ message: prettyBytes(bytes) })
+                        })
+                        .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
+                        .on('entry', (entry: FileStat) => {
+                            if (entry.header.path && entry.header.path.endsWith('package.json')) {
+                                packageJsonPaths.push(entry.header.path)
+                            }
+                        })
+                        .on('warn', warning => logger.warn(warning))
+                        .on('finish', resolve)
+                        .on('error', reject)
+                })
+                span.setTag('bytes', bytes)
             })
-            const contentType = response.headers['content-type']
-            if (!type.is(contentType, 'application/*')) {
-                throw new Error(`Expected response to be of content type application/x-tar, was ${contentType}`)
-            }
-            let bytes = 0
-            await new Promise<void>((resolve, reject) => {
-                response.data
-                    .on('error', reject)
-                    .on('data', (chunk: Buffer) => {
-                        bytes += chunk.byteLength
-                    })
-                    .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
-                    .on('entry', (entry: FileStat) => {
-                        if (entry.header.path && entry.header.path.endsWith('package.json')) {
-                            packageJsonPaths.push(entry.header.path)
-                        }
-                    })
-                    .on('warn', warning => logger.warn(warning))
-                    .on('finish', resolve)
-                    .on('error', reject)
-            })
-            span.setTag('bytes', bytes)
         })
 
         // Find package.jsons to install
@@ -615,7 +630,7 @@ webSocketServer.on('connection', connection => {
                 const cacheFolder = path.join(cacheFolderRoot, relPackageRoot)
                 const cwd = path.join(extractPath, relPackageRoot)
                 await Promise.all([mkdirp(path.join(globalFolder)), mkdirp(path.join(cacheFolder))])
-                await install({ cwd, globalFolder, cacheFolder, logger, tracer, span, token })
+                await install({ cwd, globalFolder, cacheFolder, logger, tracer, span, token, withProgress })
                 await sanitizeTsConfigs({
                     cwd: path.join(cwd, 'node_modules'),
                     logger,

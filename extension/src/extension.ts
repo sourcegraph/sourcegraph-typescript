@@ -17,6 +17,7 @@ import { filter, flatMap, map, scan } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import * as sourcegraph from 'sourcegraph'
 import {
+    ClientCapabilities,
     DefinitionRequest,
     DidOpenTextDocumentNotification,
     DidOpenTextDocumentParams,
@@ -25,7 +26,6 @@ import {
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
-    PublishDiagnosticsNotification,
     ReferenceContext,
     ReferenceParams,
     ReferencesRequest,
@@ -41,6 +41,7 @@ import {
 import { resolveRev, SourcegraphInstance } from './graphql'
 import { Logger, LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
 import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
+import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
 import { asArray, observableFromAsyncIterable, throwIfAbortError } from './util'
 
@@ -104,6 +105,32 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             ]
             logger[method](...args)
         })
+        // Log diagnostics
+        // connection.onNotification(PublishDiagnosticsNotification.type, params => {
+        //     logger.log('Diagnostics', params)
+        // })
+        // Show progress reports
+        const progressReporters = new Map<string, Promise<sourcegraph.ProgressReporter>>()
+        connection.onNotification(WindowProgressNotification.type, async ({ id, title, message, percentage, done }) => {
+            try {
+                if (!sourcegraph.app.activeWindow || !sourcegraph.app.activeWindow.showProgress) {
+                    return
+                }
+                let reporterPromise = progressReporters.get(id)
+                if (!reporterPromise) {
+                    reporterPromise = sourcegraph.app.activeWindow.showProgress({ title })
+                    progressReporters.set(id, reporterPromise)
+                }
+                const reporter = await reporterPromise
+                reporter.next({ percentage, message })
+                if (done) {
+                    reporter.complete()
+                    progressReporters.delete(id)
+                }
+            } catch (err) {
+                logger.error('Error handling progress notification', err)
+            }
+        })
         connection.listen()
         const event = await new Promise<Event>(resolve => {
             socket.addEventListener('open', resolve, { once: true })
@@ -113,11 +140,16 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             throw new Error(`The WebSocket to the TypeScript backend at ${serverUrl} could not not be opened`)
         }
         logger.log(`WebSocket connection to TypeScript backend at ${serverUrl} opened`)
+        const clientCapabilities: ClientCapabilities & WindowProgressClientCapabilities = {
+            experimental: {
+                progress: true,
+            },
+        }
         const initializeParams: InitializeParams = {
             processId: 0,
             rootUri: rootUri.href,
             workspaceFolders: [{ name: '', uri: rootUri.href }],
-            capabilities: {},
+            capabilities: clientCapabilities,
             initializationOptions: {
                 // until workspace/configuration is allowed during initialize
                 configuration: {
@@ -153,10 +185,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             }
             connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
         }
-        // Log diagnostics
-        connection.onNotification(PublishDiagnosticsNotification.type, params => {
-            logger.log('Diagnostics', params)
-        })
         return connection
     }
 
