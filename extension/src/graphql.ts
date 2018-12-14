@@ -115,25 +115,27 @@ export async function resolveRepository(
     sgInstance: SourcegraphInstance,
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
-    const { data, errors } = await requestGraphQL(
-        gql`
-            query($cloneUrl: String!) {
-                repository(cloneURL: $cloneUrl) {
-                    name
+    return await tracePromise('Resolve clone URL', tracer, span, async span => {
+        const { data, errors } = await requestGraphQL(
+            gql`
+                query($cloneUrl: String!) {
+                    repository(cloneURL: $cloneUrl) {
+                        name
+                    }
                 }
-            }
-        `,
-        { cloneUrl },
-        sgInstance,
-        { span, tracer }
-    )
-    if (errors && errors.length > 0) {
-        throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
-    }
-    if (!data.repository) {
-        throw new Error(`No repository found for clone URL ${cloneUrl} on instance ${sgInstance.instanceUrl}`)
-    }
-    return data.repository.name
+            `,
+            { cloneUrl },
+            sgInstance,
+            { span, tracer }
+        )
+        if (errors && errors.length > 0) {
+            throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
+        }
+        if (!data.repository) {
+            throw new Error(`No repository found for clone URL ${cloneUrl} on instance ${sgInstance.instanceUrl}`)
+        }
+        return data.repository.name
+    })
 }
 
 /**
