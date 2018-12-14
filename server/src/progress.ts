@@ -44,6 +44,7 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
             },
             error: err => {
                 try {
+                    connection.sendNotification(WindowProgressNotification.type, { id, done: true })
                     connection.sendNotification(ShowMessageNotification.type, {
                         message: err.message,
                         type: MessageType.Error,
