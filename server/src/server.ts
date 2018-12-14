@@ -12,6 +12,8 @@ import {
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import axios from 'axios'
+import express from 'express'
+import { highlight } from 'highlight.js'
 import * as http from 'http'
 import * as https from 'https'
 import * as ini from 'ini'
@@ -32,6 +34,7 @@ import { NullableMappedPosition, RawSourceMap, SourceMapConsumer } from 'source-
 import { extract, FileStat } from 'tar'
 import * as type from 'type-is'
 import { fileURLToPath, pathToFileURL } from 'url'
+import { inspect } from 'util'
 import uuid = require('uuid')
 import {
     CancellationToken,
@@ -67,7 +70,7 @@ import {
     resolveDependencyRootDir,
 } from './dependencies'
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
-import { AsyncDisposable, Disposable, disposeAllAsync, subscriptionToDisposable } from './disposable'
+import { AsyncDisposable, Disposable, disposeAllAsync } from './disposable'
 import { resolveRepository } from './graphql'
 import { LanguageServer, spawnLanguageServer } from './language-server'
 import { Logger, LSPLogger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from './logging'
@@ -445,21 +448,24 @@ webSocketServer.on('connection', connection => {
     }): Promise<InitializeResult> {
         // Kill old language server instance
         if (languageServer) {
+            connectionDisposables.delete(languageServer)
             languageServer.dispose()
         }
         languageServer = await spawnLanguageServer({ tempDir, configuration, connectionId, tracer, logger })
+        connectionDisposables.add(languageServer)
         connectionDisposables.add(
-            subscriptionToDisposable(
-                languageServer.errors.subscribe(err => {
-                    logger.error('Launching language server failed', err)
-                    connection.close()
-                })
-            )
+            languageServer.errors.subscribe(err => {
+                logger.error('Launching language server failed', err)
+                connection.close()
+            })
         )
         // Forward diagnostics
         connectionDisposables.add(
             languageServer.dispatcher.observeNotification(PublishDiagnosticsNotification.type).subscribe(params => {
                 try {
+                    if (params.uri.includes('/node_modules/')) {
+                        return
+                    }
                     const mappedParams: PublishDiagnosticsParams = {
                         ...params,
                         uri: mapFileToHttpUrlSimple(new URL(params.uri)).href,
@@ -975,14 +981,40 @@ httpServer.listen(port, () => {
     globalLogger.log(`WebSocket server listening on port ${port}`)
 })
 
-// Prometheus metrics
-const metricsPort = process.env.METRICS_PORT || 6060
-const metricsServer = http.createServer((req, res) => {
-    res.statusCode = 200
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-    res.end(prometheus.register.metrics())
+const debugPort = Number(process.env.METRICS_PORT || 6060)
+const debugServer = express()
+const highlightCss = fs.readFileSync(require.resolve('highlight.js/styles/github.css'), 'utf-8')
+/** Sends a plain text response, or highlighted HTML if `req.query.highlight` is set */
+function sendText(req: express.Request, res: express.Response, language: string, code: string) {
+    if (!req.query.highlight) {
+        res.setHeader('Content-Type', prometheus.register.contentType)
+        res.end(code)
+    } else {
+        res.setHeader('Content-Type', 'text/html')
+        const highlighted = highlight(language, code, true).value
+        res.end('<pre><code>\n' + highlighted + '</pre></code>\n' + '<style>\n' + highlightCss + '</style>\n')
+    }
+}
+debugServer.get('/', (req, res) => {
+    res.send(`
+        <ul>
+            <li><a href="/active_handles">Active handles</a></li>
+            <li><a href="/metrics">Prometheus metrics</a></li>
+        </ul>
+    `)
 })
-metricsServer.on('error', err => globalLogger.error('Metrics server error', err)) // don't crash on metrics
-metricsServer.listen(metricsPort, () => {
-    globalLogger.log(`Prometheus metrics on http://localhost:${metricsPort}`)
+// Prometheus metrics
+debugServer.get('/metrics', (req, res) => {
+    const metrics = prometheus.register.metrics()
+    sendText(req, res, 'php', metrics)
+})
+// Endpoint to debug handle leaks (see also nodejs_active_handles_total Prometheus metric)
+debugServer.get('/active_handles', (req, res) => {
+    const handles = { ...process._getActiveHandles() } // spread to get indexes as keys
+    const inspected = inspect(handles, req.query)
+    sendText(req, res, 'javascript', inspected)
+})
+
+debugServer.listen(debugPort, () => {
+    globalLogger.log(`Debug listening on http://localhost:${debugPort}`)
 })
