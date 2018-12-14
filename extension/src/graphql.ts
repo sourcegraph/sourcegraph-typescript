@@ -45,6 +45,7 @@ export async function search(
     { tracer, span }: { span: Span; tracer: Tracer }
 ): Promise<any> {
     return await tracePromise('Sourcegraph search', tracer, span, async span => {
+        span.setTag('query', query)
         const { data, errors } = await requestGraphQL(
             gql`
                 query Search($query: String!) {
@@ -83,6 +84,8 @@ export async function resolveRev(
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
     return await tracePromise('Resolve rev', tracer, span, async span => {
+        span.setTag('repoName', repoName)
+        span.setTag('rev', rev)
         const { data, errors } = await requestGraphQL(
             gql`
                 query ResolveRev($repoName: String!, $rev: String!) {
@@ -116,6 +119,7 @@ export async function resolveRepository(
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
     return await tracePromise('Resolve clone URL', tracer, span, async span => {
+        span.setTag('cloneUrl', cloneUrl)
         const { data, errors } = await requestGraphQL(
             gql`
                 query($cloneUrl: String!) {

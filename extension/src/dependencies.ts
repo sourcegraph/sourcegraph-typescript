@@ -1,7 +1,7 @@
 import { Span, Tracer } from 'opentracing'
 import { queryExtensions, resolveRepository, search } from './graphql'
 import { SourcegraphInstance } from './graphql'
-import { Logger } from './logging'
+import { Logger, redact } from './logging'
 import { logErrorEvent, tracedFetch, tracePromise } from './tracing'
 
 export async function fetchPackageMeta(
@@ -9,6 +9,8 @@ export async function fetchPackageMeta(
     version = 'latest',
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<PackageJson> {
+    span.setTag('packageName', packageName)
+    span.setTag('version', version)
     const response = await tracedFetch(
         `https://cors-anywhere.sourcegraph.com/https://registry.npmjs.com/${packageName}/${version}`,
         { tracer, span }
@@ -40,6 +42,7 @@ export async function* findPackageDependentsWithNpm(
     sgInstance: SourcegraphInstance,
     { logger, tracer, span }: { logger: Logger; span: Span; tracer: Tracer }
 ): AsyncIterable<string> {
+    span.setTag('packageName', packageName)
     logger.log(`Searching for dependents of package "${packageName}" through npm`)
     const limit = 100
     // Proxy through Sourcegraph because skimdb.npmjs.com does not send CORS headers
@@ -88,6 +91,7 @@ export async function* findPackageDependentsWithSourcegraphSearch(
     sgInstance: SourcegraphInstance,
     { logger, span, tracer }: { logger: Logger; span: Span; tracer: Tracer }
 ): AsyncIterable<string> {
+    span.setTag('packageName', packageName)
     logger.log(`Searching for dependents of ${packageName} through Sourcegraph`)
     const results = await search(`file:package.json$ ${packageName} max:1000`, sgInstance, { span, tracer })
     const seenRepos = new Set<string>()
@@ -170,6 +174,7 @@ export async function findClosestPackageJson(
         tracer,
         span,
         async (span): Promise<[URL, PackageJson]> => {
+            span.setTag('uri', redact(resource.href))
             let parent = new URL(resource.href)
             const headers: Record<string, string> = {}
             // Browsers don't allow using fetch on URLs with auth info in the URL
@@ -204,6 +209,7 @@ export async function findPackageName(
     uri: URL,
     { logger, tracer, span }: { logger: Logger; tracer: Tracer; span: Span }
 ): Promise<string> {
+    span.setTag('uri', redact(uri.href))
     // Special case: if the definition is in DefinitelyTyped, the package name is @types/<subfolder>
     if (uri.pathname.includes('DefinitelyTyped/DefinitelyTyped')) {
         const dtMatch = uri.pathname.match(/\/types\/([^\/]+)\//)

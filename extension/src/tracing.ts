@@ -8,6 +8,7 @@ import {
     SPAN_KIND_RPC_CLIENT,
 } from 'opentracing/lib/ext/tags'
 import { CancellationToken, MessageConnection, NotificationType1, RequestType1 } from 'vscode-jsonrpc'
+import { redact } from './logging'
 
 export const canGenerateTraceUrl = (val: any): val is { generateTraceURL(): string } =>
     typeof val === 'object' && val !== null && typeof val.generateTraceURL === 'function'
@@ -45,7 +46,7 @@ export async function tracedFetch(
     url: string | URL,
     { headers = {}, tracer, span, ...init }: RequestInit & { tracer: Tracer; span: Span }
 ) {
-    span.setTag(HTTP_URL, url.toString())
+    span.setTag(HTTP_URL, redact(url.toString()))
     span.setTag(HTTP_METHOD, init.method || 'GET')
     tracer.inject(span, FORMAT_HTTP_HEADERS, headers)
     const response = await fetch(url.toString(), { ...init, headers })

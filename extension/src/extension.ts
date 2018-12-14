@@ -46,7 +46,7 @@ import {
     findPackageName,
 } from './dependencies'
 import { resolveRev, SourcegraphInstance } from './graphql'
-import { Logger, LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
+import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from './logging'
 import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
 import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
@@ -415,6 +415,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         traceAsyncGenerator('Find external references for definition', tracer, span, async function*(
                             span
                         ) {
+                            span.setTag('uri', redact(definition.uri))
+                            span.setTag('line', definition.range.start.line)
                             try {
                                 logger.log(`Getting external references for definition`, definition)
 
@@ -446,6 +448,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                                         tracer,
                                         span,
                                         async function*(span) {
+                                            span.setTag('repoName', repoName)
                                             try {
                                                 const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
                                                     span,
