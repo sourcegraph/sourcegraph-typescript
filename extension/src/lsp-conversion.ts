@@ -1,5 +1,5 @@
 import * as sourcegraph from 'sourcegraph'
-import { Hover, Location, MarkupContent, Range } from 'vscode-languageserver-types'
+import { Diagnostic, DiagnosticSeverity, Hover, Location, MarkupContent, Range } from 'vscode-languageserver-types'
 
 export function convertRange(range: Range): sourcegraph.Range {
     return new sourcegraph.Range(range.start.line, range.start.character, range.end.line, range.end.character)
@@ -46,3 +46,17 @@ export function convertLocations(locationOrLocations: Location | Location[] | nu
     const locations = Array.isArray(locationOrLocations) ? locationOrLocations : [locationOrLocations]
     return locations.map(convertLocation)
 }
+
+const DIAGNOSTIC_COLORS: Readonly<Record<DiagnosticSeverity, string>> = {
+    [DiagnosticSeverity.Error]: 'var(--danger, #dc3545)',
+    [DiagnosticSeverity.Information]: 'var(--info, #17a2b8)',
+    [DiagnosticSeverity.Warning]: 'var(--success, #ffc107)',
+    [DiagnosticSeverity.Hint]: 'var(--secondary, #6c757d)',
+}
+export const convertDiagnosticToDecoration = (diagnostic: Diagnostic): sourcegraph.TextDocumentDecoration => ({
+    after: {
+        color: DIAGNOSTIC_COLORS[diagnostic.severity || DiagnosticSeverity.Hint],
+        contentText: diagnostic.message,
+    },
+    range: convertRange(diagnostic.range),
+})

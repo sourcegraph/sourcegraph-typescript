@@ -19,6 +19,7 @@ import * as sourcegraph from 'sourcegraph'
 import {
     ClientCapabilities,
     DefinitionRequest,
+    Diagnostic,
     DidOpenTextDocumentNotification,
     DidOpenTextDocumentParams,
     HoverRequest,
@@ -26,6 +27,7 @@ import {
     InitializeParams,
     InitializeRequest,
     LogMessageNotification,
+    PublishDiagnosticsNotification,
     ReferenceContext,
     ReferenceParams,
     ReferencesRequest,
@@ -40,7 +42,7 @@ import {
 } from './dependencies'
 import { resolveRev, SourcegraphInstance } from './graphql'
 import { Logger, LSP_TO_LOG_LEVEL, RedactingLogger } from './logging'
-import { convertHover, convertLocation, convertLocations } from './lsp-conversion'
+import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
 import { asArray, observableFromAsyncIterable, throwIfAbortError } from './util'
@@ -105,10 +107,31 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             ]
             logger[method](...args)
         })
-        // Log diagnostics
-        // connection.onNotification(PublishDiagnosticsNotification.type, params => {
-        //     logger.log('Diagnostics', params)
-        // })
+        // Display diagnostics as decorations
+        /** Diagnostic by Sourcegraph text document URI */
+        const diagnosticsByUri = new Map<string, Diagnostic[]>()
+        connection.onNotification(PublishDiagnosticsNotification.type, params => {
+            const uri = new URL(params.uri)
+            const sourcegraphTextDocumentUri = toSourcegraphTextDocumentUri(uri)
+            diagnosticsByUri.set(sourcegraphTextDocumentUri.href, params.diagnostics)
+            for (const appWindow of sourcegraph.app.windows) {
+                for (const viewComponent of appWindow.visibleViewComponents) {
+                    if (viewComponent.document.uri === sourcegraphTextDocumentUri.href) {
+                        viewComponent.setDecorations(null, params.diagnostics.map(convertDiagnosticToDecoration))
+                    }
+                }
+            }
+        })
+        ctx.subscriptions.add(
+            sourcegraph.workspace.onDidOpenTextDocument.subscribe(() => {
+                for (const appWindow of sourcegraph.app.windows) {
+                    for (const viewComponent of appWindow.visibleViewComponents) {
+                        const diagnostics = diagnosticsByUri.get(viewComponent.document.uri) || []
+                        viewComponent.setDecorations(null, diagnostics.map(convertDiagnosticToDecoration))
+                    }
+                }
+            })
+        )
         // Show progress reports
         const progressReporters = new Map<string, Promise<sourcegraph.ProgressReporter>>()
         connection.onNotification(WindowProgressNotification.type, async ({ id, title, message, percentage, done }) => {
