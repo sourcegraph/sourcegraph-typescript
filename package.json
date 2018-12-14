@@ -124,7 +124,7 @@
     "@types/mkdirp-promise": "5.0.0",
     "@types/mz": "0.0.32",
     "@types/node": "10.12.12",
-    "@types/pretty-bytes": "^5.1.0",
+    "@types/pretty-bytes": "5.1.0",
     "@types/relateurl": "0.2.28",
     "@types/rmfr": "2.0.0",
     "@types/source-map": "0.5.7",
