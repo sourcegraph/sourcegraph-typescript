@@ -16,6 +16,7 @@ import { AsyncIterableX, merge } from 'ix/asynciterable/index'
 import { filter, flatMap, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
+import { Subscription } from 'rxjs'
 import * as sourcegraph from 'sourcegraph'
 import {
     CancellationToken,
@@ -92,6 +93,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         { span, token }: { span: Span; token: CancellationToken }
     ): Promise<MessageConnection> {
         return await tracePromise('Connect to language server', tracer, span, async span => {
+            const subscriptions = new Subscription()
+            ctx.subscriptions.add(subscriptions)
+            token.onCancellationRequested(() => subscriptions.unsubscribe())
             const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
             if (typeof serverUrl !== 'string') {
                 throw new Error(
@@ -99,7 +103,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 )
             }
             const socket = new WebSocket(serverUrl)
-            ctx.subscriptions.add(() => socket.close())
+            subscriptions.add(() => socket.close())
             socket.addEventListener('close', event => {
                 logger.warn('WebSocket connection to TypeScript backend closed', event)
             })
@@ -112,7 +116,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 new WebSocketMessageWriter(rpcWebSocket),
                 logger
             )
-            ctx.subscriptions.add(() => connection.dispose())
+            subscriptions.add(() => connection.dispose())
             connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
                 // Blue background for the "TypeScript server" prefix
                 const method = LSP_TO_LOG_LEVEL[type]
@@ -127,6 +131,16 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             // Display diagnostics as decorations
             /** Diagnostic by Sourcegraph text document URI */
             const diagnosticsByUri = new Map<string, Diagnostic[]>()
+            subscriptions.add(() => {
+                // Clear all diagnostics held by this connection
+                for (const appWindow of sourcegraph.app.windows) {
+                    for (const viewComponent of appWindow.visibleViewComponents) {
+                        if (diagnosticsByUri.has(viewComponent.document.uri)) {
+                            viewComponent.setDecorations(decorationType, [])
+                        }
+                    }
+                }
+            })
             connection.onNotification(PublishDiagnosticsNotification.type, params => {
                 const uri = new URL(params.uri)
                 const sourcegraphTextDocumentUri = toSourcegraphTextDocumentUri(uri)
@@ -142,7 +156,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     }
                 }
             })
-            ctx.subscriptions.add(
+            subscriptions.add(
                 sourcegraph.workspace.onDidOpenTextDocument.subscribe(() => {
                     for (const appWindow of sourcegraph.app.windows) {
                         for (const viewComponent of appWindow.visibleViewComponents) {
@@ -154,6 +168,16 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             )
             // Show progress reports
             const progressReporters = new Map<string, Promise<sourcegraph.ProgressReporter>>()
+            subscriptions.add(() => {
+                // Cleanup unfinished progress reports
+                for (const reporterPromise of progressReporters.values()) {
+                    // tslint:disable-next-line:no-floating-promises
+                    reporterPromise.then(reporter => {
+                        reporter.complete()
+                    })
+                }
+                progressReporters.clear()
+            })
             connection.onNotification(
                 WindowProgressNotification.type,
                 async ({ id, title, message, percentage, done }) => {
