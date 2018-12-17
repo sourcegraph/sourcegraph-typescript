@@ -73,6 +73,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
 
     const accessToken = await getOrCreateAccessToken()
 
+    const decorationType = sourcegraph.app.createDecorationType()
+
     /** Adds the access token to the given server raw HTTP API URI, if available */
     function authenticateUri(uri: URL): URL {
         const authenticatedUri = new URL(uri.href)
@@ -132,7 +134,10 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 for (const appWindow of sourcegraph.app.windows) {
                     for (const viewComponent of appWindow.visibleViewComponents) {
                         if (viewComponent.document.uri === sourcegraphTextDocumentUri.href) {
-                            viewComponent.setDecorations(null, params.diagnostics.map(convertDiagnosticToDecoration))
+                            viewComponent.setDecorations(
+                                decorationType,
+                                params.diagnostics.map(convertDiagnosticToDecoration)
+                            )
                         }
                     }
                 }
@@ -142,7 +147,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     for (const appWindow of sourcegraph.app.windows) {
                         for (const viewComponent of appWindow.visibleViewComponents) {
                             const diagnostics = diagnosticsByUri.get(viewComponent.document.uri) || []
-                            viewComponent.setDecorations(null, diagnostics.map(convertDiagnosticToDecoration))
+                            viewComponent.setDecorations(decorationType, diagnostics.map(convertDiagnosticToDecoration))
                         }
                     }
                 })
