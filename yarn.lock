@@ -8276,10 +8276,10 @@ source-map@^0.5.0, source-map@^0.5.3, source-map@^0.5.6:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.5.7.tgz#8a039d2d1021d22d1ea14c80d8ea468ba2ef3fcc"
   integrity sha1-igOdLRAh0i0eoUyA2OpGi6LvP8w=
 
-sourcegraph@^19.5.0:
-  version "19.5.0"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-19.5.0.tgz#114ab03590ca9aac1f349b34ae7678a3e08a86fd"
-  integrity sha512-yV0jjmbLnGRS/pt95Fk61JQ2jo4yiZnLxb+Ol+LeD4O7PXJInSvlvrCtD5GxHM52FCzXs429uJ1EKD5ZZSLJ6g==
+sourcegraph@^20.0.0:
+  version "20.0.0"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-20.0.0.tgz#7828fa7f8383a3631e7d4f12a6c8468ba6ba2dd3"
+  integrity sha512-9wCLAIwbMIiG0KfftvRjvsHuCyRsOIk9/Kun1ULusVLnuM6Y/6VC2vrcx3Gk3YHudAwcd5xEA1LYraiNGmbuvQ==
 
 spawn-error-forwarder@~1.0.0:
   version "1.0.0"
