@@ -465,26 +465,28 @@ webSocketServer.on('connection', connection => {
             })
         )
         // Forward diagnostics
-        connectionDisposables.add(
-            languageServer.dispatcher.observeNotification(PublishDiagnosticsNotification.type).subscribe(params => {
-                try {
-                    if (params.uri.includes('/node_modules/')) {
-                        return
+        if (configuration['typescript.diagnostics.enable']) {
+            connectionDisposables.add(
+                languageServer.dispatcher.observeNotification(PublishDiagnosticsNotification.type).subscribe(params => {
+                    try {
+                        if (params.uri.includes('/node_modules/')) {
+                            return
+                        }
+                        const mappedParams: PublishDiagnosticsParams = {
+                            ...params,
+                            uri: mapFileToHttpUrlSimple(new URL(params.uri)).href,
+                        }
+                        webSocketMessageConnection.sendNotification(PublishDiagnosticsNotification.type, mappedParams)
+                    } catch (err) {
+                        logger.error(
+                            `Error handling ${PublishDiagnosticsNotification.type.method} notification`,
+                            params,
+                            err
+                        )
                     }
-                    const mappedParams: PublishDiagnosticsParams = {
-                        ...params,
-                        uri: mapFileToHttpUrlSimple(new URL(params.uri)).href,
-                    }
-                    webSocketMessageConnection.sendNotification(PublishDiagnosticsNotification.type, mappedParams)
-                } catch (err) {
-                    logger.error(
-                        `Error handling ${PublishDiagnosticsNotification.type.method} notification`,
-                        params,
-                        err
-                    )
-                }
-            })
-        )
+                })
+            )
+        }
         // Initialize it again with same InitializeParams
         const initializeResult = await sendServerRequest(InitializeRequest.type, serverInitializeParams, {
             tracer,

@@ -39,6 +39,10 @@
           "type": "string",
           "format": "url"
         },
+        "typescript.diagnostics.enable": {
+          "description": "Whether to show compile errors on lines (Default: false)",
+          "type": "boolean"
+        },
         "typescript.npmrc": {
           "description": "Settings to be written into an npmrc in key/value format. Can be used to specify custom registries and tokens.",
           "type": "object"
