@@ -107,6 +107,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             subscriptions.add(() => socket.close())
             socket.addEventListener('close', event => {
                 logger.warn('WebSocket connection to TypeScript backend closed', event)
+                subscriptions.unsubscribe()
             })
             socket.addEventListener('error', event => {
                 logger.error('WebSocket error', event)
