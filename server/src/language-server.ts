@@ -38,12 +38,14 @@ export interface LanguageServer extends Disposable {
 
 export async function spawnLanguageServer({
     tempDir,
+    tsserverCacheDir,
     configuration,
     connectionId,
     logger,
     tracer,
 }: {
     tempDir: string
+    tsserverCacheDir: string
     configuration: Configuration
     connectionId: string
     logger: Logger
@@ -73,7 +75,10 @@ export async function spawnLanguageServer({
     }
     logger.log('Spawning language server')
     const serverProcess = fork(TYPESCRIPT_LANGSERVER_JS_BIN, args, {
-        env: configuration['typescript.tsserver.env'],
+        env: {
+            ...configuration['typescript.tsserver.env'],
+            XDG_CACHE_HOME: tsserverCacheDir,
+        },
         stdio: ['ipc', 'inherit'],
         execArgv: [],
     })

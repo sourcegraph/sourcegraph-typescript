@@ -234,6 +234,7 @@ webSocketServer.on('connection', connection => {
     let httpRootUri: URL
     let fileRootUri: URL
     let extractPath: string
+    let tsserverCacheDir: string
     // yarn folders
     let globalFolderRoot: string
     let cacheFolderRoot: string
@@ -456,7 +457,14 @@ webSocketServer.on('connection', connection => {
             connectionDisposables.delete(languageServer)
             languageServer.dispose()
         }
-        languageServer = await spawnLanguageServer({ tempDir, configuration, connectionId, tracer, logger })
+        languageServer = await spawnLanguageServer({
+            tempDir,
+            tsserverCacheDir,
+            configuration,
+            connectionId,
+            tracer,
+            logger,
+        })
         connectionDisposables.add(languageServer)
         connectionDisposables.add(
             languageServer.errors.subscribe(err => {
@@ -539,7 +547,9 @@ webSocketServer.on('connection', connection => {
         extractPath = path.join(tempDir, 'repo')
         cacheFolderRoot = path.join(tempDir, 'cache')
         globalFolderRoot = path.join(tempDir, 'global')
+        tsserverCacheDir = path.join(tempDir, 'tsserver_cache')
         await Promise.all([
+            fs.mkdir(tsserverCacheDir),
             fs.mkdir(extractPath),
             fs.mkdir(cacheFolderRoot),
             fs.mkdir(globalFolderRoot),
