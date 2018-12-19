@@ -891,13 +891,14 @@
   dependencies:
     symbol-observable "^1.2.0"
 
-"@sourcegraph/lightstep-tracer-webworker@^0.20.14-fork.3":
-  version "0.20.14-fork.3"
-  resolved "https://registry.npmjs.org/@sourcegraph/lightstep-tracer-webworker/-/lightstep-tracer-webworker-0.20.14-fork.3.tgz#b7bd235af1214da9d206731e5f4271dfd267dd57"
-  integrity sha512-gODwBdCRcLu9wpO8id3FXEvwt3dBYVXNins8dhMc3mRbBDEn27TlRDj7YzAuYO7XQKw25Tx56mtF/jHSZKtLww==
+"@sourcegraph/lightstep-tracer-webworker@^0.20.14-webworker.2":
+  version "0.20.14-webworker.2"
+  resolved "https://registry.npmjs.org/@sourcegraph/lightstep-tracer-webworker/-/lightstep-tracer-webworker-0.20.14-webworker.2.tgz#2fe8cdfd6ab76015bd20b60094e1b033babd55e2"
+  integrity sha512-C2cH/NfYulWNvBglrzBeuw3GViDLEjp84SfYrtrWJt3kePmFrWe6jnEXmGRxlhAG4Bbp2rXySV5a5VcdyKl+fg==
   dependencies:
     async "1.5.0"
     eventemitter3 "1.1.1"
+    google-protobuf "3.6.1"
     hex2dec "1.0.1"
     source-map-support "0.3.3"
     thrift "0.10.0"
