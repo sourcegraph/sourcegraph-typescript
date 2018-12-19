@@ -22,11 +22,3 @@ docker push sourcegraph/lang-typescript:latest
 docker tag sourcegraph/lang-typescript:$VERSION sourcegraph/lang-typescript:insiders
 docker push sourcegraph/lang-typescript:insiders
 
-# Deploy to prod
-# CONTEXT=gke_sourcegraph-dev_us-central1-f_main-cluster-5
-# kubectl --context=$CONTEXT --namespace=prod set image deployment/lang-typescript "lang-typescript=sourcegraph/lang-typescript:$VERSION"
-# kubectl --context=$CONTEXT --namespace=prod rollout status deployment/lang-typescript
-
-# Trigger Deploybot
-curl http://deploy-bot.sourcegraph.com/set-branch-version -F "token=$DEPLOY_BOT_TOKEN" -F "branch=lang-typescript/master" -F "version=$VERSION" -F "user=$BUILDKITE_BUILD_CREATOR_EMAIL"
-
