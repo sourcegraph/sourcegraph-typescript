@@ -96,13 +96,14 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             const subscriptions = new Subscription()
             ctx.subscriptions.add(subscriptions)
             token.onCancellationRequested(() => subscriptions.unsubscribe())
-            const serverUrl: unknown = sourcegraph.configuration.get().get('typescript.serverUrl')
-            if (typeof serverUrl !== 'string') {
+            if (typeof config['typescript.serverUrl'] !== 'string') {
                 throw new Error(
                     'Setting typescript.serverUrl must be set to the WebSocket endpoint of the TypeScript language service'
                 )
             }
-            const socket = new WebSocket(serverUrl)
+            const serverUrl = new URL(config['typescript.serverUrl'])
+            serverUrl.search = redact(rootUri.href)
+            const socket = new WebSocket(serverUrl.href)
             subscriptions.add(() => socket.close())
             socket.addEventListener('close', event => {
                 logger.warn('WebSocket connection to TypeScript backend closed', event)

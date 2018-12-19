@@ -1,4 +1,5 @@
 export interface Configuration {
+    'typescript.serverUrl': string
     'typescript.npmrc'?: Record<string, string>
     'typescript.diagnostics.enable'?: boolean
     /** Whether to restart the language server after dependencies were installed (default `true`) */
