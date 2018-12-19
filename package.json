@@ -1,6 +1,6 @@
 {
   "name": "lang-typescript",
-  "title": "WIP: Code intelligence for TypeScript",
+  "title": "Code intelligence for TypeScript",
   "description": "Provides code intelligence for TypeScript",
   "private": true,
   "publisher": "sourcegraph",
