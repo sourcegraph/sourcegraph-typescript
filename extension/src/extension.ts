@@ -102,7 +102,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 )
             }
             const serverUrl = new URL(config['typescript.serverUrl'])
-            serverUrl.search = redact(rootUri.href)
+            serverUrl.search = rootUri.pathname.substr(1) // For easier debugging in network panel
             const socket = new WebSocket(serverUrl.href)
             subscriptions.add(() => socket.close())
             socket.addEventListener('close', event => {
