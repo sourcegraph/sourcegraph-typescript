@@ -317,7 +317,7 @@ webSocketServer.on('connection', connection => {
             {
                 const patternUrl = new URL(
                     path.posix.join(`**/node_modules/${packageName}`, packageRootRelativePath),
-                    fileRootUri
+                    tempDirUri
                 )
                 const file: URL | undefined = (await pickResourceRetriever(patternUrl).glob(patternUrl, {
                     span,
@@ -346,7 +346,7 @@ webSocketServer.on('connection', connection => {
             logger.log(
                 `Looking for declaration maps to map source file ${incomingUri} to declaration file in node_modules`
             )
-            const patternUrl = new URL(`**/node_modules/${packageName}/**/*.d.ts.map`, fileRootUri)
+            const patternUrl = new URL(`**/node_modules/${packageName}/**/*.d.ts.map`, tempDirUri)
             const declarationMapUrls = await pickResourceRetriever(patternUrl).glob(patternUrl, { span, tracer })
             logger.log(`Found ${declarationMapUrls.length} declaration maps in package "${packageName}"`)
             const cancellation = new CancellationTokenSource()
@@ -360,7 +360,7 @@ webSocketServer.on('connection', connection => {
                             await pickResourceRetriever(declarationMapUrl).fetch(declarationMapUrl, { span, tracer })
                         )
                         const packageRootPath = resolveDependencyRootDir(fileURLToPath(declarationMapUrl))
-                        const packageRootFileUrl = new URL(packageRootPath + '/', fileRootUri)
+                        const packageRootFileUrl = pathToFileURL(packageRootPath + '/')
                         const sourceFileUrl = new URL(packageRootRelativePath, packageRootFileUrl)
                         // Check if any of the sources of this source file matches the source file we are looking for
                         if (
