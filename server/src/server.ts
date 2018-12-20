@@ -231,6 +231,7 @@ webSocketServer.on('connection', connection => {
     let serverInitializeParams: InitializeParams
     let configuration: Configuration = {}
     let tempDir: string
+    let tempDirUri: URL
     let httpRootUri: URL
     let fileRootUri: URL
     let extractPath: string
@@ -537,6 +538,7 @@ webSocketServer.on('connection', connection => {
 
         // Create temp folders
         tempDir = path.join(CACHE_DIR, connectionId)
+        tempDirUri = pathToFileURL(tempDir + '/')
         await mkdirp(tempDir)
         connectionDisposables.add({
             disposeAsync: async () => {
@@ -759,24 +761,23 @@ webSocketServer.on('connection', connection => {
      * @param location A location on the file system (with a `file:` URI)
      */
     async function mapFileLocation(location: Location, { token }: { token: CancellationToken }): Promise<Location> {
-        const uri = new URL(location.uri)
+        const fileUri = new URL(location.uri)
         // Check if file path is in TypeScript lib
         // If yes, point to Microsoft/TypeScript GitHub repo
-        if (uri.href.startsWith(TYPESCRIPT_DIR_URI.href)) {
-            const relativeFilePath = relativeUrl(TYPESCRIPT_DIR_URI, uri)
+        if (fileUri.href.startsWith(TYPESCRIPT_DIR_URI.href)) {
+            const relativeFilePath = relativeUrl(TYPESCRIPT_DIR_URI, fileUri)
             // TypeScript git tags their releases, but has no gitHead field.
             const typescriptUrl = new URL(
                 `https://sourcegraph.com/github.com/Microsoft/TypeScript@v${TYPESCRIPT_VERSION}/-/raw/${relativeFilePath}`
             )
             return { uri: typescriptUrl.href, range: location.range }
         }
-        const relativeFilePath = decodeURIComponent(relativeUrl(fileRootUri, uri))
         // Check if file path is inside a node_modules dir
         // If it is inside node_modules, that means the file is out-of-workspace, i.e. outside of the HTTP root URI
         // We return an HTTP URL to the client that the client can access
-        if (relativeFilePath.includes('node_modules/')) {
+        if (fileUri.pathname.includes('/node_modules/')) {
             try {
-                const [, packageJson] = await findClosestPackageJson(uri, pickResourceRetriever, fileRootUri)
+                const [, packageJson] = await findClosestPackageJson(fileUri, pickResourceRetriever, tempDirUri)
                 if (!packageJson.repository) {
                     throw new Error(`Package ${packageJson.name} has no repository field`)
                 }
@@ -804,7 +805,7 @@ webSocketServer.on('connection', connection => {
                 let mappedUri: URL
                 let mappedRange: Range
                 try {
-                    const sourceMapUri = new URL(uri.href + '.map')
+                    const sourceMapUri = new URL(fileUri.href + '.map')
                     const sourceMap = await pickResourceRetriever(sourceMapUri).fetch(sourceMapUri)
                     const consumer = await new SourceMapConsumer(sourceMap, sourceMapUri.href)
                     let mappedStart: NullableMappedPosition
@@ -831,8 +832,10 @@ webSocketServer.on('connection', connection => {
                         throw new Error('Could not map position')
                     }
                     mappedUri = new URL(mappedStart.source)
-                    if (!mappedUri.href.startsWith(fileRootUri.href)) {
-                        throw new Error(`Mapped source URI ${mappedUri} is not under root URI ${fileRootUri}`)
+                    if (!mappedUri.href.startsWith(tempDirUri.href)) {
+                        throw new Error(
+                            `Mapped source URI ${mappedUri} is not under root URI ${fileRootUri} and not in automatic typings`
+                        )
                     }
                     mappedRange = {
                         start: {
@@ -847,18 +850,17 @@ webSocketServer.on('connection', connection => {
                 } catch (err) {
                     throwIfCancelled(token)
                     if (err instanceof ResourceNotFoundError) {
-                        logger.log(`No declaration map for ${uri}, using declaration file`)
+                        logger.log(`No declaration map for ${fileUri}, using declaration file`)
                     } else {
                         logger.error(`Source-mapping location failed`, location, err)
                     }
                     // If mapping failed, use the original file
-                    mappedUri = uri
+                    mappedUri = fileUri
                     mappedRange = location.range
                 }
 
-                const depRootDir = resolveDependencyRootDir(relativeFilePath)
-                const mappedRelativeFilePath = decodeURIComponent(relativeUrl(fileRootUri, mappedUri))
-                const mappedPackageRelativeFilePath = path.posix.relative(depRootDir, mappedRelativeFilePath)
+                const depRootDir = resolveDependencyRootDir(fileURLToPath(fileUri))
+                const mappedPackageRelativeFilePath = path.posix.relative(depRootDir, fileURLToPath(mappedUri))
                 const mappedRepoRelativeFilePath = path.posix.join(subdir, mappedPackageRelativeFilePath)
 
                 // Use the Sourcegraph endpoint from configuration
@@ -885,7 +887,7 @@ webSocketServer.on('connection', connection => {
         }
 
         // Not in node_modules, do not map to external repo, don't apply source maps.
-        const httpUri = mapFileToHttpUrlSimple(uri)
+        const httpUri = mapFileToHttpUrlSimple(fileUri)
         return { uri: httpUri.href, range: location.range }
     }
 
