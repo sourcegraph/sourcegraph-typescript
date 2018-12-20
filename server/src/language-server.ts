@@ -76,6 +76,7 @@ export async function spawnLanguageServer({
     logger.log('Spawning language server')
     const serverProcess = fork(TYPESCRIPT_LANGSERVER_JS_BIN, args, {
         env: {
+            ...process.env,
             ...configuration['typescript.tsserver.env'],
             XDG_CACHE_HOME: tsserverCacheDir,
         },
