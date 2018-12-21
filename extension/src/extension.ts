@@ -496,50 +496,35 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             : findPackageDependents(packageName, sgInstance, { logger, tracer, span })
 
                     // Search for references in each dependent
-                    if (!sourcegraph.app.activeWindow) {
-                        return
-                    }
-                    const reporter = await sourcegraph.app.activeWindow.showProgress({
-                        title: 'Searching dependents for references',
-                    })
-                    try {
-                        const findExternalRefsInDependent = (repoName: string) =>
-                            traceAsyncGenerator('Find external references in dependent', tracer, span, async function*(
-                                span
-                            ) {
-                                try {
-                                    logger.log(`Looking for external references in dependent repo ${repoName}`)
-                                    reporter.next({ message: repoName })
-                                    span.setTag('repoName', repoName)
-                                    const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
+                    const findExternalRefsInDependent = (repoName: string) =>
+                        traceAsyncGenerator('Find external references in dependent', tracer, span, async function*(
+                            span
+                        ) {
+                            try {
+                                logger.log(`Looking for external references in dependent repo ${repoName}`)
+                                span.setTag('repoName', repoName)
+                                const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
+                                    span,
+                                    tracer,
+                                })
+                                const rootUri = authenticateUri(new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl))
+                                const connection = await getOrCreateConnection(rootUri, { span, token })
+                                const references = asArray(
+                                    await sendTracedRequest(connection, ReferencesRequest.type, referenceParams, {
                                         span,
                                         tracer,
+                                        token,
                                     })
-                                    const rootUri = authenticateUri(
-                                        new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
-                                    )
-                                    const connection = await getOrCreateConnection(rootUri, { span, token })
-                                    const references = asArray(
-                                        await sendTracedRequest(connection, ReferencesRequest.type, referenceParams, {
-                                            span,
-                                            tracer,
-                                            token,
-                                        })
-                                    )
-                                    logger.log(`Found ${references.length} references in dependent repo ${repoName}`)
-                                    yield references
-                                } catch (err) {
-                                    throwIfAbortError(err)
-                                    logErrorEvent(span, err)
-                                    logger.error(`Error searching dependent repo ${repoName} for references`, err)
-                                }
-                            })
-                        yield* flatMapConcurrent(dependents, findExternalRefsInDependent, EXTERNAL_REFS_CONCURRENCY)
-                    } catch (e) {
-                        reporter.error(e)
-                    } finally {
-                        reporter.complete()
-                    }
+                                )
+                                logger.log(`Found ${references.length} references in dependent repo ${repoName}`)
+                                yield references
+                            } catch (err) {
+                                throwIfAbortError(err)
+                                logErrorEvent(span, err)
+                                logger.error(`Error searching dependent repo ${repoName} for references`, err)
+                            }
+                        })
+                    yield* flatMapConcurrent(dependents, findExternalRefsInDependent, EXTERNAL_REFS_CONCURRENCY)
                     logger.log('Done going through dependents')
                 })
 
