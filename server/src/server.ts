@@ -625,6 +625,17 @@ webSocketServer.on('connection', connection => {
         return await restartLanguageServer({ span, token })
     })
 
+    /**
+     * Returns all known package.json directories that are an ancestor of the given URI (and therefor should be installed to provide codeintel on this URI).
+     *
+     * @param uri The HTTP URL of a text document
+     * @return HTTP URLs of package.json directories
+     */
+    const findParentPackageRoots = (uri: URL): URL[] =>
+        [...packageRootUris]
+            .filter(packageRoot => uri.href.startsWith(packageRoot))
+            .map(packageRoot => new URL(packageRoot))
+
     async function installDependenciesForPackage(
         packageRootUri: URL,
         { tracer, span, token }: { tracer: Tracer; span?: Span; token: CancellationToken }
@@ -679,6 +690,33 @@ webSocketServer.on('connection', connection => {
     }
 
     /**
+     * Ensures dependencies for all package.jsons in parent directories of the given text document were installed.
+     * Errors will be caught and logged.
+     *
+     * @param textDocumentUri The HTTP text document URI that dependencies should be installed for
+     * @throws never
+     */
+    async function ensureDependenciesForDocument(
+        textDocumentUri: URL,
+        { tracer, span, token = CancellationToken.None }: { tracer: Tracer; span?: Span; token?: CancellationToken }
+    ): Promise<void> {
+        await tracePromise('Ensure dependencies', tracer, span, async span => {
+            throwIfCancelled(token)
+            const parentPackageRoots = findParentPackageRoots(textDocumentUri)
+            span.setTag('packageJsonLocations', parentPackageRoots.map(String))
+            logger.log(
+                `Ensuring dependencies for text document ${textDocumentUri} defined in`,
+                parentPackageRoots.map(String)
+            )
+            await Promise.all(
+                parentPackageRoots.map(async packageRoot => {
+                    await ensureDependenciesForPackageRoot(packageRoot, { tracer, span, token })
+                })
+            )
+        })
+    }
+
+    /**
      * Sends a request to the language server with support for OpenTracing (wrapping the request in a span)
      */
     async function sendServerRequest<P, R>(
@@ -697,7 +735,16 @@ webSocketServer.on('connection', connection => {
     dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
         // Map the http URI in params to file URIs
         const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
-        return await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
+        const result = await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
+        // Heuristic: If the hover contained an `any` type or shows the definition at the `import` line,
+        // start dependency installation in the background
+        // This is not done on file open because tsserver can get busy with handling all the file change events
+        // It's expected that the client polls to get an updated hover content once dependency installation finished
+        if (/\b(any|import)\b/.test(JSON.stringify(result))) {
+            // tslint:disable-next-line:no-floating-promises
+            ensureDependenciesForDocument(new URL(params.textDocument.uri), { tracer, span, token })
+        }
+        return result
     })
 
     /**
