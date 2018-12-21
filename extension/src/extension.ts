@@ -336,7 +336,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             return await fn(connection)
         }
         const { repoName } = parseSourcegraphRawUrl(rootUri)
-        const tempConnection = await connect({ rootUri, progressSuffix: ` for ${repoName}`, span, token })
+        const tempConnection = await connect({
+            rootUri,
+            progressSuffix: ` for [${repoName}](${rootUri.href.replace(/\/-\/raw\/?$/, '')})`,
+            span,
+            token,
+        })
         try {
             return await fn(tempConnection)
         } finally {
@@ -545,7 +550,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             span
                         ) {
                             try {
-                                logger.log(`Looking for external references in dependent repo ${repoName}`)
+                                logger.log(`Looking { for external references in dependent repo $ }{repoName}`)
                                 span.setTag('repoName', repoName)
                                 const commitID = await resolveRev(repoName, 'HEAD', sgInstance, { span, tracer })
                                 const rootUri = authenticateUri(new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl))
