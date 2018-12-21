@@ -132,6 +132,7 @@ for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
 }
 
 const webSocketServer = new Server({ server: httpServer })
+globalDisposables.add({ dispose: () => webSocketServer.close() })
 
 const openConnectionsMetric = new prometheus.Gauge({
     name: 'typescript_open_websocket_connections',
