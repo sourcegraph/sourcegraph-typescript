@@ -52,7 +52,13 @@ import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from './logging'
 import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
 import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
-import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
+import {
+    parseSourcegraphRawUrl,
+    resolveServerRootUri,
+    rewriteUris,
+    toServerTextDocumentUri,
+    toSourcegraphTextDocumentUri,
+} from './uris'
 import {
     abortPrevious,
     asArray,
@@ -102,10 +108,17 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     /**
      * @param rootUri The server HTTP root URI
      */
-    async function connect(
-        rootUri: URL,
-        { span, token }: { span: Span; token: CancellationToken }
-    ): Promise<MessageConnection> {
+    async function connect({
+        rootUri,
+        progressSuffix = '',
+        span,
+        token,
+    }: {
+        rootUri: URL
+        progressSuffix?: string
+        span: Span
+        token: CancellationToken
+    }): Promise<MessageConnection> {
         return await tracePromise('Connect to language server', tracer, span, async span => {
             const subscriptions = new Subscription()
             token.onCancellationRequested(() => subscriptions.unsubscribe())
@@ -203,6 +216,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         }
                         let reporterPromise = progressReporters.get(id)
                         if (!reporterPromise) {
+                            if (title) {
+                                title = title + progressSuffix
+                            }
                             reporterPromise = sourcegraph.app.activeWindow.showProgress({ title })
                             progressReporters.set(id, reporterPromise)
                         }
@@ -291,10 +307,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             if (connectionPromise) {
                 return await connectionPromise
             }
-            const newConnectionPromise = connect(
-                rootUri,
-                { span, token }
-            )
+            const newConnectionPromise = connect({ rootUri, span, token })
             // Cache connection until the extension deactivates
             connectionsByRootUri.set(rootUri.href, newConnectionPromise)
             const connection = await newConnectionPromise
@@ -322,10 +335,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         if (connection) {
             return await fn(connection)
         }
-        const tempConnection = await connect(
-            rootUri,
-            { span, token }
-        )
+        const { repoName } = parseSourcegraphRawUrl(rootUri)
+        const tempConnection = await connect({ rootUri, progressSuffix: ` for ${repoName}`, span, token })
         try {
             return await fn(tempConnection)
         } finally {

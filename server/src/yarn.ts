@@ -231,7 +231,7 @@ export async function install({
                                 steps
                             ).pipe(
                                 map(([activityName, step]) => ({
-                                    message: step.message + '  \n' + activityName,
+                                    message: [step.message, activityName].filter(Boolean).join(' - '),
                                     percentage: Math.round(((step.current - 1) / step.total) * 100),
                                 }))
                             ),

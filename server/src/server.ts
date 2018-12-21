@@ -568,7 +568,7 @@ webSocketServer.on('connection', connection => {
         logger.info('Fetching archive from', httpRootUri.href)
         logger.log('Extracting to', extractPath)
         await tracePromise('Fetch source archive', tracer, span, async span => {
-            await withProgress('Downloading source archive', async reporter => {
+            await withProgress('Fetching source', async reporter => {
                 span.setTag(HTTP_URL, redact(httpRootUri.href))
                 const headers = {
                     Accept: 'application/x-tar',
