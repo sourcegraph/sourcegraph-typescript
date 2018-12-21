@@ -19,6 +19,7 @@ import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
 import { Subscription } from 'rxjs'
 import * as sourcegraph from 'sourcegraph'
+import { Omit } from 'type-zoo'
 import {
     CancellationToken,
     CancellationTokenSource,
@@ -64,7 +65,9 @@ import {
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
 
-const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
+type NonDisposableMessageConnection = Omit<MessageConnection, 'dispose'>
+
+const connectionsByRootUri = new Map<string, Promise<NonDisposableMessageConnection>>()
 
 const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
 
@@ -105,7 +108,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     ): Promise<MessageConnection> {
         return await tracePromise('Connect to language server', tracer, span, async span => {
             const subscriptions = new Subscription()
-            ctx.subscriptions.add(subscriptions)
             token.onCancellationRequested(() => subscriptions.unsubscribe())
             if (typeof config['typescript.serverUrl'] !== 'string') {
                 throw new Error(
@@ -129,6 +131,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 new WebSocketMessageWriter(rpcWebSocket),
                 logger
             )
+            connection.onDispose(() => subscriptions.unsubscribe())
             subscriptions.add(() => connection.dispose())
             connection.onNotification(LogMessageNotification.type, ({ type, message }) => {
                 // Blue background for the "TypeScript server" prefix
@@ -282,22 +285,52 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     async function getOrCreateConnection(
         rootUri: URL,
         { span, token }: { span: Span; token: CancellationToken }
-    ): Promise<MessageConnection> {
+    ): Promise<NonDisposableMessageConnection> {
         return await tracePromise('Get or create connection', tracer, span, async span => {
-            let connectionPromise = connectionsByRootUri.get(rootUri.href)
-            if (!connectionPromise) {
-                connectionPromise = connect(
-                    rootUri,
-                    { span, token }
-                )
-                connectionsByRootUri.set(rootUri.href, connectionPromise)
+            const connectionPromise = connectionsByRootUri.get(rootUri.href)
+            if (connectionPromise) {
+                return await connectionPromise
             }
-            const connection = await connectionPromise
-            connection.onClose(() => {
-                connectionsByRootUri.delete(rootUri.href)
-            })
+            const newConnectionPromise = connect(
+                rootUri,
+                { span, token }
+            )
+            // Cache connection until the extension deactivates
+            connectionsByRootUri.set(rootUri.href, newConnectionPromise)
+            const connection = await newConnectionPromise
+            // When connection gets disposed/closed, delete it from the Map
+            connection.onDispose(() => connectionsByRootUri.delete(rootUri.href))
+            // Only dispose the connection when extension gets deactivated
+            ctx.subscriptions.add(() => connection.dispose())
             return connection
         })
+    }
+
+    /**
+     * Gets or creates a temporary connection that is not persisted, and passes it to the given function.
+     * The connection is closed again after the function finished.
+     * The function is not allowed to dispose the connection itself.
+     *
+     * @param rootUri The server HTTP root URI
+     */
+    async function withTempConnection<R>(
+        rootUri: URL,
+        { span, token }: { span: Span; token: CancellationToken },
+        fn: (connection: NonDisposableMessageConnection) => Promise<R>
+    ): Promise<R> {
+        const connection = await connectionsByRootUri.get(rootUri.href)
+        if (connection) {
+            return await fn(connection)
+        }
+        const tempConnection = await connect(
+            rootUri,
+            { span, token }
+        )
+        try {
+            return await fn(tempConnection)
+        } finally {
+            tempConnection.dispose()
+        }
     }
 
     // Forward didOpen notifications
@@ -503,21 +536,19 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             try {
                                 logger.log(`Looking for external references in dependent repo ${repoName}`)
                                 span.setTag('repoName', repoName)
-                                const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
-                                    span,
-                                    tracer,
-                                })
+                                const commitID = await resolveRev(repoName, 'HEAD', sgInstance, { span, tracer })
                                 const rootUri = authenticateUri(new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl))
-                                const connection = await getOrCreateConnection(rootUri, { span, token })
-                                const references = asArray(
-                                    await sendTracedRequest(connection, ReferencesRequest.type, referenceParams, {
-                                        span,
-                                        tracer,
-                                        token,
-                                    })
-                                )
-                                logger.log(`Found ${references.length} references in dependent repo ${repoName}`)
-                                yield references
+                                yield await withTempConnection(rootUri, { span, token }, async connection => {
+                                    const references = asArray(
+                                        await sendTracedRequest(connection, ReferencesRequest.type, referenceParams, {
+                                            span,
+                                            tracer,
+                                            token,
+                                        })
+                                    )
+                                    logger.log(`Found ${references.length} references in dependent repo ${repoName}`)
+                                    return references
+                                })
                             } catch (err) {
                                 throwIfAbortError(err)
                                 logErrorEvent(span, err)

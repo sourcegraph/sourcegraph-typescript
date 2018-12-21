@@ -21,7 +21,7 @@ export type NotificationType<P> = NotificationType1<P, any>
  * Sends an LSP request traced with OpenTracing
  */
 export async function sendTracedRequest<P, R>(
-    connection: MessageConnection,
+    connection: Pick<MessageConnection, 'sendRequest'>,
     type: RequestType<P, R>,
     params: P,
     { span, tracer, token }: { span: Span; tracer: Tracer; token: CancellationToken }
