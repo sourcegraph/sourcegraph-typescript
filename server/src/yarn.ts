@@ -216,7 +216,7 @@ export async function install({
 }: YarnInstallOptions): Promise<void> {
     throwIfCancelled(token)
     await tracePromise('yarn install', tracer, span, async span => {
-        await withProgress(undefined, async reporter => {
+        await withProgress('Dependency installation', async reporter => {
             const using: (Disposable | Unsubscribable)[] = []
             try {
                 // const [stdout] = await exec(`node ${YARN_BIN_JS} config list`, { cwd })
