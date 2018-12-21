@@ -732,26 +732,9 @@ webSocketServer.on('connection', connection => {
     }
 
     dispatcher.setRequestHandler(HoverRequest.type, async (params, token, span) => {
-        const httpResourceUri = new URL(params.textDocument.uri)
         // Map the http URI in params to file URIs
         const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
-        const hover = await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
-        const contents = !hover ? [] : Array.isArray(hover.contents) ? hover.contents : [hover.contents]
-        const contentStrings = contents.map(c => (typeof c === 'string' ? c : c.value)).filter(s => !!s.trim())
-        // Check if the type is `any` or the import is shown as the declaration
-        if (contentStrings.length === 0 || contentStrings.some(s => /\b(any|import)\b/.test(s))) {
-            logger.log(`textDocument/hover result was not sufficient, waiting for dependency installation and retrying`)
-            await ensureDependenciesForDocument(httpResourceUri, { tracer, span, token })
-            throwIfCancelled(token)
-            return await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
-        }
-        // If any of the parent package.json roots is not finished installing, let the user know
-        if (findParentPackageRoots(httpResourceUri).some(root => !finishedDependencyInstallations.has(root.href))) {
-            contents.push(
-                '_Dependency installation is still in progress. The information shown might be missing type information._'
-            )
-        }
-        return { ...hover, contents }
+        return await sendServerRequest(HoverRequest.type, mappedParams, { token, tracer, span })
     })
 
     /**
@@ -909,32 +892,6 @@ webSocketServer.on('connection', connection => {
     }
 
     /**
-     * Checks if a location result is not satisfactory and should be retried after dependency installation finished
-     *
-     * @param params Original HTTP TextDocumentPositionParams as given by the client
-     * @param locations Locations mapped back to HTTP URIs
-     */
-    function shouldLocationsWaitForDependencies(params: TextDocumentPositionParams, locations: Definition): boolean {
-        if (!locations) {
-            return true
-        }
-        const locationsArray = Array.isArray(locations) ? locations : [locations]
-        if (locationsArray.length === 0) {
-            return true
-        }
-        // Check if the only definition/reference found is the line that was requested
-        if (
-            locationsArray.length === 1 &&
-            locationsArray[0].uri === params.textDocument.uri &&
-            locationsArray[0].range.start.line === params.position.line
-        ) {
-            return true
-        }
-        // TODO check if location is at import statement
-        return false
-    }
-
-    /**
      * Forwards all requests of a certain method that returns Locations to the server, rewriting URIs.
      * It blocks on dependency installation if needed.
      * The returned locations get mapped to HTTP URLs and potentially to external repository URLs if they are in node_modules.
@@ -961,12 +918,6 @@ webSocketServer.on('connection', connection => {
                 await sendServerRequest(type, mappedParams, { tracer, span, token }),
                 { token }
             )
-            if (shouldLocationsWaitForDependencies(params, result)) {
-                logger.log(`${type.method} result was not sufficient, waiting for dependency installation and retrying`)
-                await ensureDependenciesForDocument(httpTextDocumentUri, { tracer, span, token })
-                const result = await sendServerRequest(type, mappedParams, { tracer, span, token })
-                return await mapFileLocations(result, { token })
-            }
             return result
         })
     }

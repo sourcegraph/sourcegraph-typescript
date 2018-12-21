@@ -12,6 +12,7 @@ import {
     WebSocketMessageReader,
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
+import delayPromise from 'delay'
 import { AsyncIterableX, merge } from 'ix/asynciterable/index'
 import { filter, flatMap, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
@@ -51,7 +52,9 @@ import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLo
 import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
 import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
-import { asArray, distinctUntilChanged, observableFromAsyncIterable, throwIfAbortError } from './util'
+import { abortPrevious, asArray, distinctUntilChanged, observableFromAsyncIterable, throwIfAbortError } from './util'
+
+const HOVER_DEF_POLL_INTERVAL = 2000
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
@@ -327,57 +330,71 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     ): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
 
     // Hover
+    const provideHover = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
+        traceAsyncGenerator('Provide hover', tracer, undefined, async function*(span) {
+            if (canGenerateTraceUrl(span)) {
+                logger.log('Hover trace', span.generateTraceURL())
+            }
+            const textDocumentUri = new URL(textDocument.uri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri, { span, token })
+            // Poll server to get updated results when e.g. dependency installation finished
+            while (true) {
+                const hoverResult = await sendTracedRequest(
+                    connection,
+                    HoverRequest.type,
+                    {
+                        textDocument: { uri: serverTextDocumentUri.href },
+                        position,
+                    },
+                    { span, tracer, token }
+                )
+                rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
+                yield convertHover(hoverResult)
+                await delayPromise(HOVER_DEF_POLL_INTERVAL)
+            }
+        })
+    )
     ctx.subscriptions.add(
         sourcegraph.languages.registerHoverProvider(documentSelector, {
             provideHover: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                tracePromise('Provide hover', tracer, undefined, async span => {
-                    if (canGenerateTraceUrl(span)) {
-                        logger.log('Hover trace', span.generateTraceURL())
-                    }
-                    const textDocumentUri = new URL(textDocument.uri)
-                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-                    const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                    const hoverResult = await sendTracedRequest(
-                        connection,
-                        HoverRequest.type,
-                        {
-                            textDocument: { uri: serverTextDocumentUri.href },
-                            position,
-                        },
-                        { span, tracer, token }
-                    )
-                    rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
-                    return convertHover(hoverResult)
-                })
+                observableFromAsyncIterable(provideHover(textDocument, position))
             ),
         })
     )
 
     // Definition
+    const provideDefinition = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
+        traceAsyncGenerator('Provide definition', tracer, undefined, async function*(span) {
+            if (canGenerateTraceUrl(span)) {
+                logger.log('Definition trace', span.generateTraceURL())
+            }
+            const textDocumentUri = new URL(textDocument.uri)
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const connection = await getOrCreateConnection(serverRootUri, { span, token })
+            // Poll server to get updated contents when e.g. dependency installation finished
+            while (true) {
+                const definitionResult = await sendTracedRequest(
+                    connection,
+                    DefinitionRequest.type,
+                    {
+                        textDocument: { uri: serverTextDocumentUri.href },
+                        position,
+                    },
+                    { span, tracer, token }
+                )
+                rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
+                yield convertLocations(definitionResult)
+                await delayPromise(HOVER_DEF_POLL_INTERVAL)
+            }
+        })
+    )
     ctx.subscriptions.add(
         sourcegraph.languages.registerDefinitionProvider(documentSelector, {
             provideDefinition: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                tracePromise('Provide definition', tracer, undefined, async span => {
-                    if (canGenerateTraceUrl(span)) {
-                        logger.log('Definition trace', span.generateTraceURL())
-                    }
-                    const textDocumentUri = new URL(textDocument.uri)
-                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
-                    const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                    const definitionResult = await sendTracedRequest(
-                        connection,
-                        DefinitionRequest.type,
-                        {
-                            textDocument: { uri: serverTextDocumentUri.href },
-                            position,
-                        },
-                        { span, tracer, token }
-                    )
-                    rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
-                    return convertLocations(definitionResult)
-                })
+                observableFromAsyncIterable(provideDefinition(textDocument, position))
             ),
         })
     )

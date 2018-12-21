@@ -1,3 +1,4 @@
+import { noop } from 'lodash'
 import { Observable } from 'rxjs'
 
 export const isAbortError = (val: any) => typeof val === 'object' && val !== null && val.name === 'AbortError'
@@ -44,6 +45,33 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
             }
         }
     })
+
+/**
+ * Similar to Rx `switchMap`, finishes the generator returned from the previous call whenever the function is called again.
+ *
+ * Workaround for https://github.com/sourcegraph/sourcegraph/issues/1190
+ */
+export const abortPrevious = <P extends any[], R>(
+    fn: (...args: P) => AsyncIterable<R>
+): ((...args: P) => AsyncIterable<R>) => {
+    let abort = noop
+    return async function*(...args) {
+        abort()
+        let aborted = false
+        abort = () => {
+            aborted = true
+        }
+        for await (const element of fn(...args)) {
+            if (aborted) {
+                return
+            }
+            yield element
+            if (aborted) {
+                return
+            }
+        }
+    }
+}
 
 export const asArray = <T>(val: T[] | T | null): T[] => (!val ? [] : Array.isArray(val) ? val : [val])
 
