@@ -1,3 +1,5 @@
+import { flatMap } from 'ix/asynciterable/index'
+import { MergeAsyncIterable } from 'ix/asynciterable/merge'
 import { noop } from 'lodash'
 import { Observable } from 'rxjs'
 
@@ -91,3 +93,12 @@ export function distinctUntilChanged<P extends any[], R>(
         return previousResult
     }
 }
+
+/**
+ * Flatmaps the source iterable with `selector`, `concurrency` times at a time.
+ */
+export const flatMapConcurrent = <T, R>(
+    source: AsyncIterable<T>,
+    selector: (value: T) => AsyncIterable<R>,
+    concurrency: number
+): AsyncIterable<R> => new MergeAsyncIterable(new Array<AsyncIterable<R>>(concurrency).fill(flatMap(source, selector)))

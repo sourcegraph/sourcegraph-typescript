@@ -13,8 +13,8 @@ import {
     WebSocketMessageWriter,
 } from '@sourcegraph/vscode-ws-jsonrpc'
 import delayPromise from 'delay'
-import { AsyncIterableX, merge } from 'ix/asynciterable/index'
-import { filter, flatMap, map, scan, tap } from 'ix/asynciterable/pipe/index'
+import { merge } from 'ix/asynciterable/index'
+import { filter, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
 import { Subscription } from 'rxjs'
@@ -52,9 +52,17 @@ import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLo
 import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
 import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
 import { resolveServerRootUri, rewriteUris, toServerTextDocumentUri, toSourcegraphTextDocumentUri } from './uris'
-import { abortPrevious, asArray, distinctUntilChanged, observableFromAsyncIterable, throwIfAbortError } from './util'
+import {
+    abortPrevious,
+    asArray,
+    distinctUntilChanged,
+    flatMapConcurrent,
+    observableFromAsyncIterable,
+    throwIfAbortError,
+} from './util'
 
 const HOVER_DEF_POLL_INTERVAL = 2000
+const EXTERNAL_REFS_CONCURRENCY = 7
 
 const connectionsByRootUri = new Map<string, Promise<MessageConnection>>()
 
@@ -495,51 +503,42 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         title: 'Searching dependents for references',
                     })
                     try {
-                        const findExternalReferencesInDependent = (repoName: string) =>
+                        const findExternalRefsInDependent = (repoName: string) =>
                             traceAsyncGenerator('Find external references in dependent', tracer, span, async function*(
                                 span
                             ) {
                                 try {
+                                    logger.log(`Looking for external references in dependent repo ${repoName}`)
                                     reporter.next({ message: repoName })
                                     span.setTag('repoName', repoName)
                                     const commitID = await resolveRev(repoName, 'HEAD', sgInstance, {
                                         span,
                                         tracer,
                                     })
-                                    const dependentRootUri = authenticateUri(
+                                    const rootUri = authenticateUri(
                                         new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
                                     )
-                                    logger.log(`Looking for external references in dependent repo ${repoName}`)
-                                    const dependentConnection = await getOrCreateConnection(dependentRootUri, {
-                                        span,
-                                        token,
-                                    })
-                                    const referencesInDependent = asArray(
-                                        await sendTracedRequest(
-                                            dependentConnection,
-                                            ReferencesRequest.type,
-                                            referenceParams,
-                                            {
-                                                span,
-                                                tracer,
-                                                token,
-                                            }
-                                        )
+                                    const connection = await getOrCreateConnection(rootUri, { span, token })
+                                    const references = asArray(
+                                        await sendTracedRequest(connection, ReferencesRequest.type, referenceParams, {
+                                            span,
+                                            tracer,
+                                            token,
+                                        })
                                     )
-                                    logger.log(
-                                        `Found ${referencesInDependent.length} references in dependent repo ${repoName}`
-                                    )
-                                    yield referencesInDependent
+                                    logger.log(`Found ${references.length} references in dependent repo ${repoName}`)
+                                    yield references
                                 } catch (err) {
                                     throwIfAbortError(err)
                                     logErrorEvent(span, err)
-                                    logger.error(`Error searching dependent repo "${repoName}" for references`, err)
+                                    logger.error(`Error searching dependent repo ${repoName} for references`, err)
                                 }
                             })
-                        yield* AsyncIterableX.from(dependents).pipe(flatMap(findExternalReferencesInDependent))
-                        reporter.complete()
+                        yield* flatMapConcurrent(dependents, findExternalRefsInDependent, EXTERNAL_REFS_CONCURRENCY)
                     } catch (e) {
                         reporter.error(e)
+                    } finally {
+                        reporter.complete()
                     }
                     logger.log('Done going through dependents')
                 })
