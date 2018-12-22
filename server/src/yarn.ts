@@ -127,6 +127,7 @@ export function spawnYarn({ span = new Span(), logger = new NoopLogger(), ...opt
         '--non-interactive', // Don't ask for any user input
         '--json', // Output a newline-delimited JSON stream
         '--link-duplicates', // Use hardlinks instead of copying
+        '--pure-lockfile', // Trust the lockfile if exists
 
         // Use a separate global and cache folders per package.json
         // that we can clean up afterwards and don't interfere with concurrent installations
