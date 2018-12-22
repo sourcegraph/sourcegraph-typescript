@@ -56,7 +56,7 @@ const DIAGNOSTIC_COLORS: Readonly<Record<DiagnosticSeverity, string>> = {
 export const convertDiagnosticToDecoration = (diagnostic: Diagnostic): sourcegraph.TextDocumentDecoration => ({
     after: {
         color: DIAGNOSTIC_COLORS[diagnostic.severity || DiagnosticSeverity.Hint],
-        contentText: diagnostic.message,
+        contentText: diagnostic.message.replace(/\n/g, ' '),
     },
     range: convertRange(diagnostic.range),
 })
