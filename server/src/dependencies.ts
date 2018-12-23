@@ -2,10 +2,11 @@ import * as fs from 'mz/fs'
 import npmFetch, { NpmOptions } from 'npm-registry-fetch'
 import { Span, Tracer } from 'opentracing'
 import * as semver from 'semver'
+import { URL } from 'url'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
-import { ResourceNotFoundError, ResourceRetrieverPicker } from './resources'
+import { ResourceNotFoundError, ResourceRetrieverPicker, walkUp } from './resources'
 import { logErrorEvent, tracePromise } from './tracing'
 
 export async function fetchPackageMeta(
@@ -157,10 +158,9 @@ export async function findClosestPackageJson(
         tracer,
         span,
         async (span): Promise<[URL, PackageJson]> => {
-            let parent = resource
-            while (true) {
+            for await (const parent of walkUp(resource)) {
                 if (!parent.href.startsWith(rootUri.href)) {
-                    throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
+                    break
                 }
                 const packageJsonUri = new URL('package.json', parent.href)
                 try {
@@ -168,12 +168,12 @@ export async function findClosestPackageJson(
                     return [packageJsonUri, packageJson]
                 } catch (err) {
                     if (err instanceof ResourceNotFoundError) {
-                        parent = new URL('..', parent.href)
                         continue
                     }
                     throw err
                 }
             }
+            throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
         }
     )
 }
