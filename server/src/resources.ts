@@ -1,7 +1,5 @@
 import * as glob from 'fast-glob'
 import got from 'got'
-import { AsyncIterableX } from 'ix/asynciterable'
-import { noop } from 'lodash'
 import { exists, readFile } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { fileURLToPath, pathToFileURL, URL } from 'url'

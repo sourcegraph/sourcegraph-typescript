@@ -42,7 +42,6 @@ import { inspect } from 'util'
 import uuid = require('uuid')
 import {
     CancellationToken,
-    CancellationTokenSource,
     ClientCapabilities,
     Definition,
     DefinitionRequest,
