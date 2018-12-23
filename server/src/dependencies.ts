@@ -158,7 +158,7 @@ export async function findClosestPackageJson(
         tracer,
         span,
         async (span): Promise<[URL, PackageJson]> => {
-            for await (const parent of walkUp(resource)) {
+            for (const parent of walkUp(resource)) {
                 if (!parent.href.startsWith(rootUri.href)) {
                     break
                 }
