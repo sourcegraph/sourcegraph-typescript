@@ -550,7 +550,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             span
                         ) {
                             try {
-                                logger.log(`Looking { for external references in dependent repo $ }{repoName}`)
+                                logger.log(`Looking for external references in dependent repo ${repoName}`)
                                 span.setTag('repoName', repoName)
                                 const commitID = await resolveRev(repoName, 'HEAD', sgInstance, { span, tracer })
                                 const rootUri = authenticateUri(new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl))
@@ -572,7 +572,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                                 logger.error(`Error searching dependent repo ${repoName} for references`, err)
                             }
                         })
-                    yield* flatMapConcurrent(dependents, findExternalRefsInDependent, EXTERNAL_REFS_CONCURRENCY)
+                    yield* flatMapConcurrent(dependents, EXTERNAL_REFS_CONCURRENCY, findExternalRefsInDependent)
                     logger.log('Done going through dependents')
                 })
 
