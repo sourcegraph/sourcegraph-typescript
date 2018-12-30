@@ -7918,10 +7918,10 @@ source-map@^0.7.3:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.7.3.tgz#5302f8169031735226544092e64981f751750383"
   integrity sha512-CkCj6giN3S+n9qrYiBTX5gystlENnRW5jZeNLHpe6aue+SrHcG5VYwujhW9s4dY31mEGsxBDrHR6oI69fTXsaQ==
 
-sourcegraph@^20.0.0:
-  version "20.0.0"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-20.0.0.tgz#7828fa7f8383a3631e7d4f12a6c8468ba6ba2dd3"
-  integrity sha512-9wCLAIwbMIiG0KfftvRjvsHuCyRsOIk9/Kun1ULusVLnuM6Y/6VC2vrcx3Gk3YHudAwcd5xEA1LYraiNGmbuvQ==
+sourcegraph@^20.1.0:
+  version "20.1.0"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-20.1.0.tgz#9ba6c0e57107b1fe66c4299db32c7780094398cc"
+  integrity sha512-zbpDsFtExHQ04eJvQ2IIoi1rWrJU7Uhw4wXoy7V9Xpj/qMgbNnV4dev1kDg24y6F9vXM+jSONRrVcg/EO/UMag==
 
 spawn-error-forwarder@~1.0.0:
   version "1.0.0"
