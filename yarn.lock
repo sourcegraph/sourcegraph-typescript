@@ -847,10 +847,10 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
-"@types/got@9.2.1":
-  version "9.2.1"
-  resolved "https://registry.npmjs.org/@types/got/-/got-9.2.1.tgz#962e5a041d66f8be484740d76a6ca15d2a8d141b"
-  integrity sha512-3l1/X5MBeuPFWEcsEb5UVKrdzuXJ4DXkKHv+on9sYK0+BEO4OmIwdkLorYry3kVbdyFTlgF4yP+F5aeZoKIRDw==
+"@types/got@9.2.2":
+  version "9.2.2"
+  resolved "https://registry.npmjs.org/@types/got/-/got-9.2.2.tgz#b1ae5e47f3882f2d425d4274409381ee29b0a5ce"
+  integrity sha512-6G2FdsJxcaUP0/08di2A5kHEfSbXd2npcB/9gsvFNR5kdlKWkJ4RpYdJLQRifwktHqsq/NfSnkoZYws/E009og==
   dependencies:
     "@types/node" "*"
     "@types/tough-cookie" "*"
