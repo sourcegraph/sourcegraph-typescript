@@ -527,7 +527,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     const referenceParams: ReferenceParams = {
                         textDocument: { uri: definitionUri.href },
                         position: definition.range.start,
-                        context,
+                        context: { includeDeclaration: false },
                     }
 
                     const packageName = await findPackageName(definitionUri, { logger, tracer, span })
