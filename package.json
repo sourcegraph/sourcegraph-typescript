@@ -1,7 +1,6 @@
 {
   "name": "lang-typescript",
-  "title": "Code intelligence for TypeScript",
-  "description": "Provides code intelligence for TypeScript",
+  "description": "TypeScript code intelligence",
   "private": true,
   "publisher": "sourcegraph",
   "engines": {
@@ -11,6 +10,8 @@
     "type": "git",
     "url": "https://github.com/sourcegraph/lang-typescript"
   },
+  "categories": ["Programming languages"],
+  "tags": ["typescript", "javascript", "react", "jsx", "cross-repository", "language-server"],
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:javascript"
