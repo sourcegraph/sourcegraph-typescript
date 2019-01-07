@@ -733,10 +733,9 @@ webSocketServer.on('connection', connection => {
             throwIfCancelled(token)
             const parentPackageRoots = findParentPackageRoots(textDocumentUri)
             span.setTag('packageJsonLocations', parentPackageRoots.map(String))
-            logger.log(
-                `Ensuring dependencies for text document ${textDocumentUri} defined in`,
-                parentPackageRoots.map(String)
-            )
+            logger.log(`Ensuring dependencies for text document ${textDocumentUri} defined in`, [
+                ...parentPackageRoots.map(String),
+            ])
             await Promise.all(
                 parentPackageRoots.map(async packageRoot => {
                     await ensureDependenciesForPackageRoot(packageRoot, { tracer, span, token })
