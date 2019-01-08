@@ -562,7 +562,7 @@ webSocketServer.on('connection', connection => {
         }
 
         const capabilities = params.capabilities as ClientCapabilities & WindowProgressClientCapabilities
-        if (capabilities.experimental && capabilities.experimental.progress) {
+        if (capabilities.experimental && capabilities.experimental.progress && configuration['typescript.progress']) {
             // Client supports reporting progress
             withProgress = createProgressProvider(webSocketMessageConnection, logger)
         }
