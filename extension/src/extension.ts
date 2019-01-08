@@ -207,32 +207,34 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 }
                 progressReporters.clear()
             })
-            connection.onNotification(
-                WindowProgressNotification.type,
-                async ({ id, title, message, percentage, done }) => {
-                    try {
-                        if (!sourcegraph.app.activeWindow || !sourcegraph.app.activeWindow.showProgress) {
-                            return
-                        }
-                        let reporterPromise = progressReporters.get(id)
-                        if (!reporterPromise) {
-                            if (title) {
-                                title = title + progressSuffix
+            if (config['typescript.progress']) {
+                connection.onNotification(
+                    WindowProgressNotification.type,
+                    async ({ id, title, message, percentage, done }) => {
+                        try {
+                            if (!sourcegraph.app.activeWindow || !sourcegraph.app.activeWindow.showProgress) {
+                                return
                             }
-                            reporterPromise = sourcegraph.app.activeWindow.showProgress({ title })
-                            progressReporters.set(id, reporterPromise)
+                            let reporterPromise = progressReporters.get(id)
+                            if (!reporterPromise) {
+                                if (title) {
+                                    title = title + progressSuffix
+                                }
+                                reporterPromise = sourcegraph.app.activeWindow.showProgress({ title })
+                                progressReporters.set(id, reporterPromise)
+                            }
+                            const reporter = await reporterPromise
+                            reporter.next({ percentage, message })
+                            if (done) {
+                                reporter.complete()
+                                progressReporters.delete(id)
+                            }
+                        } catch (err) {
+                            logger.error('Error handling progress notification', err)
                         }
-                        const reporter = await reporterPromise
-                        reporter.next({ percentage, message })
-                        if (done) {
-                            reporter.complete()
-                            progressReporters.delete(id)
-                        }
-                    } catch (err) {
-                        logger.error('Error handling progress notification', err)
                     }
-                }
-            )
+                )
+            }
             connection.listen()
             const event = await new Promise<Event>(resolve => {
                 socket.addEventListener('open', resolve, { once: true })

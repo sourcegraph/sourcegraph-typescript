@@ -8,6 +8,8 @@ export interface Configuration {
     'typescript.tsserver.log'?: false | 'terse' | 'normal' | 'requestTime' | 'verbose'
     'typescript.tsserver.env'?: Record<string, string>
     'typescript.accessToken'?: string
+    /** Whether to show a progress indicator while initializing. */
+    'typescript.progress'?: boolean
     'sourcegraph.url'?: string
     'lightstep.token'?: string | null
 }
