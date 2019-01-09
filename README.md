@@ -247,9 +247,22 @@ and mount it into the container:
 +       name: yarn-config
 ```
 
-#### Support for dependencies on private packages and git repositories
+## Configuration
 
-Dependencies on private npm packages is currently supported by mounting an `.npmrc` into the container that contains the registry token.
+### Support for dependencies on private packages and git repositories
+
+Dependencies on private npm packages and private registries is supported by setting the `typescript.npmrc` setting.
+It contains the same key/value settings as your `.npmrc` file in your home folder, and therefor supports the same scoping to registries and package scopes.
+See https://docs.npmjs.com/misc/config#config-settings for more information on what is possible to configure in `.npmrc`.
+
+Example:
+
+```json
+"typescript.npmrc": {
+  "//registry.npmjs.org/:_authToken": "asfdh21e-1234-asdn-123v-1234asdb2"
+}
+```
+
 For dependencies on private git repositories, mount an SSH key into `~/.ssh`.
 
 ## Contributing
