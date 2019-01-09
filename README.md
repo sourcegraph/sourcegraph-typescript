@@ -7,6 +7,8 @@ A Sourcegraph extension that provides code intelligence for TypeScript.
 The extension is configured to talk to a language server deployed somewhere over WebSockets.
 The server is available as a Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
+### Using Docker
+
 You can run it locally with:
 
 ```sh
