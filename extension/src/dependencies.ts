@@ -1,8 +1,8 @@
 import { Span, Tracer } from 'opentracing'
 import { queryExtensions, resolveRepository, search } from './graphql'
-import { SourcegraphInstance } from './graphql'
 import { Logger, redact } from './logging'
 import { logErrorEvent, tracedFetch, tracePromise } from './tracing'
+import { SourcegraphEndpoint } from './util'
 
 export async function fetchPackageMeta(
     packageName: string,
@@ -39,7 +39,7 @@ interface NpmCouchDBQueryResult {
  */
 export async function* findPackageDependentsWithNpm(
     packageName: string,
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { logger, tracer, span }: { logger: Logger; span: Span; tracer: Tracer }
 ): AsyncIterable<string> {
     span.setTag('packageName', packageName)
@@ -68,7 +68,7 @@ export async function* findPackageDependentsWithNpm(
             const dependentPackageName = row.key[1]
             try {
                 const packageMeta = await fetchPackageMeta(dependentPackageName, undefined, { tracer, span })
-                const repoName = await resolvePackageNameToRepoName(packageMeta, sgInstance, { tracer, span })
+                const repoName = await resolvePackageNameToRepoName(packageMeta, sgEndpoint, { tracer, span })
                 if (!seenRepos.has(repoName)) {
                     seenRepos.add(repoName)
                     yield repoName
@@ -89,12 +89,12 @@ export async function* findPackageDependentsWithNpm(
  */
 export async function* findPackageDependentsWithSourcegraphSearch(
     packageName: string,
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { logger, span, tracer }: { logger: Logger; span: Span; tracer: Tracer }
 ): AsyncIterable<string> {
     span.setTag('packageName', packageName)
     logger.log(`Searching for dependents of ${packageName} through Sourcegraph`)
-    const results = await search(`file:package.json$ ${packageName} max:1000`, sgInstance, { span, tracer })
+    const results = await search(`file:package.json$ ${packageName} max:1000`, sgEndpoint, { span, tracer })
     const seenRepos = new Set<string>()
     for (const result of results) {
         const repoName = result.repository.name
@@ -109,11 +109,11 @@ export async function* findPackageDependentsWithSourcegraphSearch(
  * @return AsyncIterable that yields Sourcegraph repository names
  */
 export async function* findPackageDependentsWithSourcegraphExtensionRegistry(
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { logger, tracer, span }: { logger: Logger; tracer: Tracer; span: Span }
 ): AsyncIterable<string> {
     logger.log(`Searching for dependents to "sourcegraph" through Sourcegraph extension registry`)
-    const extensions = await queryExtensions(sgInstance, { span, tracer })
+    const extensions = await queryExtensions(sgEndpoint, { span, tracer })
     logger.log(`Found ${extensions.length} extensions`)
     const seenRepos = new Set<string>()
     for (const extension of extensions) {
@@ -122,7 +122,7 @@ export async function* findPackageDependentsWithSourcegraphExtensionRegistry(
                 continue
             }
             const manifest = JSON.parse(extension.manifest.raw)
-            const repoName = await resolvePackageNameToRepoName(manifest, sgInstance, { span, tracer })
+            const repoName = await resolvePackageNameToRepoName(manifest, sgEndpoint, { span, tracer })
             if (!seenRepos.has(repoName)) {
                 seenRepos.add(repoName)
                 yield repoName
@@ -244,10 +244,10 @@ function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {
 
 export async function resolvePackageNameToRepoName(
     packageMeta: PackageJson,
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
     const cloneUrl = cloneUrlFromPackageMeta(packageMeta)
-    const repoName = await resolveRepository(cloneUrl, sgInstance, { span, tracer })
+    const repoName = await resolveRepository(cloneUrl, sgEndpoint, { span, tracer })
     return repoName
 }

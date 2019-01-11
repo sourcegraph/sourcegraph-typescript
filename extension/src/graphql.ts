@@ -1,11 +1,7 @@
 import { Span, Tracer } from 'opentracing'
 import gql from 'tagged-template-noop'
 import { tracedFetch, tracePromise } from './tracing'
-
-export interface SourcegraphInstance {
-    instanceUrl: URL
-    accessToken?: string
-}
+import { SourcegraphEndpoint } from './util'
 
 /**
  * Does a GraphQL request to the Sourcegraph GraphQL API
@@ -16,17 +12,17 @@ export interface SourcegraphInstance {
 export async function requestGraphQL(
     query: string,
     variables: any = {},
-    { accessToken, instanceUrl }: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<{ data?: any; errors?: { message: string; path: string }[] }> {
     const headers: Record<string, string> = {
         Accept: 'application/json',
         'Content-Type': 'application/json',
     }
-    if (accessToken) {
-        headers.Authorization = 'token ' + accessToken
+    if (sgEndpoint.accessToken) {
+        headers.Authorization = 'token ' + sgEndpoint.accessToken
     }
-    const response = await tracedFetch(new URL('/.api/graphql', instanceUrl), {
+    const response = await tracedFetch(new URL('/.api/graphql', sgEndpoint.url), {
         method: 'POST',
         headers,
         body: JSON.stringify({ query, variables }),
@@ -41,7 +37,7 @@ export async function requestGraphQL(
 
 export async function search(
     query: string,
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { tracer, span }: { span: Span; tracer: Tracer }
 ): Promise<any> {
     return await tracePromise('Sourcegraph search', tracer, span, async span => {
@@ -63,7 +59,7 @@ export async function search(
                 }
             `,
             { query },
-            sgInstance,
+            sgEndpoint,
             { tracer, span }
         )
         if (errors && errors.length > 0) {
@@ -80,7 +76,7 @@ export async function search(
 export async function resolveRev(
     repoName: string,
     rev: string,
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
     return await tracePromise('Resolve rev', tracer, span, async span => {
@@ -97,7 +93,7 @@ export async function resolveRev(
                 }
             `,
             { repoName, rev },
-            sgInstance,
+            sgEndpoint,
             { span, tracer }
         )
         if (errors && errors.length > 0) {
@@ -115,7 +111,7 @@ export async function resolveRev(
  */
 export async function resolveRepository(
     cloneUrl: string,
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<string> {
     return await tracePromise('Resolve clone URL', tracer, span, async span => {
@@ -129,14 +125,14 @@ export async function resolveRepository(
                 }
             `,
             { cloneUrl },
-            sgInstance,
+            sgEndpoint,
             { span, tracer }
         )
         if (errors && errors.length > 0) {
             throw new Error('GraphQL Error:' + errors.map(e => e.message).join('\n'))
         }
         if (!data.repository) {
-            throw new Error(`No repository found for clone URL ${cloneUrl} on instance ${sgInstance.instanceUrl}`)
+            throw new Error(`No repository found for clone URL ${cloneUrl} on instance ${sgEndpoint.url}`)
         }
         return data.repository.name
     })
@@ -146,7 +142,7 @@ export async function resolveRepository(
  * Returns all extensions on the Sourcegraph instance.
  */
 export async function queryExtensions(
-    sgInstance: SourcegraphInstance,
+    sgEndpoint: SourcegraphEndpoint,
     { span, tracer }: { span: Span; tracer: Tracer }
 ): Promise<any[]> {
     return await tracePromise('Query extensions', tracer, span, async span => {
@@ -166,7 +162,7 @@ export async function queryExtensions(
                 }
             `,
             {},
-            sgInstance,
+            sgEndpoint,
             { span, tracer }
         )
         if (errors && errors.length > 0) {

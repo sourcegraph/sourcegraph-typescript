@@ -47,7 +47,7 @@ import {
     findPackageDependentsWithSourcegraphSearch,
     findPackageName,
 } from './dependencies'
-import { resolveRev, SourcegraphInstance } from './graphql'
+import { resolveRev } from './graphql'
 import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from './logging'
 import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLocations } from './lsp-conversion'
 import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
@@ -65,6 +65,7 @@ import {
     distinctUntilChanged,
     flatMapConcurrent,
     observableFromAsyncIterable,
+    SourcegraphEndpoint,
     throwIfAbortError,
 } from './util'
 
@@ -93,18 +94,20 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         : new Tracer()
 
     const accessToken = await getOrCreateAccessToken()
-    const instanceUrl = new URL(config['sourcegraph.url'] || sourcegraph.internal.sourcegraphURL.toString())
+    /** The Sourcegraph endpoint contactable by the server */
+    const serverSgEndpoint: SourcegraphEndpoint = {
+        url: new URL(config['sourcegraph.url'] || sourcegraph.internal.sourcegraphURL.toString()),
+        accessToken,
+    }
+    /** The Sourcegraph endpoint contactable by the extension  */
+    const clientSgEndpoint: SourcegraphEndpoint = {
+        // use self.location.href so it's the exact same host
+        // internal.sourcegraphURL might point to 127.0.0.1 while location.href points to localhost
+        url: new URL(self.location.href),
+        accessToken,
+    }
 
     const decorationType = sourcegraph.app.createDecorationType()
-
-    /** Adds the access token to the given server raw HTTP API URI, if available */
-    function authenticateUri(uri: URL): URL {
-        const authenticatedUri = new URL(uri.href)
-        if (accessToken) {
-            authenticatedUri.username = accessToken
-        }
-        return authenticatedUri
-    }
 
     /**
      * @param rootUri The server HTTP root URI
@@ -259,7 +262,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     // until workspace/configuration is allowed during initialize
                     configuration: {
                         // The server needs to use the API to resolve repositories
-                        'sourcegraph.url': instanceUrl.href,
+                        'sourcegraph.url': serverSgEndpoint.url.href,
                         ...fromPairs(
                             Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
                                 key.startsWith('typescript.')
@@ -280,9 +283,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 if (!isTypeScriptFile(new URL(textDocument.uri))) {
                     continue
                 }
-                const serverTextDocumentUri = authenticateUri(
-                    toServerTextDocumentUri(new URL(textDocument.uri), instanceUrl)
-                )
+                const serverTextDocumentUri = toServerTextDocumentUri(new URL(textDocument.uri), serverSgEndpoint)
                 if (!serverTextDocumentUri.href.startsWith(rootUri.href)) {
                     continue
                 }
@@ -367,8 +368,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         return
                     }
 
-                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
+                    const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
                     const connection = await getOrCreateConnection(serverRootUri, { token, span })
                     const didOpenParams: DidOpenTextDocumentParams = {
                         textDocument: {
@@ -398,8 +399,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 logger.log('Hover trace', span.generateTraceURL())
             }
             const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
+            const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+
             const connection = await getOrCreateConnection(serverRootUri, { span, token })
             // Poll server to get updated results when e.g. dependency installation finished
             while (true) {
@@ -433,8 +435,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 logger.log('Definition trace', span.generateTraceURL())
             }
             const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
+            const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
             const connection = await getOrCreateConnection(serverRootUri, { span, token })
             // Poll server to get updated contents when e.g. dependency installation finished
             while (true) {
@@ -472,8 +474,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 logger.log('References trace', span.generateTraceURL())
             }
             const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
+            const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+
             const connection = await getOrCreateConnection(serverRootUri, { span, token })
 
             const findLocalReferences = () =>
@@ -516,12 +519,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         span.setTag('uri', redact(definition.uri))
                         span.setTag('line', definition.range.start.line)
 
-                        const sgInstance: SourcegraphInstance = {
-                            accessToken,
-                            instanceUrl,
-                        }
                         const findPackageDependents =
-                            instanceUrl.hostname === 'sourcegraph.com'
+                            clientSgEndpoint.url.hostname === 'sourcegraph.com'
                                 ? findPackageDependentsWithNpm
                                 : findPackageDependentsWithSourcegraphSearch
 
@@ -535,19 +534,23 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             context: { includeDeclaration: false },
                         }
 
-                        const packageName = await findPackageName(definitionUri, { logger, tracer, span })
+                        // The definition returned by the server points to the server endpoint, rewrite to the client endpoint
+                        const clientDefinitionUrl = new URL(definitionUri.href)
+                        clientDefinitionUrl.protocol = clientSgEndpoint.url.protocol
+                        clientDefinitionUrl.host = clientSgEndpoint.url.host
+                        const packageName = await findPackageName(clientDefinitionUrl, { logger, tracer, span })
 
                         // Find dependent packages on the package
                         const dependents =
                             packageName === 'sourcegraph'
                                 ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
                                   // Extensions are not published to npm, so search the extension registry
-                                  findDependentsWithSourcegraphExtensionRegistry(sgInstance, {
+                                  findDependentsWithSourcegraphExtensionRegistry(clientSgEndpoint, {
                                       logger,
                                       tracer,
                                       span,
                                   })
-                                : findPackageDependents(packageName, sgInstance, { logger, tracer, span })
+                                : findPackageDependents(packageName, clientSgEndpoint, { logger, tracer, span })
 
                         // Search for references in each dependent
                         const findExternalRefsInDependent = (repoName: string) =>
@@ -557,10 +560,15 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                                 try {
                                     logger.log(`Looking for external references in dependent repo ${repoName}`)
                                     span.setTag('repoName', repoName)
-                                    const commitID = await resolveRev(repoName, 'HEAD', sgInstance, { span, tracer })
-                                    const rootUri = authenticateUri(
-                                        new URL(`${repoName}@${commitID}/-/raw/`, instanceUrl)
-                                    )
+                                    const commitID = await resolveRev(repoName, 'HEAD', clientSgEndpoint, {
+                                        span,
+                                        tracer,
+                                    })
+                                    const rootUri = new URL(`${repoName}@${commitID}/-/raw/`, serverSgEndpoint.url)
+                                    if (serverSgEndpoint.accessToken) {
+                                        rootUri.username = serverSgEndpoint.accessToken
+                                    }
+
                                     yield await withTempConnection(rootUri, { span, token }, async connection => {
                                         const references = asArray(
                                             await sendTracedRequest(
@@ -640,8 +648,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         logger.log('Implementation trace', span.generateTraceURL())
                     }
                     const textDocumentUri = new URL(textDocument.uri)
-                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
+                    const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
                     const connection = await getOrCreateConnection(serverRootUri, { span, token })
                     const implementationParams: TextDocumentPositionParams = {
                         textDocument: { uri: serverTextDocumentUri.href },

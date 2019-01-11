@@ -1,9 +1,14 @@
+import { SourcegraphEndpoint } from './util'
+
 /**
  * @param textDocumentUri The Sourcegraph text document URI, e.g. `git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts`
  * @returns The root URI for the server, e.g. `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/`. Always has a trailing slash.
  */
-export function resolveServerRootUri(textDocumentUri: URL, instanceUrl: URL): URL {
-    const rootUri = new URL(instanceUrl.href)
+export function resolveServerRootUri(textDocumentUri: URL, sgEndpoint: SourcegraphEndpoint): URL {
+    const rootUri = new URL(sgEndpoint.url.href)
+    if (sgEndpoint.accessToken) {
+        rootUri.username = sgEndpoint.accessToken
+    }
     // rootUri.username = accessToken
     rootUri.pathname =
         [textDocumentUri.host + textDocumentUri.pathname, textDocumentUri.search.substr(1)].filter(Boolean).join('@') +
@@ -15,11 +20,11 @@ export function resolveServerRootUri(textDocumentUri: URL, instanceUrl: URL): UR
  * @param textDocumentUri The Sourcegraph text document URI like git://github.com/sourcegraph/extensions-client-common?80389224bd48e1e696d5fa11b3ec6fba341c695b#src/schema/graphqlschema.ts
  * @returns The text document URI for the server, e.g. https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/src/schema/graphqlschema.ts
  */
-export function toServerTextDocumentUri(textDocumentUri: URL, instanceUrl: URL): URL {
+export function toServerTextDocumentUri(textDocumentUri: URL, sgEndpoint: SourcegraphEndpoint): URL {
     if (textDocumentUri.protocol !== 'git:') {
         throw new Error('Not a Sourcegraph git:// URI: ' + textDocumentUri)
     }
-    const rootUri = resolveServerRootUri(textDocumentUri, instanceUrl)
+    const rootUri = resolveServerRootUri(textDocumentUri, sgEndpoint)
     const serverTextDocumentUri = new URL(textDocumentUri.hash.substr(1), rootUri.href)
     return serverTextDocumentUri
 }

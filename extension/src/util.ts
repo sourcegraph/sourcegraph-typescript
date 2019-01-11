@@ -3,6 +3,11 @@ import { MergeAsyncIterable } from 'ix/asynciterable/merge'
 import { noop } from 'lodash'
 import { Observable } from 'rxjs'
 
+export interface SourcegraphEndpoint {
+    url: URL
+    accessToken?: string
+}
+
 export const isAbortError = (val: any) => typeof val === 'object' && val !== null && val.name === 'AbortError'
 
 export function throwIfAbortError(err: any): void {

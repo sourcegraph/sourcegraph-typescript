@@ -36,7 +36,7 @@
           ]
         },
         "sourcegraph.url": {
-          "description": "The Sourcegraph endpoint to contact",
+          "description": "The Sourcegraph endpoint the TypeScript server should use",
           "type": "string",
           "format": "url"
         },
