@@ -56,7 +56,6 @@ import {
     parseSourcegraphRawUrl,
     resolveServerRootUri,
     rewriteUris,
-    sourcegraphRootUri,
     toServerTextDocumentUri,
     toSourcegraphTextDocumentUri,
 } from './uris'
@@ -94,6 +93,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         : new Tracer()
 
     const accessToken = await getOrCreateAccessToken()
+    const instanceUrl = new URL(config['sourcegraph.url'] || sourcegraph.internal.sourcegraphURL.toString())
 
     const decorationType = sourcegraph.app.createDecorationType()
 
@@ -259,7 +259,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     // until workspace/configuration is allowed during initialize
                     configuration: {
                         // The server needs to use the API to resolve repositories
-                        'sourcegraph.url': sourcegraphRootUri(),
+                        'sourcegraph.url': instanceUrl.href,
                         ...fromPairs(
                             Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
                                 key.startsWith('typescript.')
@@ -280,7 +280,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 if (!isTypeScriptFile(new URL(textDocument.uri))) {
                     continue
                 }
-                const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(new URL(textDocument.uri)))
+                const serverTextDocumentUri = authenticateUri(
+                    toServerTextDocumentUri(new URL(textDocument.uri), instanceUrl)
+                )
                 if (!serverTextDocumentUri.href.startsWith(rootUri.href)) {
                     continue
                 }
@@ -365,8 +367,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         return
                     }
 
-                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
+                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
                     const connection = await getOrCreateConnection(serverRootUri, { token, span })
                     const didOpenParams: DidOpenTextDocumentParams = {
                         textDocument: {
@@ -396,8 +398,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 logger.log('Hover trace', span.generateTraceURL())
             }
             const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
             const connection = await getOrCreateConnection(serverRootUri, { span, token })
             // Poll server to get updated results when e.g. dependency installation finished
             while (true) {
@@ -431,8 +433,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 logger.log('Definition trace', span.generateTraceURL())
             }
             const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
             const connection = await getOrCreateConnection(serverRootUri, { span, token })
             // Poll server to get updated contents when e.g. dependency installation finished
             while (true) {
@@ -470,8 +472,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 logger.log('References trace', span.generateTraceURL())
             }
             const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+            const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
+            const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
             const connection = await getOrCreateConnection(serverRootUri, { span, token })
 
             const findLocalReferences = () =>
@@ -514,7 +516,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         span.setTag('uri', redact(definition.uri))
                         span.setTag('line', definition.range.start.line)
 
-                        const instanceUrl = new URL(sourcegraphRootUri())
                         const sgInstance: SourcegraphInstance = {
                             accessToken,
                             instanceUrl,
@@ -639,8 +640,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         logger.log('Implementation trace', span.generateTraceURL())
                     }
                     const textDocumentUri = new URL(textDocument.uri)
-                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri))
-                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri))
+                    const serverRootUri = authenticateUri(resolveServerRootUri(textDocumentUri, instanceUrl))
+                    const serverTextDocumentUri = authenticateUri(toServerTextDocumentUri(textDocumentUri, instanceUrl))
                     const connection = await getOrCreateConnection(serverRootUri, { span, token })
                     const implementationParams: TextDocumentPositionParams = {
                         textDocument: { uri: serverTextDocumentUri.href },
