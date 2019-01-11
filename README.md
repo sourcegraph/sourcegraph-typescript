@@ -9,22 +9,27 @@ The server is available as a Docker image `sourcegraph/lang-typescript` from Doc
 
 ### Using Docker
 
-You can run it locally with:
+You can run the server locally with:
 
 ```sh
 docker run -p 8080:8080 sourcegraph/lang-typescript
 ```
 
-This will make the server listen on `ws://localhost:8080`.
+This will make the server listen on `ws://localhost:8080`, which is what you need to set `typescript.serverUrl` to in Sourcegraph settings so the extension connects to it:
 
-Add these to your Sourcegraph settings in https://sourcegraph.example.com/site-admin/global-settings and make sure the port matches either the Docker command or your Kubernetes config:
-
+```json
+  "typescript.serverUrl": "ws://localhost:8080"
 ```
-  "typescript.serverUrl": "ws://localhost:8080",
+
+To allow the server to access a Sourcegraph instance that is also running in Docker, configure `sourcegraph.url` like this in your Sourcegraph settings:
+
+```json
   "sourcegraph.url": "http://host.docker.internal:7080",
 ```
 
-If you're running on Linux, change `sourcegraph.url` to the IP given by:
+Make sure the port matches the Docker command.
+
+If you're running on Linux, you can find the IP to use for `sourcegraph.url` with:
 
 ```bash
 ip addr show docker0 | grep -Po 'inet \K[\d.]+'
