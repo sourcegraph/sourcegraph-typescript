@@ -7,7 +7,7 @@ import { Configuration } from './config'
  * deployments that must access the Sourcegraph instance on
  * `http://host.docker.internal:7080` instead of `http://localhost:7080`.
  */
-export function serverRootUri() {
+export function sourcegraphRootUri() {
     return (
         sourcegraph.configuration.get<Configuration>().get('sourcegraph.url') ||
         sourcegraph.internal.sourcegraphURL.toString()
@@ -19,7 +19,7 @@ export function serverRootUri() {
  * @returns The root URI for the server, e.g. `https://accesstoken@sourcegraph.com/github.com/sourcegraph/extensions-client-common@80389224bd48e1e696d5fa11b3ec6fba341c695b/-/raw/`. Always has a trailing slash.
  */
 export function resolveServerRootUri(textDocumentUri: URL): URL {
-    const rootUri = new URL(serverRootUri())
+    const rootUri = new URL(sourcegraphRootUri())
     // rootUri.username = accessToken
     rootUri.pathname =
         [textDocumentUri.host + textDocumentUri.pathname, textDocumentUri.search.substr(1)].filter(Boolean).join('@') +
