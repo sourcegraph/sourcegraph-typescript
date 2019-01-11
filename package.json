@@ -40,6 +40,10 @@
           "type": "string",
           "format": "url"
         },
+        "typescript.progress": {
+          "description": "Whether to report progress while fetching sources, installing dependencies etc. (Default: false)",
+          "type": "boolean"
+        },
         "typescript.diagnostics.enable": {
           "description": "Whether to show compile errors on lines (Default: false)",
           "type": "boolean"
