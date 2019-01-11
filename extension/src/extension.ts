@@ -58,6 +58,7 @@ import {
     rewriteUris,
     toServerTextDocumentUri,
     toSourcegraphTextDocumentUri,
+    serverRootUri,
 } from './uris'
 import {
     abortPrevious,
@@ -258,7 +259,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     // until workspace/configuration is allowed during initialize
                     configuration: {
                         // The server needs to use the API to resolve repositories
-                        'sourcegraph.url': sourcegraph.internal.sourcegraphURL.toString(),
+                        'sourcegraph.url': serverRootUri(),
                         ...fromPairs(
                             Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
                                 key.startsWith('typescript.')
@@ -513,7 +514,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         span.setTag('uri', redact(definition.uri))
                         span.setTag('line', definition.range.start.line)
 
-                        const instanceUrl = new URL(sourcegraph.internal.sourcegraphURL.toString())
+                        const instanceUrl = new URL(serverRootUri())
                         const sgInstance: SourcegraphInstance = {
                             accessToken,
                             instanceUrl,
