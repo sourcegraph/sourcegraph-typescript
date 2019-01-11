@@ -5,7 +5,7 @@ steps:
   # Run tests
   - command: |-
       yarn
-      yarn run prettier
+      yarn run prettier-check
       yarn run tslint
       yarn run typecheck-ext
       yarn run build
