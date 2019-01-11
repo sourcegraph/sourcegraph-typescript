@@ -279,7 +279,7 @@ Example:
 
 ```json
 "typescript.npmrc": {
-  "//registry.npmjs.org/:_authToken": "asfdh21e-1234-asdn-123v-1234asdb2"
+  "//registry.npmjs.org/:_authToken": "********-****-****-****-*********"
 }
 ```
 
