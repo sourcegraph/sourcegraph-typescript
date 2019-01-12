@@ -27,14 +27,14 @@ The server is available as a Docker image `sourcegraph/lang-typescript` from Doc
         "typescript.sourcegraphUrl": "http://host.docker.internal:7080",
         ```
 
-        The above value works for macOS when running the server in a local Docker container. If you're
-        running locally on Linux, use the value emitted by this command:
+    The above value works for macOS when running the server in a local Docker container. If you're
+    running locally on Linux, use the value emitted by this command:
 
         ```bash
         ip addr show docker0 | grep -Po 'inet \K[\d.]+'
         ```
 
-        The port should match that of the `docker run` command running Sourcegraph.
+    The port should match that of the `docker run` command running Sourcegraph.
 
 ### Authentication proxies and firewalls
 
