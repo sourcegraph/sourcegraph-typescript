@@ -885,7 +885,7 @@ webSocketServer.on('connection', connection => {
                 const mappedRepoRelativeFilePath = path.posix.join(subdir, mappedPackageRelativeFilePath)
 
                 // Use the Sourcegraph endpoint from configuration
-                const instanceUrl = new URL(configuration['sourcegraph.url'] || 'https://sourcegraph.com')
+                const instanceUrl = new URL(configuration['typescript.sourcegraphUrl'] || 'https://sourcegraph.com')
                 const accessToken = configuration['typescript.accessToken']
                 const repoName = await resolveRepository(cloneUrl, { instanceUrl, accessToken })
                 const commit = packageMeta.gitHead

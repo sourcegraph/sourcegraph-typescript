@@ -2,38 +2,49 @@
 
 A Sourcegraph extension that provides code intelligence for TypeScript.
 
-## How to deploy the server
+## How to deploy the language server
 
 The extension is configured to talk to a language server deployed somewhere over WebSockets.
 The server is available as a Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
 ### Using Docker
 
-You can run the server locally with:
+1. Run the language server listening on `ws://localhost:8080`:
 
-```sh
-docker run -p 8080:8080 sourcegraph/lang-typescript
-```
+  ```sh
+  docker run -p 8080:8080 sourcegraph/lang-typescript
+  ```
 
-This will make the server listen on `ws://localhost:8080`, which is what you need to set `typescript.serverUrl` to in Sourcegraph settings so the extension connects to it:
+1. In your Sourcegraph settings, set `typescript.serverUrl` to tell the extension where to connect to the language server:
 
-```json
-  "typescript.serverUrl": "ws://localhost:8080"
-```
+  ```json
+    "typescript.serverUrl": "ws://localhost:8080"
+  ```
 
-To allow the server to access a Sourcegraph instance that is also running in Docker, configure `sourcegraph.url` like this in your Sourcegraph settings:
+1. Also set `typescript.sourcegraphUrl` to tell the language server where to connect to Sourcegraph:
 
-```json
-  "sourcegraph.url": "http://host.docker.internal:7080",
-```
+  ```json
+    "typescript.sourcegraphUrl": "http://host.docker.internal:7080",
+  ```
 
-Make sure the port matches the Docker command.
+  The above value works for macOS. If you're running on Linux, you can find the IP to use for `typescript.sourcegraphUrl` with:
 
-If you're running on Linux, you can find the IP to use for `sourcegraph.url` with:
+  ```bash
+  ip addr show docker0 | grep -Po 'inet \K[\d.]+'
+  ```
 
-```bash
-ip addr show docker0 | grep -Po 'inet \K[\d.]+'
-```
+  The port should match that of the `docker run` command running Sourcegraph.
+
+  Note: This is the URL of Sourcegraph *from the language server's perspective*, which is likely different from the URL that end users see.
+
+### Firewalls and authentication proxies
+
+Some customers deploy Sourcegraph behind an authentication proxy or firewall. If you do this, we
+recommend deploying the language server behind the firewall so that it can issue requests directly
+to Sourcegraph without going through the firewall. (Otherwise, you will need to configure the
+language server to authenticate through your firewall.) Make sure you set
+`typescript.sourcegraphUrl` to the URL that the language server should use to reach Sourcegraph,
+which is likely different from the URL that end users see outside the firewall.
 
 ### Using Kubernetes
 
