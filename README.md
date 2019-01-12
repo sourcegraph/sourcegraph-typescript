@@ -11,9 +11,9 @@ The server is available as a Docker image `sourcegraph/lang-typescript` from Doc
 
 1.  Run the server listening on `ws://localhost:8080`:
 
-        ```sh
-        docker run -p 8080:8080 sourcegraph/lang-typescript
-        ```
+    ```sh
+    docker run -p 8080:8080 sourcegraph/lang-typescript
+    ```
 
 1.  In your Sourcegraph settings, set `typescript.serverUrl` to tell the extension where to connect to the server:
 
