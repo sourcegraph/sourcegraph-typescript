@@ -10,6 +10,6 @@ export interface Configuration {
     'typescript.accessToken'?: string
     /** Whether to show a progress indicator while initializing. */
     'typescript.progress'?: boolean
-    'sourcegraph.url'?: string
+    'typescript.sourcegraphUrl'?: string
     'lightstep.token'?: string | null
 }

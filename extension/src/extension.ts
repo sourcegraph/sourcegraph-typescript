@@ -96,7 +96,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const accessToken = await getOrCreateAccessToken()
     /** The Sourcegraph endpoint contactable by the server */
     const serverSgEndpoint: SourcegraphEndpoint = {
-        url: new URL(config['sourcegraph.url'] || sourcegraph.internal.sourcegraphURL.toString()),
+        url: new URL(config['typescript.sourcegraphUrl'] || sourcegraph.internal.sourcegraphURL.toString()),
         accessToken,
     }
     /** The Sourcegraph endpoint contactable by the extension  */
@@ -262,7 +262,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     // until workspace/configuration is allowed during initialize
                     configuration: {
                         // The server needs to use the API to resolve repositories
-                        'sourcegraph.url': serverSgEndpoint.url.href,
+                        'typescript.sourcegraphUrl': serverSgEndpoint.url.href,
                         ...fromPairs(
                             Object.entries(sourcegraph.configuration.get().value).filter(([key]) =>
                                 key.startsWith('typescript.')

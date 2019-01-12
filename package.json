@@ -10,8 +10,17 @@
     "type": "git",
     "url": "https://github.com/sourcegraph/lang-typescript"
   },
-  "categories": ["Programming languages"],
-  "tags": ["typescript", "javascript", "react", "jsx", "cross-repository", "language-server"],
+  "categories": [
+    "Programming languages"
+  ],
+  "tags": [
+    "typescript",
+    "javascript",
+    "react",
+    "jsx",
+    "cross-repository",
+    "language-server"
+  ],
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:javascript"
@@ -35,7 +44,7 @@
             }
           ]
         },
-        "sourcegraph.url": {
+        "typescript.sourcegraphUrl": {
           "description": "The Sourcegraph endpoint the TypeScript server should use",
           "type": "string",
           "format": "url"
