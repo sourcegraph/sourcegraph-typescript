@@ -2,10 +2,11 @@
 
 A Sourcegraph extension that provides code intelligence for TypeScript.
 
-## How to deploy the server
+## Usage with private Sourcegraph instances
 
-The extension is configured to talk to a language server deployed somewhere over WebSockets.
-The server is available as a Docker image `sourcegraph/lang-typescript` from Docker Hub.
+This extension is configured to talk to a language server over WebSockets. If you are running a
+private Sourcegraph instance, you should run your own language server. The server is available as a
+Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
 ### Using Docker
 
