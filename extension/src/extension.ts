@@ -110,6 +110,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const decorationType = sourcegraph.app.createDecorationType()
 
     /**
+     * Set to true when a codeintel action is taken in a file (e.g. hover)
+     * and reset when a different file is opened
+     */
+    let inActiveUse = false
+
+    /**
      * @param rootUri The server HTTP root URI
      */
     async function connect({
@@ -211,7 +217,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 }
                 progressReporters.clear()
             })
-            if (config['typescript.progress']) {
+            if (config['typescript.progress'] !== false) {
                 connection.onNotification(
                     WindowProgressNotification.type,
                     async ({ id, title, message, percentage, done }) => {
@@ -221,6 +227,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             }
                             let reporterPromise = progressReporters.get(id)
                             if (!reporterPromise) {
+                                // If the extension is not in active use (i.e. at least one token was hovered on this file),
+                                // don't annoy the user with (new) progress indicators
+                                // (do continue to update old ones though)
+                                if (!inActiveUse) {
+                                    return
+                                }
                                 if (title) {
                                     title = title + progressSuffix
                                 }
@@ -360,6 +372,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
             try {
                 await tracePromise('Handle didOpenTextDocument', tracer, undefined, async span => {
+                    inActiveUse = false
                     if (canGenerateTraceUrl(span)) {
                         logger.log('didOpen trace', span.generateTraceURL())
                     }
@@ -395,6 +408,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     // Hover
     const provideHover = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
         traceAsyncGenerator('Provide hover', tracer, undefined, async function*(span) {
+            inActiveUse = true
             if (canGenerateTraceUrl(span)) {
                 logger.log('Hover trace', span.generateTraceURL())
             }
@@ -431,6 +445,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     // Definition
     const provideDefinition = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
         traceAsyncGenerator('Provide definition', tracer, undefined, async function*(span) {
+            inActiveUse = true
             if (canGenerateTraceUrl(span)) {
                 logger.log('Definition trace', span.generateTraceURL())
             }
@@ -470,6 +485,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         context: sourcegraph.ReferenceContext
     ): AsyncIterable<sourcegraph.Location[]> =>
         traceAsyncGenerator('Provide references', tracer, undefined, async function*(span) {
+            inActiveUse = true
             if (canGenerateTraceUrl(span)) {
                 logger.log('References trace', span.generateTraceURL())
             }
@@ -644,6 +660,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         sourcegraph.languages.registerImplementationProvider(documentSelector, {
             provideImplementation: (textDocument, position) =>
                 tracePromise('Provide implementations', tracer, undefined, async span => {
+                    inActiveUse = true
                     if (canGenerateTraceUrl(span)) {
                         logger.log('Implementation trace', span.generateTraceURL())
                     }
