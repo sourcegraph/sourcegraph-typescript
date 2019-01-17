@@ -100,9 +100,9 @@
             "requestTime",
             "verbose"
           ]
-          }
         }
       }
+    }
   },
   "license": "MIT",
   "main": "dist/extension.js",
