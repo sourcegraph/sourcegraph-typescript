@@ -33,6 +33,12 @@
       "commandPalette": []
     },
     "configuration": {
+      "title": "LangTypescriptConfiguration",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typescript.serverUrl"
+      ],
       "properties": {
         "lightstep.token": {
           "description": "The LightStep project token to use for tracing.",
@@ -94,38 +100,9 @@
             "requestTime",
             "verbose"
           ]
-        },
-        "typescript.tsserver.env": {
-          "description": "Environment variables to give to tsserver",
-          "type": "object",
-          "properties": {
-            "TSC_WATCHFILE": {
-              "enum": [
-                "PriorityPollingInterval",
-                "DynamicPriorityPolling",
-                "UseFsEvents",
-                "UseFsEventsWithFallbackDynamicPolling",
-                "UseFsEventsOnParentDirectory"
-              ]
-            },
-            "TSC_NONPOLLING_WATCHER": {
-              "enum": [
-                "true"
-              ]
-            },
-            "TSC_WATCHDIRECTORY": {
-              "enum": [
-                "RecursiveDirectoryUsingFsWatchFile",
-                "RecursiveDirectoryUsingDynamicPriorityPolling"
-              ]
-            }
-          },
-          "additionalProperties": {
-            "type": "string"
           }
         }
       }
-    }
   },
   "license": "MIT",
   "main": "dist/extension.js",
@@ -138,13 +115,16 @@
   "scripts": {
     "prettier": "prettier --list-different --write \"**/{*.{js?(on),ts,md,yml},.*.yml}\"",
     "prettier-check": "npm run prettier -- --write=false",
+    "config-types": "jsonref -f package.json -j /contributes/configuration | json2ts --unreachableDefinitions --style.singleQuote --no-style.semi",
+    "config-types-ext": "npm run config-types -- -o extension/src/config.ts",
+    "config-types-server": "npm run config-types -- -o server/src/config.ts",
     "tslint": "tslint -p extension/tsconfig.json --format stylish && tslint -p server/tsconfig.json --format stylish",
     "build": "npm run build-ext && npm run build-server",
-    "build-server": "tsc -p ./server/tsconfig.json",
-    "watch-server": "tsc -w -p ./server/tsconfig.json",
-    "build-ext": "parcel build --out-file extension.js extension/src/extension.ts",
-    "serve-ext": "parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
-    "typecheck-ext": "tsc -p ./extension/tsconfig.json",
+    "build-server": "npm run config-types-server && tsc -p ./server/tsconfig.json",
+    "watch-server": "npm run config-types-server && tsc -w -p ./server/tsconfig.json",
+    "build-ext": "npm run config-types-ext && parcel build --out-file extension.js extension/src/extension.ts",
+    "serve-ext": "npm run config-types-ext && parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
+    "typecheck-ext": "npm run config-types-ext && tsc -p ./extension/tsconfig.json",
     "sourcegraph:prepublish": "npm run build-ext"
   },
   "devDependencies": {
@@ -171,6 +151,8 @@
     "@types/whatwg-url": "6.4.0",
     "@types/ws": "6.0.1",
     "husky": "^1.1.2",
+    "json-schema-to-typescript": "^6.1.0",
+    "jsonref-cli": "^1.0.0",
     "parcel-bundler": "^1.10.3",
     "prettier": "^1.14.3",
     "semantic-release": "^15.10.6",

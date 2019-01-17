@@ -62,7 +62,7 @@ import {
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
 import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
-import { Configuration } from './config'
+import { LangTypescriptConfiguration } from './config'
 import {
     cloneUrlFromPackageMeta,
     fetchPackageMeta,
@@ -235,7 +235,7 @@ webSocketServer.on('connection', connection => {
     let languageServer: LanguageServer
     /** The initialize params passed to the typescript language server */
     let serverInitializeParams: InitializeParams
-    let configuration: Configuration = {}
+    let configuration: LangTypescriptConfiguration
     let tempDir: string
     let tempDirUri: URL
     let httpRootUri: URL

@@ -40,7 +40,7 @@ import {
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
-import { Configuration } from './config'
+import { LangTypescriptConfiguration } from './config'
 import {
     findPackageDependentsWithNpm,
     findPackageDependentsWithSourcegraphExtensionRegistry as findDependentsWithSourcegraphExtensionRegistry,
@@ -88,7 +88,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     ctx.subscriptions.add(() => cancellationTokenSource.cancel())
     const token = cancellationTokenSource.token
 
-    const config = sourcegraph.configuration.get().value as Configuration
+    const config = sourcegraph.configuration.get().value as LangTypescriptConfiguration
     const tracer: Tracer = config['lightstep.token']
         ? new LightstepTracer({ access_token: config['lightstep.token'], component_name: 'ext-lang-typescript' })
         : new Tracer()
