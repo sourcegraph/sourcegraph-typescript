@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/sourcegraph/sourcegraph/master/shared/src/schema/extension.schema.json",
   "name": "lang-typescript",
   "description": "TypeScript code intelligence",
   "private": true,
