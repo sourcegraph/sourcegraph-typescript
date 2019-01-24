@@ -1,6 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/renovate",
   "extends": ["github>sourcegraph/renovate-config"],
+  "rangeStrategy": "lockfile-update",
   "semanticCommits": false,
   "docker": {
     "enabled": true,
