@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/sourcegraph/sourcegraph/master/shared/src/schema/extension.schema.json",
-  "name": "lang-typescript",
+  "name": "typescript",
   "description": "TypeScript code intelligence",
   "private": true,
   "publisher": "sourcegraph",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sourcegraph/lang-typescript"
+    "url": "https://github.com/sourcegraph/sourcegraph-typescript"
   },
   "categories": [
     "Programming languages"
