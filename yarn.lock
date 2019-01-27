@@ -852,10 +852,10 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
-"@types/got@9.3.0":
-  version "9.3.0"
-  resolved "https://registry.npmjs.org/@types/got/-/got-9.3.0.tgz#b659ce208234d30cd9ce14b5bccb57937a9f21dd"
-  integrity sha512-XEyz4tCx6RnybUcw0ZmpEkNNNxc+QcnEY0r0VV5Ocp+7fjK60iMOvj1mfNMwgzMS7sNQMl+L8SIW7lO/QBAkxg==
+"@types/got@9.4.0":
+  version "9.4.0"
+  resolved "https://registry.npmjs.org/@types/got/-/got-9.4.0.tgz#5c8b0f5a0dc1b67e676430561a0b85a0fde1d12d"
+  integrity sha512-18c/Bu9tpv6owaz17urNFfkzfxdmr3PoREqFpAkUasBbV9gc7OqChRj/e2f98abiJo7j++PhArfm66EFqAY4qA==
   dependencies:
     "@types/node" "*"
     "@types/tough-cookie" "*"
