@@ -4,6 +4,8 @@
   "force": {
     "rangeStrategy": "lockfile-update"
   },
+  "masterIssue": true,
+  "schedule": [],
   "semanticCommits": false,
   "docker": {
     "enabled": true,
