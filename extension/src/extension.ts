@@ -101,9 +101,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     }
     /** The Sourcegraph endpoint contactable by the extension  */
     const clientSgEndpoint: SourcegraphEndpoint = {
-        // use self.location.href so it's the exact same host
-        // internal.sourcegraphURL might point to 127.0.0.1 while location.href points to localhost
-        url: new URL(self.location.href),
+        url: new URL(sourcegraph.internal.sourcegraphURL.toString()),
         accessToken,
     }
 
