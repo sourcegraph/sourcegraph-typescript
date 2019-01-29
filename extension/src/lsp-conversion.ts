@@ -31,6 +31,7 @@ export function convertHover(hover: Hover | null): sourcegraph.Hover | null {
                 .filter(str => !!str.trim())
                 .join('\n\n---\n\n'),
         },
+        priority: 100, // take precedence over basic-code-intel and other fuzzy hovers
     }
 }
 
