@@ -743,6 +743,13 @@
   dependencies:
     symbol-observable "^1.2.0"
 
+"@sourcegraph/basic-code-intel@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-1.0.0.tgz#3e315936f4cd3132e5b837b944f6dcdad0b47a7e"
+  integrity sha512-fGYsUzNDx8kA4qbhg147RyaSsU4AX+kz2ywkBMNFqZ/7CsCFSrt7RAyaHB5Lv0vnlybi0x/rtS++CDGMkdW0FA==
+  dependencies:
+    rxjs "^6.3.3"
+
 "@sourcegraph/lightstep-tracer-webworker@^0.20.14-fork.3":
   version "0.20.14-fork.3"
   resolved "https://registry.npmjs.org/@sourcegraph/lightstep-tracer-webworker/-/lightstep-tracer-webworker-0.20.14-fork.3.tgz#b7bd235af1214da9d206731e5f4271dfd267dd57"

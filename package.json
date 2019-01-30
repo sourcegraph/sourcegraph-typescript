@@ -159,6 +159,7 @@
     "tslint": "^5.11.0"
   },
   "dependencies": {
+    "@sourcegraph/basic-code-intel": "^1.0.0",
     "@sourcegraph/lightstep-tracer-webworker": "^0.20.14-fork.3",
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
