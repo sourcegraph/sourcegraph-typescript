@@ -1,6 +1,6 @@
-# Code intelligence for TypeScript
+# Code intelligence for TypeScript/JavaScript
 
-A Sourcegraph extension that provides code intelligence for TypeScript.
+A Sourcegraph extension that provides code intelligence for TypeScript/JavaScript.
 
 ## Usage with private Sourcegraph instances
 
