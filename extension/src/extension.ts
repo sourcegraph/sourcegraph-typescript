@@ -4,6 +4,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
+import { activateOnFileExts as activateBasicCodeIntelOnFileExts } from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -89,6 +90,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const token = cancellationTokenSource.token
 
     const config = sourcegraph.configuration.get().value as LangTypescriptConfiguration
+
+    if (!config['typescript.serverUrl']) {
+        // Fall back to basic-code-intel behavior
+        return activateBasicCodeIntelOnFileExts(['ts', 'tsx', 'js', 'jsx'])(ctx)
+    }
+
     const tracer: Tracer = config['lightstep.token']
         ? new LightstepTracer({ access_token: config['lightstep.token'], component_name: 'ext-lang-typescript' })
         : new Tracer()
