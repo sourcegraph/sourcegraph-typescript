@@ -743,10 +743,10 @@
   dependencies:
     symbol-observable "^1.2.0"
 
-"@sourcegraph/basic-code-intel@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-1.0.0.tgz#3e315936f4cd3132e5b837b944f6dcdad0b47a7e"
-  integrity sha512-fGYsUzNDx8kA4qbhg147RyaSsU4AX+kz2ywkBMNFqZ/7CsCFSrt7RAyaHB5Lv0vnlybi0x/rtS++CDGMkdW0FA==
+"@sourcegraph/basic-code-intel@2.0.0":
+  version "2.0.0"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-2.0.0.tgz#1e65d3fdc7c2550a26001063965560359a9d274c"
+  integrity sha512-VmBVmqv3WPfjjSTkJxNk5rrUxL2r71DeCiw65mxXAi2L+wzx6nnSLhch8lPwjTnzTwFwlv6iAmlpqkCst968wA==
   dependencies:
     rxjs "^6.3.3"
 
