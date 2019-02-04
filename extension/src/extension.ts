@@ -95,7 +95,15 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         // Fall back to basic-code-intel behavior
         return activateBasicCodeIntel({
             fileExts: ['ts', 'tsx', 'js', 'jsx'],
-            definitionPatterns: ['var.%s.=', 'let.%s.=', 'const.%s.=', 'function.%s', 'interface.%s', 'type.%s', '%s:'],
+            definitionPatterns: [
+                'var\\s\\b%s\\b',
+                'let\\s\\b%s\\b',
+                'const\\s\\b%s\\b',
+                'function\\s\\b%s\\b',
+                'interface\\s\\b%s\\b',
+                'type\\s\\b%s\\b',
+                '\\b%s\\b:',
+            ],
         })(ctx)
     }
 
