@@ -104,6 +104,14 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 'type\\s\\b%s\\b',
                 '\\b%s\\b:',
             ],
+            commentStyle: {
+                lineRegex: /\/\/\s*(.*)/,
+                block: {
+                    startRegex: /\/\*\*?/,
+                    contentRegex: /^\s*\*?\s*(.*)/,
+                    endRegex: /\*\//,
+                },
+            },
         })(ctx)
     }
 
