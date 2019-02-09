@@ -94,6 +94,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     if (!config['typescript.serverUrl']) {
         // Fall back to basic-code-intel behavior
         return activateBasicCodeIntel({
+            languageID: 'typescript',
             fileExts: ['ts', 'tsx', 'js', 'jsx'],
             definitionPatterns: [
                 'var\\s\\b%s\\b',
@@ -105,10 +106,10 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 '\\b%s\\b:',
             ],
             commentStyle: {
-                lineRegex: /\/\/\s*(.*)/,
+                lineRegex: /\/\/\s?/,
                 block: {
                     startRegex: /\/\*\*?/,
-                    contentRegex: /^\s*\*?\s*(.*)/,
+                    lineNoiseRegex: /(^\s*\*\s?)?/,
                     endRegex: /\*\//,
                 },
             },
