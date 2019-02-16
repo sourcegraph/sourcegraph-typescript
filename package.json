@@ -36,9 +36,6 @@
       "title": "LangTypescriptConfiguration",
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "typescript.serverUrl"
-      ],
       "properties": {
         "lightstep.token": {
           "description": "The LightStep project token to use for tracing.",
