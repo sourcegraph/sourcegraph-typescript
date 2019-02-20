@@ -92,6 +92,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const config = sourcegraph.configuration.get().value as LangTypescriptConfiguration
 
     if (!config['typescript.serverUrl']) {
+        logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
         // Fall back to basic-code-intel behavior
         return activateBasicCodeIntel({
             languageID: 'typescript',
