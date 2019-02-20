@@ -1,3 +1,4 @@
+import { LSPConnection } from '@sourcegraph/lsp-client'
 import { FORMAT_HTTP_HEADERS, FORMAT_TEXT_MAP, Span, SpanOptions, Tracer } from 'opentracing'
 import {
     ERROR,
@@ -7,7 +8,7 @@ import {
     SPAN_KIND,
     SPAN_KIND_RPC_CLIENT,
 } from 'opentracing/lib/ext/tags'
-import { CancellationToken, MessageConnection, NotificationType1, RequestType1 } from 'vscode-jsonrpc'
+import { CancellationToken, NotificationType1, RequestType1 } from 'vscode-jsonrpc'
 import { redact } from './logging'
 
 export const canGenerateTraceUrl = (val: any): val is { generateTraceURL(): string } =>
@@ -21,7 +22,7 @@ export type NotificationType<P> = NotificationType1<P, any>
  * Sends an LSP request traced with OpenTracing
  */
 export async function sendTracedRequest<P, R>(
-    connection: Pick<MessageConnection, 'sendRequest'>,
+    connection: LSPConnection,
     type: RequestType<P, R>,
     params: P,
     { span, tracer, token }: { span: Span; tracer: Tracer; token: CancellationToken }
@@ -37,7 +38,7 @@ export async function sendTracedRequest<P, R>(
         },
         async span => {
             tracer.inject(span, FORMAT_TEXT_MAP, params)
-            return await connection.sendRequest(type, params, token)
+            return await connection.sendRequest(type, params)
         }
     )
 }
