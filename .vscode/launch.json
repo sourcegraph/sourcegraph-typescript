@@ -9,7 +9,8 @@
       "request": "launch",
       "name": "Launch Server",
       "program": "${workspaceFolder}/server/dist/server.js",
-      "outFiles": ["${workspaceFolder}/server/dist/**/*.js"]
+      "outFiles": ["${workspaceFolder}/server/dist/**/*.js"],
+      "skipFiles": ["async_hooks.js"]
     }
   ]
 }
