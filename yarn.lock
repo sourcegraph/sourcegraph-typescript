@@ -814,15 +814,15 @@
     source-map-support "0.3.3"
     thrift "0.10.0"
 
-"@sourcegraph/lsp-client@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/@sourcegraph/lsp-client/-/lsp-client-1.0.0.tgz#94bd3db58c67295e71994ea443a37b4063d15708"
-  integrity sha512-D9IH5rsaTAZfqin8dzA6HKCaxW0dX1Ez7D8oUWMLg3u3jJMYUhv8qDAGb8tuXuGGBGX5W3733qFrq8ou7ku6+w==
+"@sourcegraph/lsp-client@^2.0.0-beta.1":
+  version "2.0.0-beta.1"
+  resolved "https://registry.npmjs.org/@sourcegraph/lsp-client/-/lsp-client-2.0.0-beta.1.tgz#d231d8caba53a1ff70de20f7b442c2ea439d3b37"
+  integrity sha512-hho0weMoCxKk96hYkj4re7B6JxY+NccfUm2pgv0+YUKBDWRijqO8sqlgOsN8tl+H1s7UjvE7xw//cENI1N+NGA==
   dependencies:
     "@sourcegraph/vscode-ws-jsonrpc" "^0.0.3-fork"
     lodash "^4.17.11"
-    rxjs "^6.3.3"
-    sourcegraph "^20.0.0"
+    rxjs "^6.4.0"
+    sourcegraph "^22.0.0"
     type-zoo "^3.2.1"
     uuid "^3.3.2"
     vscode-languageserver-protocol "^3.14.1"
@@ -8402,7 +8402,7 @@ source-map@^0.7.3:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.7.3.tgz#5302f8169031735226544092e64981f751750383"
   integrity sha512-CkCj6giN3S+n9qrYiBTX5gystlENnRW5jZeNLHpe6aue+SrHcG5VYwujhW9s4dY31mEGsxBDrHR6oI69fTXsaQ==
 
-sourcegraph@^20.0.0, sourcegraph@^20.1.0:
+sourcegraph@^20.1.0:
   version "20.1.0"
   resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-20.1.0.tgz#9ba6c0e57107b1fe66c4299db32c7780094398cc"
   integrity sha512-zbpDsFtExHQ04eJvQ2IIoi1rWrJU7Uhw4wXoy7V9Xpj/qMgbNnV4dev1kDg24y6F9vXM+jSONRrVcg/EO/UMag==

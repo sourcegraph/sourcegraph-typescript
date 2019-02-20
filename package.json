@@ -160,7 +160,7 @@
   "dependencies": {
     "@sourcegraph/basic-code-intel": "^6.0.3",
     "@sourcegraph/lightstep-tracer-webworker": "^0.20.14-fork.3",
-    "@sourcegraph/lsp-client": "^1.0.0",
+    "@sourcegraph/lsp-client": "^2.0.0-beta.1",
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^2.0.0",
