@@ -794,14 +794,14 @@
   resolved "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz#9a06f4f137ee84d7df0460c1fdb1135ffa6c50fd"
   integrity sha512-ONhaKPIufzzrlNbqtWFFd+jlnemX6lJAgq9ZeiZtS7I1PIf/la7CW4m83rTXRnVnsMbW2k56pGYu7AUFJD9Pow==
 
-"@sourcegraph/basic-code-intel@^6.0.3":
-  version "6.0.3"
-  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.3.tgz#d24546b033c1d08a638ae91556cd5d42d91ef7e6"
-  integrity sha512-NHyptPa8XMIaB7pGKQUv3XIGSQGlvz14UcSxL+jR/K2FJhJ8XFTFY4HuD63ZQFhHpFF3N0HCVarm2CrBt3Q4QA==
+"@sourcegraph/basic-code-intel@6.0.5":
+  version "6.0.5"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.5.tgz#09d394066ea2e860c2c89354425c0fd331abe0c6"
+  integrity sha512-T6tx5srg9s/kqGnF9JydWqyAyxLGueaOa/IlLRRcKBwvVyTWPwBeg1kWXxPaBTVTR6VKt9E9LOx3BqNTGuNYHw==
   dependencies:
     lodash "^4.17.11"
     rxjs "^6.3.3"
-    sourcegraph "^20.1.0"
+    sourcegraph "^22.0.0"
 
 "@sourcegraph/lightstep-tracer-webworker@^0.20.14-fork.3":
   version "0.20.14-fork.3"
@@ -8387,11 +8387,6 @@ source-map@^0.7.3:
   version "0.7.3"
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.7.3.tgz#5302f8169031735226544092e64981f751750383"
   integrity sha512-CkCj6giN3S+n9qrYiBTX5gystlENnRW5jZeNLHpe6aue+SrHcG5VYwujhW9s4dY31mEGsxBDrHR6oI69fTXsaQ==
-
-sourcegraph@^20.1.0:
-  version "20.1.0"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-20.1.0.tgz#9ba6c0e57107b1fe66c4299db32c7780094398cc"
-  integrity sha512-zbpDsFtExHQ04eJvQ2IIoi1rWrJU7Uhw4wXoy7V9Xpj/qMgbNnV4dev1kDg24y6F9vXM+jSONRrVcg/EO/UMag==
 
 sourcegraph@^22.0.0:
   version "22.0.0"
