@@ -1,3 +1,5 @@
+import '@babel/polyfill'
+
 // Polyfill
 import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 // @ts-ignore
