@@ -1,6 +1,9 @@
 {
   "$schema": "http://json.schemastore.org/renovate",
   "extends": ["github>sourcegraph/renovate-config"],
+  "lockFileMaintenance": {
+    "enabled": false
+  },
   "force": {
     "rangeStrategy": "lockfile-update"
   },
