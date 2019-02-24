@@ -1,6 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/renovate",
   "extends": ["github>sourcegraph/renovate-config"],
+  "prHourlyLimit": 0,
   "lockFileMaintenance": {
     "enabled": false
   },
