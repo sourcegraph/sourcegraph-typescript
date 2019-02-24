@@ -154,7 +154,6 @@
     "lnfs-cli": "^2.1.0",
     "parcel-bundler": "^1.11.0",
     "prettier": "^1.14.3",
-    "semantic-release": "^15.10.6",
     "tslint": "^5.11.0",
     "yarn-deduplicate": "^1.1.1"
   },
