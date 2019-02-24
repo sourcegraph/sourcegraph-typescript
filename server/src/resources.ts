@@ -49,15 +49,15 @@ export class FileResourceRetriever implements ResourceRetriever {
     public readonly protocols = new Set(['file:'])
 
     public async *glob(pattern: URL, { ignore = [] }: GlobOptions = {}): AsyncIterable<URL> {
-        // TODO use glob.stream() API once https://github.com/mrmlnc/fast-glob/issues/140 is fixed
-        const files = await glob.async<string>(fileURLToPath(pattern), {
+        const files = glob.stream(fileURLToPath(pattern), {
             ignore,
             absolute: true,
             markDirectories: true,
             onlyFiles: false,
         })
-        for (const file of files) {
-            yield pathToFileURL(file)
+        // tslint:disable-next-line: await-promise https://github.com/palantir/tslint/issues/3997
+        for await (const file of files) {
+            yield pathToFileURL(file as string)
         }
     }
 
