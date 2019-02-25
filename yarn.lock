@@ -5553,9 +5553,9 @@ process@^0.11.10:
   integrity sha1-czIwDoQBYb2j5podHZGn1LwW8YI=
 
 prom-client@^11.2.0:
-  version "11.2.0"
-  resolved "https://registry.npmjs.org/prom-client/-/prom-client-11.2.0.tgz#4a52b29a6e9960f8b0b27054b87ad37ad120562e"
-  integrity sha512-4gUAq/GR5C8q5eWxOa7tA60AtmkMpbyBd/2btCayvd3h/7HzS0p/kESKRwggJgbFrfdhTCBpOwPAwKiI01Q0VQ==
+  version "11.2.1"
+  resolved "https://registry.npmjs.org/prom-client/-/prom-client-11.2.1.tgz#486e7817de9b1d43c0a12aee26fc68830f4d1b16"
+  integrity sha512-7VwtjrkQS50NvDoeYNn2z6wzXB5BMGzUlmMOeLPaITtJsTVXnPywRta7QFiV4pKr0fbRx9oDfUcx1xibabjSAg==
   dependencies:
     tdigest "^0.1.1"
 
