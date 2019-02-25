@@ -127,7 +127,7 @@
   },
   "devDependencies": {
     "@sourcegraph/prettierrc": "^2.2.0",
-    "@sourcegraph/tsconfig": "^3.0.0",
+    "@sourcegraph/tsconfig": "^4.0.0",
     "@sourcegraph/tslint-config": "^12.3.1",
     "@types/express": "4.16.1",
     "@types/got": "9.4.0",
