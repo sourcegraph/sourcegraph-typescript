@@ -6768,9 +6768,9 @@ type-is@^1.6.16, type-is@~1.6.16:
     mime-types "~2.1.18"
 
 type-zoo@^3.2.1:
-  version "3.2.1"
-  resolved "https://registry.npmjs.org/type-zoo/-/type-zoo-3.2.1.tgz#67bc1abca3f4c54c143e7d93db2d4d568348e758"
-  integrity sha512-q5EZCfSB2VC0p8GIldsVOkayrIHezI+FSsKMmt7hFX9GeeTKN7cG3EdxscQQVA3ewQb8g3lMldNsLFQcgHCz5A==
+  version "3.3.0"
+  resolved "https://registry.npmjs.org/type-zoo/-/type-zoo-3.3.0.tgz#d5b59393b09a48ac30380c50e2369e828817e9b3"
+  integrity sha512-ID2kIg4QMbujPOpphFvSl7yyk0JaN2+5m2cprhxpzJqYWHhozLbYOHCAZqq7j1PPfzLe8XrYeZfPb99v96WVRw==
 
 typedarray@^0.0.6:
   version "0.0.6"
