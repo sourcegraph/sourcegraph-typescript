@@ -25,7 +25,7 @@ let progressIds = 1
 const createReporter = (connection: MessageConnection, logger: Logger, title?: string): ProgressReporter => {
     const id = String(progressIds++)
     const subject = new Subject<Progress>()
-    tryLogError(logger, () => connection.sendNotification(WindowProgressNotification.type, { id, title }))
+    let didReport = false
     subject
         .pipe(
             // Convert a next() with percentage >= 100 to a complete() for safety
@@ -42,6 +42,7 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
         )
         .subscribe({
             next: progress => {
+                didReport = true
                 tryLogError(logger, () => {
                     connection.sendNotification(WindowProgressNotification.type, {
                         ...progress,
@@ -54,7 +55,9 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
                 tryLogError(logger, () => {
                     // window/progress doesn't support erroring the progress,
                     // but we can emulate by hiding the progress and showing an error
-                    connection.sendNotification(WindowProgressNotification.type, { id, done: true })
+                    if (didReport) {
+                        connection.sendNotification(WindowProgressNotification.type, { id, done: true })
+                    }
                     connection.sendNotification(ShowMessageNotification.type, {
                         message: err.message,
                         type: MessageType.Error,
@@ -62,6 +65,9 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
                 })
             },
             complete: () => {
+                if (!didReport) {
+                    return
+                }
                 tryLogError(logger, () => {
                     connection.sendNotification(WindowProgressNotification.type, { id, percentage: 100, done: true })
                 })
