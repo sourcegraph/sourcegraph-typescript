@@ -618,13 +618,18 @@ webSocketServer.on('connection', connection => {
                 if (!type.is(contentType, 'application/*')) {
                     throw new Error(`Expected response to be of content type application/x-tar, was ${contentType}`)
                 }
+                const contentLength: number | undefined =
+                    response.headers['content-length'] && +response.headers['content-length']
+                logger.log('Archive size:', contentLength && prettyBytes(contentLength))
                 let bytes = 0
                 await new Promise<void>((resolve, reject) => {
                     response.data
                         .on('error', reject)
                         .on('data', (chunk: Buffer) => {
                             bytes += chunk.byteLength
-                            reporter.next({ message: prettyBytes(bytes) })
+                            if (contentLength) {
+                                reporter.next({ percentage: bytes / contentLength })
+                            }
                         })
                         .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
                         .on('entry', (entry: FileStat) => {
