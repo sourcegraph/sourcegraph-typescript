@@ -5,6 +5,7 @@ import { MessageConnection } from 'vscode-jsonrpc'
 import { MessageType, ShowMessageNotification } from 'vscode-languageserver-protocol'
 import { Logger } from './logging'
 import { WindowProgressNotification } from './protocol.progress.proposed'
+import { tryLogError } from './util'
 
 export interface Progress {
     /** Integer from 0 to 100 */
@@ -24,6 +25,7 @@ let progressIds = 1
 const createReporter = (connection: MessageConnection, logger: Logger, title?: string): ProgressReporter => {
     const id = String(progressIds++)
     const subject = new Subject<Progress>()
+    tryLogError(logger, () => connection.sendNotification(WindowProgressNotification.type, { id, title }))
     subject
         .pipe(
             // Convert a next() with percentage >= 100 to a complete() for safety
@@ -40,18 +42,16 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
         )
         .subscribe({
             next: progress => {
-                try {
+                tryLogError(logger, () => {
                     connection.sendNotification(WindowProgressNotification.type, {
                         ...progress,
                         id,
                         title,
                     })
-                } catch (err) {
-                    logger.error(err)
-                }
+                })
             },
             error: err => {
-                try {
+                tryLogError(logger, () => {
                     // window/progress doesn't support erroring the progress,
                     // but we can emulate by hiding the progress and showing an error
                     connection.sendNotification(WindowProgressNotification.type, { id, done: true })
@@ -59,16 +59,12 @@ const createReporter = (connection: MessageConnection, logger: Logger, title?: s
                         message: err.message,
                         type: MessageType.Error,
                     })
-                } catch (err) {
-                    logger.error(err)
-                }
+                })
             },
             complete: () => {
-                try {
-                    connection.sendNotification(WindowProgressNotification.type, { id, done: true })
-                } catch (err) {
-                    logger.error(err)
-                }
+                tryLogError(logger, () => {
+                    connection.sendNotification(WindowProgressNotification.type, { id, percentage: 100, done: true })
+                })
             },
         })
     return subject
