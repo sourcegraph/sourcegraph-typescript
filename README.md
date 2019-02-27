@@ -8,6 +8,17 @@ This extension is configured to talk to a language server over WebSockets. If yo
 private Sourcegraph instance, you should run your own language server. The server is available as a
 Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
+### 🚨 Secure deployment 🚨
+
+We recommend deploying the language server behind an auth proxy or firewall and
+treating it like an authenticated user because anyone that connects to the
+language server can access resources such as private code that the language
+server has access to.
+
+Make sure you set `typescript.sourcegraphUrl` to the URL that the language
+server should use to reach Sourcegraph, which is likely different from the URL
+that end users use.
+
 ### Using Docker
 
 1.  Run the server listening on `ws://localhost:8080`:
@@ -36,15 +47,6 @@ Docker image `sourcegraph/lang-typescript` from Docker Hub.
     ```
 
     The port should match that of the `docker run` command running Sourcegraph.
-
-### Authentication proxies and firewalls
-
-Some customers deploy Sourcegraph behind an authentication proxy or firewall. If you do this, we
-recommend deploying the language server behind the proxy so that it can issue requests directly to
-Sourcegraph without going through the proxy. (Otherwise, you will need to configure the language
-server to authenticate through your proxy.) Make sure you set `typescript.sourcegraphUrl` to the URL
-that the language server should use to reach Sourcegraph, which is likely different from the URL
-that end users use.
 
 ### Using Kubernetes
 
