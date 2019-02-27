@@ -8,7 +8,7 @@ This extension is configured to talk to a language server over WebSockets. If yo
 private Sourcegraph instance, you should run your own language server. The server is available as a
 Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
-### 🚨 Secure deployment 🚨
+### 🔐 Secure deployment 🔐
 
 We recommend deploying the language server behind an auth proxy or firewall and
 treating it like an authenticated user because anyone that connects to the
