@@ -10,10 +10,9 @@ Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
 ### 🔐 Secure deployment 🔐
 
-We recommend deploying the language server behind an auth proxy or firewall and
-treating it like an authenticated user because anyone that connects to the
-language server can access resources such as private code that the language
-server has access to.
+We recommend deploying the language server behind an auth proxy or firewall
+because anyone that connects to the language server can access private code that
+the language server has access to.
 
 Make sure you set `typescript.sourcegraphUrl` to the URL that the language
 server should use to reach Sourcegraph, which is likely different from the URL
