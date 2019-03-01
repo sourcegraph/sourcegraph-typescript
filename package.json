@@ -27,9 +27,25 @@
     "onLanguage:javascript"
   ],
   "contributes": {
-    "actions": [],
+    "actions": [
+      {
+        "id": "typescript.toggle",
+        "command": "typescript.toggle",
+        "title": "${config.typescript.enable && \"Disable\" || \"Enable\"} TypeScript code intelligence",
+        "category": "TypeScript",
+        "actionItem": {
+          "description": "${config.typescript.enable && \"Disable\" || \"Enable\"} TypeScript code intelligence",
+          "iconURL": "https://raw.githubusercontent.com/remojansen/logo.ts/5b4f0df433a5301aee0180582a8782bfbc9a0739/ts.svg?sanitize=true",
+          "pressed": "config.typescript.enable"
+        }
+      }
+    ],
     "menus": {
-      "editor/title": [],
+      "editor/title": [
+        {
+          "action": "typescript.toggle"
+        }
+      ],
       "commandPalette": []
     },
     "configuration": {
@@ -52,6 +68,10 @@
           "description": "The Sourcegraph endpoint the TypeScript server should use",
           "type": "string",
           "format": "url"
+        },
+        "typescript.enable": {
+          "description": "Whether to enable TypeScript code intelligence. (Default: true)",
+          "type": "boolean"
         },
         "typescript.progress": {
           "description": "Whether to report progress while fetching sources, installing dependencies etc. (Default: true)",
