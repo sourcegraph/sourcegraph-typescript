@@ -602,7 +602,7 @@ webSocketServer.on('connection', connection => {
         logger.info('Fetching archive from', httpRootUri.href)
         logger.log('Extracting to', extractPath)
         await tracePromise('Fetch source archive', tracer, span, async span => {
-            await withProgress('Downloading source to TypeScript server', async reporter => {
+            await withProgress('Loading TypeScript project', async reporter => {
                 span.setTag(HTTP_URL, redact(httpRootUri.href))
                 const headers = {
                     Accept: 'application/x-tar',
