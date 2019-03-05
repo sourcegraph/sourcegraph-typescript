@@ -118,7 +118,17 @@ spec:
 
 #### TLS
 
-TLS is optional but recommended for production deployments. It is used if `TLS_KEY` and `TLS_CERT` environment variables are set.
+TLS is optional but recommended for production deployments. It is used if `TLS_KEY` and `TLS_CERT` environment variables are set. Example:
+
+```bash
+docker run -p 8080:8080 -e TLS_KEY="$(cat sourcegraph.key)" -e TLS_CERT="$(cat sourcegraph.crt)" -v ~/.sourcegraph/config:/home/node sourcegraph/lang-typescript
+```
+
+Now use Websocket with SSL in your Sourcegraph settings to connect to the server:
+
+```json
+"typescript.serverUrl": "wss://localhost:8080"
+```
 
 #### Enabling OpenTracing
 
