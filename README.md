@@ -123,7 +123,7 @@ TLS is optional but recommended for production deployments. It is used if `TLS_K
 ```bash
 docker run -p 8080:8080 -e TLS_KEY="$(cat sourcegraph.key)" -e TLS_CERT="$(cat sourcegraph.crt)" sourcegraph/lang-typescript
 ```
-If you are using self signed keys [like these](https://docs.sourcegraph.com/admin/nginx#tls-https) add `-e NODE_TLS_REJECT_UNAUTHORIZED=0` to the command line.
+If you are using a self signed certificate [like this](https://docs.sourcegraph.com/admin/nginx#tls-https) add [-e NODE_TLS_REJECT_UNAUTHORIZED=0](https://github.com/nodejs/node/issues/5258) to the command line above.
 
 Make sure to use Websocket with SSL in your Sourcegraph settings to connect to the server:
 
