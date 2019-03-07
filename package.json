@@ -27,9 +27,25 @@
     "onLanguage:javascript"
   ],
   "contributes": {
-    "actions": [],
+    "actions": [
+      {
+        "id": "typescript.toggle",
+        "command": "typescript.toggle",
+        "title": "${config.typescript.enable && \"Disable\" || \"Enable\"} TypeScript code intelligence",
+        "category": "TypeScript",
+        "actionItem": {
+          "description": "${config.typescript.enable && \"Disable\" || \"Enable\"} TypeScript code intelligence",
+          "iconURL": "https://raw.githubusercontent.com/remojansen/logo.ts/5b4f0df433a5301aee0180582a8782bfbc9a0739/ts.svg?sanitize=true",
+          "pressed": "config.typescript.enable"
+        }
+      }
+    ],
     "menus": {
-      "editor/title": [],
+      "editor/title": [
+        {
+          "action": "typescript.toggle"
+        }
+      ],
       "commandPalette": []
     },
     "configuration": {
@@ -52,6 +68,10 @@
           "description": "The Sourcegraph endpoint the TypeScript server should use",
           "type": "string",
           "format": "url"
+        },
+        "typescript.enable": {
+          "description": "Whether to enable TypeScript code intelligence. (Default: true)",
+          "type": "boolean"
         },
         "typescript.progress": {
           "description": "Whether to report progress while fetching sources, installing dependencies etc. (Default: true)",
@@ -134,7 +154,7 @@
     "@types/highlight.js": "9.12.3",
     "@types/ini": "1.3.30",
     "@types/json5": "0.0.30",
-    "@types/lodash": "4.14.120",
+    "@types/lodash": "4.14.122",
     "@types/mkdirp-promise": "5.0.0",
     "@types/mz": "0.0.32",
     "@types/node": "10.12.18",
@@ -150,10 +170,10 @@
     "@types/ws": "6.0.1",
     "dot-json": "^1.1.0",
     "husky": "^1.1.2",
-    "json-schema-to-typescript": "^6.1.0",
+    "json-schema-to-typescript": "^6.1.3",
     "lnfs-cli": "^2.1.0",
     "parcel-bundler": "^1.11.0",
-    "prettier": "^1.14.3",
+    "prettier": "^1.16.4",
     "tslint": "^5.13.0",
     "yarn-deduplicate": "^1.1.1"
   },
