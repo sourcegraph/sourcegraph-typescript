@@ -8,6 +8,7 @@
   "force": {
     "rangeStrategy": "lockfile-update"
   },
+  "postUpdateOptions": ["yarnDedupeFewer"],
   "masterIssue": true,
   "schedule": [],
   "semanticCommits": false,
