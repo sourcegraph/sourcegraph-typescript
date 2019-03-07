@@ -20,7 +20,8 @@ import { merge } from 'ix/asynciterable/index'
 import { filter, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
-import { Subscription } from 'rxjs'
+import { BehaviorSubject, from, fromEventPattern, Subscription } from 'rxjs'
+import * as rxop from 'rxjs/operators'
 import * as sourcegraph from 'sourcegraph'
 import { Omit } from 'type-zoo'
 import {
@@ -53,7 +54,11 @@ import {
 import { resolveRev } from './graphql'
 import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from './logging'
 import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLocations } from './lsp-conversion'
-import { WindowProgressClientCapabilities, WindowProgressNotification } from './protocol.progress.proposed'
+import {
+    ProgressParams,
+    WindowProgressClientCapabilities,
+    WindowProgressNotification,
+} from './protocol.progress.proposed'
 import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
 import {
     parseSourcegraphRawUrl,
@@ -64,6 +69,7 @@ import {
 } from './uris'
 import {
     abortPrevious,
+    areProviderParamsEqual,
     asArray,
     distinctUntilChanged,
     flatMapConcurrent,
@@ -74,6 +80,8 @@ import {
 
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
+
+const getConfig = () => sourcegraph.configuration.get().value as LangTypescriptConfiguration
 
 type NonDisposableMessageConnection = Omit<MessageConnection, 'dispose'>
 
@@ -91,9 +99,10 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     ctx.subscriptions.add(() => cancellationTokenSource.cancel())
     const token = cancellationTokenSource.token
 
-    const config = sourcegraph.configuration.get().value as LangTypescriptConfiguration
+    const config = new BehaviorSubject(getConfig())
+    ctx.subscriptions.add(sourcegraph.configuration.subscribe(() => config.next(getConfig())))
 
-    if (!config['typescript.serverUrl']) {
+    if (!config.value['typescript.serverUrl']) {
         logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
         // Fall back to basic-code-intel behavior
         return activateBasicCodeIntel({
@@ -119,14 +128,14 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         })(ctx)
     }
 
-    const tracer: Tracer = config['lightstep.token']
-        ? new LightstepTracer({ access_token: config['lightstep.token'], component_name: 'ext-lang-typescript' })
+    const tracer: Tracer = config.value['lightstep.token']
+        ? new LightstepTracer({ access_token: config.value['lightstep.token'], component_name: 'ext-lang-typescript' })
         : new Tracer()
 
     const accessToken = await getOrCreateAccessToken()
     /** The Sourcegraph endpoint contactable by the server */
     const serverSgEndpoint: SourcegraphEndpoint = {
-        url: new URL(config['typescript.sourcegraphUrl'] || sourcegraph.internal.sourcegraphURL.toString()),
+        url: new URL(config.value['typescript.sourcegraphUrl'] || sourcegraph.internal.sourcegraphURL.toString()),
         accessToken,
     }
     /** The Sourcegraph endpoint contactable by the extension  */
@@ -137,11 +146,18 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
 
     const decorationType = sourcegraph.app.createDecorationType()
 
-    /**
-     * Set to true when a codeintel action is taken in a file (e.g. hover)
-     * and reset when a different file is opened
-     */
-    let inActiveUse = false
+    sourcegraph.commands.registerCommand('typescript.toggle', async () => {
+        const config = sourcegraph.configuration.get<LangTypescriptConfiguration>()
+        await config.update('typescript.enable', config.value['typescript.enable'] === false)
+    })
+
+    const enabled = new BehaviorSubject(config.value['typescript.enable'] !== false)
+    from(config)
+        .pipe(
+            rxop.map(config => config['typescript.enable'] !== false),
+            rxop.distinctUntilChanged()
+        )
+        .subscribe(enabled)
 
     /**
      * @param rootUri The server HTTP root URI
@@ -160,12 +176,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         return await tracePromise('Connect to language server', tracer, span, async span => {
             const subscriptions = new Subscription()
             token.onCancellationRequested(() => subscriptions.unsubscribe())
-            if (typeof config['typescript.serverUrl'] !== 'string') {
+            if (typeof config.value['typescript.serverUrl'] !== 'string') {
                 throw new Error(
                     'Setting typescript.serverUrl must be set to the WebSocket endpoint of the TypeScript language service'
                 )
             }
-            const serverUrl = new URL(config['typescript.serverUrl'])
+            const serverUrl = new URL(config.value['typescript.serverUrl'])
             serverUrl.search = rootUri.pathname.substr(1) // For easier debugging in network panel
             const socket = new WebSocket(serverUrl.href)
             subscriptions.add(() => socket.close())
@@ -235,7 +251,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             )
             // Show progress reports
             const progressReporters = new Map<string, Promise<sourcegraph.ProgressReporter>>()
-            subscriptions.add(() => {
+            const completeReporters = () => {
                 // Cleanup unfinished progress reports
                 for (const reporterPromise of progressReporters.values()) {
                     // tslint:disable-next-line:no-floating-promises
@@ -244,39 +260,47 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     })
                 }
                 progressReporters.clear()
-            })
-            if (config['typescript.progress'] !== false) {
-                connection.onNotification(
-                    WindowProgressNotification.type,
-                    async ({ id, title, message, percentage, done }) => {
-                        try {
-                            if (!sourcegraph.app.activeWindow || !sourcegraph.app.activeWindow.showProgress) {
-                                return
-                            }
-                            let reporterPromise = progressReporters.get(id)
-                            if (!reporterPromise) {
-                                // If the extension is not in active use (i.e. at least one token was hovered on this file),
-                                // don't annoy the user with (new) progress indicators
-                                // (do continue to update old ones though)
-                                if (!inActiveUse) {
-                                    return
+            }
+            subscriptions.add(completeReporters)
+            subscriptions.add(enabled.pipe(rxop.filter(isEnabled => !isEnabled)).subscribe(completeReporters))
+            if (config.value['typescript.progress'] !== false) {
+                subscriptions.add(
+                    fromEventPattern<ProgressParams>(handler =>
+                        connection.onNotification(WindowProgressNotification.type, (p: ProgressParams) => handler(p))
+                    )
+                        .pipe(
+                            rxop.withLatestFrom(enabled),
+                            rxop.switchMap(async ([{ id, title, message, percentage, done }, isEnabled]) => {
+                                try {
+                                    if (!sourcegraph.app.activeWindow || !sourcegraph.app.activeWindow.showProgress) {
+                                        return
+                                    }
+                                    let reporterPromise = progressReporters.get(id)
+                                    if (!reporterPromise) {
+                                        // If the extension is not in active use (i.e. at least one token was hovered on this file),
+                                        // don't annoy the user with (new) progress indicators
+                                        // (do continue to update old ones though)
+                                        if (!isEnabled) {
+                                            return
+                                        }
+                                        if (title) {
+                                            title = title + progressSuffix
+                                        }
+                                        reporterPromise = sourcegraph.app.activeWindow.showProgress({ title })
+                                        progressReporters.set(id, reporterPromise)
+                                    }
+                                    const reporter = await reporterPromise
+                                    reporter.next({ percentage, message })
+                                    if (done) {
+                                        reporter.complete()
+                                        progressReporters.delete(id)
+                                    }
+                                } catch (err) {
+                                    logger.error('Error handling progress notification', err)
                                 }
-                                if (title) {
-                                    title = title + progressSuffix
-                                }
-                                reporterPromise = sourcegraph.app.activeWindow.showProgress({ title })
-                                progressReporters.set(id, reporterPromise)
-                            }
-                            const reporter = await reporterPromise
-                            reporter.next({ percentage, message })
-                            if (done) {
-                                reporter.complete()
-                                progressReporters.delete(id)
-                            }
-                        } catch (err) {
-                            logger.error('Error handling progress notification', err)
-                        }
-                    }
+                            })
+                        )
+                        .subscribe()
                 )
             }
             connection.listen()
@@ -400,7 +424,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         sourcegraph.workspace.onDidOpenTextDocument.subscribe(async textDocument => {
             try {
                 await tracePromise('Handle didOpenTextDocument', tracer, undefined, async span => {
-                    inActiveUse = false
                     if (canGenerateTraceUrl(span)) {
                         logger.log('didOpen trace', span.generateTraceURL())
                     }
@@ -428,289 +451,316 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         })
     )
 
-    const areProviderParamsEqual = (
-        [doc1, pos1]: [sourcegraph.TextDocument, sourcegraph.Position],
-        [doc2, pos2]: [sourcegraph.TextDocument, sourcegraph.Position]
-    ): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
+    let providers = new Subscription()
 
-    // Hover
-    const provideHover = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
-        traceAsyncGenerator('Provide hover', tracer, undefined, async function*(span) {
-            inActiveUse = true
-            if (canGenerateTraceUrl(span)) {
-                logger.log('Hover trace', span.generateTraceURL())
-            }
-            const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
-
-            const connection = await getOrCreateConnection(serverRootUri, { span, token })
-            // Poll server to get updated results when e.g. dependency installation finished
-            while (true) {
-                const hoverResult = await sendTracedRequest(
-                    connection,
-                    HoverRequest.type,
-                    {
-                        textDocument: { uri: serverTextDocumentUri.href },
-                        position,
-                    },
-                    { span, tracer, token }
-                )
-                rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
-                yield convertHover(hoverResult)
-                await delayPromise(HOVER_DEF_POLL_INTERVAL)
-            }
-        })
-    )
     ctx.subscriptions.add(
-        sourcegraph.languages.registerHoverProvider(documentSelector, {
-            provideHover: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                observableFromAsyncIterable(provideHover(textDocument, position))
-            ),
-        })
-    )
-
-    // Definition
-    const provideDefinition = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
-        traceAsyncGenerator('Provide definition', tracer, undefined, async function*(span) {
-            inActiveUse = true
-            if (canGenerateTraceUrl(span)) {
-                logger.log('Definition trace', span.generateTraceURL())
-            }
-            const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
-            const connection = await getOrCreateConnection(serverRootUri, { span, token })
-            // Poll server to get updated contents when e.g. dependency installation finished
-            while (true) {
-                const definitionResult = await sendTracedRequest(
-                    connection,
-                    DefinitionRequest.type,
-                    {
-                        textDocument: { uri: serverTextDocumentUri.href },
-                        position,
-                    },
-                    { span, tracer, token }
-                )
-                rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
-                yield convertLocations(definitionResult)
-                await delayPromise(HOVER_DEF_POLL_INTERVAL)
+        enabled.subscribe(isEnabled => {
+            if (isEnabled) {
+                logger.log('TypeScript support enabled')
+                registerProviders()
+            } else {
+                logger.log('TypeScript support disabled')
+                providers.unsubscribe()
             }
         })
     )
-    ctx.subscriptions.add(
-        sourcegraph.languages.registerDefinitionProvider(documentSelector, {
-            provideDefinition: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                observableFromAsyncIterable(provideDefinition(textDocument, position))
-            ),
-        })
-    )
 
-    // References
-    const provideReferences = (
-        textDocument: sourcegraph.TextDocument,
-        position: sourcegraph.Position,
-        context: sourcegraph.ReferenceContext
-    ): AsyncIterable<sourcegraph.Location[]> =>
-        traceAsyncGenerator('Provide references', tracer, undefined, async function*(span) {
-            inActiveUse = true
-            if (canGenerateTraceUrl(span)) {
-                logger.log('References trace', span.generateTraceURL())
-            }
-            const textDocumentUri = new URL(textDocument.uri)
-            const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-            const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+    function registerProviders() {
+        providers = new Subscription()
+        ctx.subscriptions.add(providers)
+        // Hover
+        const provideHover = abortPrevious((textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
+            traceAsyncGenerator('Provide hover', tracer, undefined, async function*(span) {
+                if (canGenerateTraceUrl(span)) {
+                    logger.log('Hover trace', span.generateTraceURL())
+                }
+                const textDocumentUri = new URL(textDocument.uri)
+                const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
 
-            const connection = await getOrCreateConnection(serverRootUri, { span, token })
-
-            const findLocalReferences = () =>
-                traceAsyncGenerator('Find local references', tracer, span, async function*(span) {
-                    logger.log('Searching for same-repo references')
-                    const localReferences = asArray(
-                        await sendTracedRequest(
-                            connection,
-                            ReferencesRequest.type,
-                            {
-                                textDocument: { uri: serverTextDocumentUri.href },
-                                position,
-                                context,
-                            },
-                            { span, tracer, token }
-                        )
+                const connection = await getOrCreateConnection(serverRootUri, { span, token })
+                // Poll server to get updated results when e.g. dependency installation finished
+                while (true) {
+                    const hoverResult = await sendTracedRequest(
+                        connection,
+                        HoverRequest.type,
+                        {
+                            textDocument: { uri: serverTextDocumentUri.href },
+                            position,
+                        },
+                        { span, tracer, token }
                     )
-                    logger.log(`Found ${localReferences.length} same-repo references`)
-                    yield localReferences
-                })
-
-            const findExternalReferences = () =>
-                traceAsyncGenerator('Find external references', tracer, span, async function*(span) {
-                    try {
-                        logger.log('Getting canonical definition for cross-repo references')
-                        const definition: Location | undefined = asArray(
-                            await sendTracedRequest(
-                                connection,
-                                DefinitionRequest.type,
-                                {
-                                    textDocument: { uri: serverTextDocumentUri.href },
-                                    position,
-                                },
-                                { span, tracer, token }
-                            )
-                        )[0]
-                        if (!definition) {
-                            return
-                        }
-                        span.setTag('uri', redact(definition.uri))
-                        span.setTag('line', definition.range.start.line)
-
-                        const findPackageDependents =
-                            clientSgEndpoint.url.hostname === 'sourcegraph.com'
-                                ? findPackageDependentsWithNpm
-                                : findPackageDependentsWithSourcegraphSearch
-
-                        logger.log(`Getting external references for definition`, definition)
-
-                        const definitionUri = new URL(definition.uri)
-
-                        const referenceParams: ReferenceParams = {
-                            textDocument: { uri: definitionUri.href },
-                            position: definition.range.start,
-                            context: { includeDeclaration: false },
-                        }
-
-                        // The definition returned by the server points to the server endpoint, rewrite to the client endpoint
-                        const clientDefinitionUrl = new URL(definitionUri.href)
-                        clientDefinitionUrl.protocol = clientSgEndpoint.url.protocol
-                        clientDefinitionUrl.host = clientSgEndpoint.url.host
-                        const packageName = await findPackageName(clientDefinitionUrl, { logger, tracer, span })
-
-                        // Find dependent packages on the package
-                        const dependents =
-                            packageName === 'sourcegraph'
-                                ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
-                                  // Extensions are not published to npm, so search the extension registry
-                                  findDependentsWithSourcegraphExtensionRegistry(clientSgEndpoint, {
-                                      logger,
-                                      tracer,
-                                      span,
-                                  })
-                                : findPackageDependents(packageName, clientSgEndpoint, { logger, tracer, span })
-
-                        // Search for references in each dependent
-                        const findExternalRefsInDependent = (repoName: string) =>
-                            traceAsyncGenerator('Find external references in dependent', tracer, span, async function*(
-                                span
-                            ) {
-                                try {
-                                    logger.log(`Looking for external references in dependent repo ${repoName}`)
-                                    span.setTag('repoName', repoName)
-                                    const commitID = await resolveRev(repoName, 'HEAD', clientSgEndpoint, {
-                                        span,
-                                        tracer,
-                                    })
-                                    const rootUri = new URL(`${repoName}@${commitID}/-/raw/`, serverSgEndpoint.url)
-                                    if (serverSgEndpoint.accessToken) {
-                                        rootUri.username = serverSgEndpoint.accessToken
-                                    }
-
-                                    yield await withTempConnection(rootUri, { span, token }, async connection => {
-                                        const references = asArray(
-                                            await sendTracedRequest(
-                                                connection,
-                                                ReferencesRequest.type,
-                                                referenceParams,
-                                                {
-                                                    span,
-                                                    tracer,
-                                                    token,
-                                                }
-                                            )
-                                        )
-                                        logger.log(
-                                            `Found ${references.length} references in dependent repo ${repoName}`
-                                        )
-                                        // Only include references in the external repo, do not duplicate references in the same repo
-                                        return references.filter(location => location.uri.startsWith(rootUri.href))
-                                    })
-                                } catch (err) {
-                                    throwIfAbortError(err)
-                                    logErrorEvent(span, err)
-                                    logger.error(`Error searching dependent repo ${repoName} for references`, err)
-                                }
-                            })
-                        yield* flatMapConcurrent(dependents, EXTERNAL_REFS_CONCURRENCY, findExternalRefsInDependent)
-                        logger.log('Done going through dependents')
-                    } catch (err) {
-                        logger.error('Could not find external references', err)
-                    }
-                })
-
-            yield* merge(findLocalReferences(), findExternalReferences()).pipe(
-                // Same-repo references
-                // Cross-repo references
-                // Find canonical source location
-                filter(chunk => chunk.length > 0),
-                tap({
-                    next: chunk => {
-                        span.log({ event: 'chunk', count: chunk.length })
-                    },
-                }),
-                // Rewrite URIs and convert from LSP to Sourcegraph Location
-                map(chunk =>
-                    chunk
-                        .map(location => {
-                            try {
-                                return convertLocation({
-                                    ...location,
-                                    uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
-                                })
-                            } catch (err) {
-                                return undefined
-                            }
-                        })
-                        .filter((location): location is Exclude<typeof location, undefined> => !!location)
+                    rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
+                    yield convertHover(hoverResult)
+                    await delayPromise(HOVER_DEF_POLL_INTERVAL)
+                }
+            })
+        )
+        providers.add(
+            sourcegraph.languages.registerHoverProvider(documentSelector, {
+                provideHover: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
+                    observableFromAsyncIterable(provideHover(textDocument, position))
                 ),
-                // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
-                scan<sourcegraph.Location[], sourcegraph.Location[]>(
-                    (allReferences, chunk) => allReferences.concat(chunk),
-                    []
-                )
-            )
-        })
-    ctx.subscriptions.add(
-        sourcegraph.languages.registerReferenceProvider(documentSelector, {
-            provideReferences: (doc, pos, ctx) => observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
-        })
-    )
+            })
+        )
 
-    // Implementations
-    ctx.subscriptions.add(
-        sourcegraph.languages.registerImplementationProvider(documentSelector, {
-            provideImplementation: (textDocument, position) =>
-                tracePromise('Provide implementations', tracer, undefined, async span => {
-                    inActiveUse = true
+        // Definition
+        const provideDefinition = abortPrevious(
+            (textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
+                traceAsyncGenerator('Provide definition', tracer, undefined, async function*(span) {
                     if (canGenerateTraceUrl(span)) {
-                        logger.log('Implementation trace', span.generateTraceURL())
+                        logger.log('Definition trace', span.generateTraceURL())
                     }
                     const textDocumentUri = new URL(textDocument.uri)
                     const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
                     const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
                     const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                    const implementationParams: TextDocumentPositionParams = {
-                        textDocument: { uri: serverTextDocumentUri.href },
-                        position,
+                    // Poll server to get updated contents when e.g. dependency installation finished
+                    while (true) {
+                        const definitionResult = await sendTracedRequest(
+                            connection,
+                            DefinitionRequest.type,
+                            {
+                                textDocument: { uri: serverTextDocumentUri.href },
+                                position,
+                            },
+                            { span, tracer, token }
+                        )
+                        rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
+                        yield convertLocations(definitionResult)
+                        await delayPromise(HOVER_DEF_POLL_INTERVAL)
                     }
-                    const implementationResult = await sendTracedRequest(
-                        connection,
-                        ImplementationRequest.type,
-                        implementationParams,
-                        { span, tracer, token }
+                })
+        )
+        providers.add(
+            sourcegraph.languages.registerDefinitionProvider(documentSelector, {
+                provideDefinition: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
+                    observableFromAsyncIterable(provideDefinition(textDocument, position))
+                ),
+            })
+        )
+
+        // References
+        const provideReferences = (
+            textDocument: sourcegraph.TextDocument,
+            position: sourcegraph.Position,
+            context: sourcegraph.ReferenceContext
+        ): AsyncIterable<sourcegraph.Location[]> =>
+            traceAsyncGenerator('Provide references', tracer, undefined, async function*(span) {
+                if (canGenerateTraceUrl(span)) {
+                    logger.log('References trace', span.generateTraceURL())
+                }
+                const textDocumentUri = new URL(textDocument.uri)
+                const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+
+                const connection = await getOrCreateConnection(serverRootUri, { span, token })
+
+                const findLocalReferences = () =>
+                    traceAsyncGenerator('Find local references', tracer, span, async function*(span) {
+                        logger.log('Searching for same-repo references')
+                        const localReferences = asArray(
+                            await sendTracedRequest(
+                                connection,
+                                ReferencesRequest.type,
+                                {
+                                    textDocument: { uri: serverTextDocumentUri.href },
+                                    position,
+                                    context,
+                                },
+                                { span, tracer, token }
+                            )
+                        )
+                        logger.log(`Found ${localReferences.length} same-repo references`)
+                        yield localReferences
+                    })
+
+                const findExternalReferences = () =>
+                    traceAsyncGenerator('Find external references', tracer, span, async function*(span) {
+                        try {
+                            logger.log('Getting canonical definition for cross-repo references')
+                            const definition: Location | undefined = asArray(
+                                await sendTracedRequest(
+                                    connection,
+                                    DefinitionRequest.type,
+                                    {
+                                        textDocument: { uri: serverTextDocumentUri.href },
+                                        position,
+                                    },
+                                    { span, tracer, token }
+                                )
+                            )[0]
+                            if (!definition) {
+                                return
+                            }
+                            span.setTag('uri', redact(definition.uri))
+                            span.setTag('line', definition.range.start.line)
+
+                            const findPackageDependents =
+                                clientSgEndpoint.url.hostname === 'sourcegraph.com'
+                                    ? findPackageDependentsWithNpm
+                                    : findPackageDependentsWithSourcegraphSearch
+
+                            logger.log(`Getting external references for definition`, definition)
+
+                            const definitionUri = new URL(definition.uri)
+
+                            const referenceParams: ReferenceParams = {
+                                textDocument: { uri: definitionUri.href },
+                                position: definition.range.start,
+                                context: { includeDeclaration: false },
+                            }
+
+                            // The definition returned by the server points to the server endpoint, rewrite to the client endpoint
+                            const clientDefinitionUrl = new URL(definitionUri.href)
+                            clientDefinitionUrl.protocol = clientSgEndpoint.url.protocol
+                            clientDefinitionUrl.host = clientSgEndpoint.url.host
+                            const packageName = await findPackageName(clientDefinitionUrl, { logger, tracer, span })
+
+                            // Find dependent packages on the package
+                            const dependents =
+                                packageName === 'sourcegraph'
+                                    ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
+                                      // Extensions are not published to npm, so search the extension registry
+                                      findDependentsWithSourcegraphExtensionRegistry(clientSgEndpoint, {
+                                          logger,
+                                          tracer,
+                                          span,
+                                      })
+                                    : findPackageDependents(packageName, clientSgEndpoint, { logger, tracer, span })
+
+                            // Search for references in each dependent
+                            const findExternalRefsInDependent = (repoName: string) =>
+                                traceAsyncGenerator(
+                                    'Find external references in dependent',
+                                    tracer,
+                                    span,
+                                    async function*(span) {
+                                        try {
+                                            logger.log(`Looking for external references in dependent repo ${repoName}`)
+                                            span.setTag('repoName', repoName)
+                                            const commitID = await resolveRev(repoName, 'HEAD', clientSgEndpoint, {
+                                                span,
+                                                tracer,
+                                            })
+                                            const rootUri = new URL(
+                                                `${repoName}@${commitID}/-/raw/`,
+                                                serverSgEndpoint.url
+                                            )
+                                            if (serverSgEndpoint.accessToken) {
+                                                rootUri.username = serverSgEndpoint.accessToken
+                                            }
+
+                                            yield await withTempConnection(
+                                                rootUri,
+                                                { span, token },
+                                                async connection => {
+                                                    const references = asArray(
+                                                        await sendTracedRequest(
+                                                            connection,
+                                                            ReferencesRequest.type,
+                                                            referenceParams,
+                                                            {
+                                                                span,
+                                                                tracer,
+                                                                token,
+                                                            }
+                                                        )
+                                                    )
+                                                    logger.log(
+                                                        `Found ${
+                                                            references.length
+                                                        } references in dependent repo ${repoName}`
+                                                    )
+                                                    // Only include references in the external repo, do not duplicate references in the same repo
+                                                    return references.filter(location =>
+                                                        location.uri.startsWith(rootUri.href)
+                                                    )
+                                                }
+                                            )
+                                        } catch (err) {
+                                            throwIfAbortError(err)
+                                            logErrorEvent(span, err)
+                                            logger.error(
+                                                `Error searching dependent repo ${repoName} for references`,
+                                                err
+                                            )
+                                        }
+                                    }
+                                )
+                            yield* flatMapConcurrent(dependents, EXTERNAL_REFS_CONCURRENCY, findExternalRefsInDependent)
+                            logger.log('Done going through dependents')
+                        } catch (err) {
+                            logger.error('Could not find external references', err)
+                        }
+                    })
+
+                yield* merge(findLocalReferences(), findExternalReferences()).pipe(
+                    // Same-repo references
+                    // Cross-repo references
+                    // Find canonical source location
+                    filter(chunk => chunk.length > 0),
+                    tap({
+                        next: chunk => {
+                            span.log({ event: 'chunk', count: chunk.length })
+                        },
+                    }),
+                    // Rewrite URIs and convert from LSP to Sourcegraph Location
+                    map(chunk =>
+                        chunk
+                            .map(location => {
+                                try {
+                                    return convertLocation({
+                                        ...location,
+                                        uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
+                                    })
+                                } catch (err) {
+                                    return undefined
+                                }
+                            })
+                            .filter((location): location is Exclude<typeof location, undefined> => !!location)
+                    ),
+                    // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
+                    scan<sourcegraph.Location[], sourcegraph.Location[]>(
+                        (allReferences, chunk) => allReferences.concat(chunk),
+                        []
                     )
-                    rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
-                    return convertLocations(implementationResult)
-                }),
-        })
-    )
+                )
+            })
+        providers.add(
+            sourcegraph.languages.registerReferenceProvider(documentSelector, {
+                provideReferences: (doc, pos, ctx) => observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
+            })
+        )
+
+        // Implementations
+        providers.add(
+            sourcegraph.languages.registerImplementationProvider(documentSelector, {
+                provideImplementation: (textDocument, position) =>
+                    tracePromise('Provide implementations', tracer, undefined, async span => {
+                        if (canGenerateTraceUrl(span)) {
+                            logger.log('Implementation trace', span.generateTraceURL())
+                        }
+                        const textDocumentUri = new URL(textDocument.uri)
+                        const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                        const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+                        const connection = await getOrCreateConnection(serverRootUri, { span, token })
+                        const implementationParams: TextDocumentPositionParams = {
+                            textDocument: { uri: serverTextDocumentUri.href },
+                            position,
+                        }
+                        const implementationResult = await sendTracedRequest(
+                            connection,
+                            ImplementationRequest.type,
+                            implementationParams,
+                            { span, tracer, token }
+                        )
+                        rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
+                        return convertLocations(implementationResult)
+                    }),
+            })
+        )
+    }
 }
 
 // Learn what else is possible by visiting the [Sourcegraph extension documentation](https://github.com/sourcegraph/sourcegraph-extension-docs)

@@ -2,11 +2,17 @@ import { flatMap, share } from 'ix/asynciterable'
 import { MergeAsyncIterable } from 'ix/asynciterable/merge'
 import { noop } from 'lodash'
 import { Observable } from 'rxjs'
+import * as sourcegraph from 'sourcegraph'
 
 export interface SourcegraphEndpoint {
     url: URL
     accessToken?: string
 }
+
+export const areProviderParamsEqual = (
+    [doc1, pos1]: [sourcegraph.TextDocument, sourcegraph.Position],
+    [doc2, pos2]: [sourcegraph.TextDocument, sourcegraph.Position]
+): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
 
 export const isAbortError = (val: any) => typeof val === 'object' && val !== null && val.name === 'AbortError'
 
@@ -46,7 +52,7 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
         return () => {
             unsubscribed = true
             if (!iteratorDone && iterator.throw) {
-                iterator.throw(createAbortError()).catch(err => {
+                iterator.throw(createAbortError()).catch(() => {
                     // ignore
                 })
             }
