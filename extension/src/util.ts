@@ -92,7 +92,7 @@ export const asArray = <T>(val: T[] | T | null): T[] => (!val ? [] : Array.isArr
 export function distinctUntilChanged<P extends any[], R>(
     compare: (a: P, b: P) => boolean,
     fn: (...args: P) => R
-): ((...args: P) => R) {
+): (...args: P) => R {
     let previousResult: R
     let previousArgs: P
     return (...args) => {
