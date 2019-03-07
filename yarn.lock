@@ -4074,17 +4074,17 @@ levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-lightstep-tracer@^0.20.13:
-  version "0.20.13"
-  resolved "https://registry.npmjs.org/lightstep-tracer/-/lightstep-tracer-0.20.13.tgz#7527e24a344f3fae6ea3e46f5fdcd8105e6fab6d"
-  integrity sha512-bwcMK62y8RxmK96+zp2wlHeq+PYQZFjvlBQKPk3VfcHUlp20g8oSkYeJ8/b42MYpNA2j+w7dgkOV8AJgHw7siA==
+lightstep-tracer@^0.21.0:
+  version "0.21.1"
+  resolved "https://registry.npmjs.org/lightstep-tracer/-/lightstep-tracer-0.21.1.tgz#2df122a056d259858eeae14eb24fc4df66325139"
+  integrity sha512-5rH+ZwvTSgOe9/ZQ+IP8U9iNxfm+zknuaL/Us64FHck9qeAiEGMGWMxzXPiEYXrhsAkS5w0jGKU407tHnPB+PQ==
   dependencies:
     async "1.5.0"
     eventemitter3 "1.1.1"
     google-protobuf "3.6.1"
     hex2dec "1.0.1"
     source-map-support "0.3.3"
-    thrift "0.10.0"
+    thrift "0.11.0"
 
 lnfs-cli@^2.1.0:
   version "2.1.0"
@@ -4548,6 +4548,11 @@ node-forge@^0.7.1:
   version "0.7.6"
   resolved "https://registry.npmjs.org/node-forge/-/node-forge-0.7.6.tgz#fdf3b418aee1f94f0ef642cd63486c77ca9724ac"
   integrity sha512-sol30LUpz1jQFBjOKwbjxijiE3b6pjd74YwfD0fJOKPjF+fONKb2Yg8rYgS6+bK6VDl+/wfr4IYpC7jDzLUIfw==
+
+node-int64@^0.4.0:
+  version "0.4.0"
+  resolved "https://registry.npmjs.org/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
+  integrity sha1-h6kGXNs1XTGC2PlM4RGIuCXGijs=
 
 node-int64@~0.3.0:
   version "0.3.3"
@@ -5662,7 +5667,7 @@ q@1.0.x:
   resolved "https://registry.npmjs.org/q/-/q-1.0.1.tgz#11872aeedee89268110b10a718448ffb10112a14"
   integrity sha1-EYcq7t7okmgRCxCnGESP+xARKhQ=
 
-q@^1.1.2:
+q@^1.1.2, q@^1.5.0:
   version "1.5.1"
   resolved "https://registry.npmjs.org/q/-/q-1.5.1.tgz#7e32f75b41381291d04611f1bf14109ac00651d7"
   integrity sha1-fjL3W0E4EpHQRhHxvxQQmsAGUdc=
@@ -6663,6 +6668,15 @@ thrift@0.10.0:
     q "1.0.x"
     ws "~0.4.32"
 
+thrift@0.11.0:
+  version "0.11.0"
+  resolved "https://registry.npmjs.org/thrift/-/thrift-0.11.0.tgz#256115e4ff87871e12537f4b510bd2b425e13990"
+  integrity sha1-JWEV5P+Hhx4SU39LUQvStCXhOZA=
+  dependencies:
+    node-int64 "^0.4.0"
+    q "^1.5.0"
+    ws ">= 2.2.3"
+
 through2@^2.0.0, through2@~2.0.3:
   version "2.0.5"
   resolved "https://registry.npmjs.org/through2/-/through2-2.0.5.tgz#01c1e39eb31d07cb7d03a96a70823260b23132cd"
@@ -7234,7 +7248,7 @@ wrappy@1:
   resolved "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz#b5243d8f3ec1aa35f1364605bc0d1036e30ab69f"
   integrity sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=
 
-ws@^5.1.1, ws@^5.2.0:
+"ws@>= 2.2.3", ws@^5.1.1, ws@^5.2.0:
   version "5.2.2"
   resolved "https://registry.npmjs.org/ws/-/ws-5.2.2.tgz#dffef14866b8e8dc9133582514d1befaf96e980f"
   integrity sha512-jaHFD6PFv6UgoIVda6qZllptQsMlDEJkTQcybzzXDYM1XO9Y8em691FGMPmM46WGyLU4z9KMgQN+qrux/nhlHA==
