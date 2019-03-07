@@ -517,7 +517,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     const connection = await getOrCreateConnection(serverRootUri, { span, token })
                     // Poll server to get updated contents when e.g. dependency installation finished
                     while (true) {
-                        const definitionResult = await sendTracedRequest(
+                        const definitionResult = (await sendTracedRequest(
                             connection,
                             DefinitionRequest.type,
                             {
@@ -525,7 +525,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                                 position,
                             },
                             { span, tracer, token }
-                        )
+                        )) as Location[] | Location | null
                         rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
                         yield convertLocations(definitionResult)
                         await delayPromise(HOVER_DEF_POLL_INTERVAL)
@@ -579,17 +579,15 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     traceAsyncGenerator('Find external references', tracer, span, async function*(span) {
                         try {
                             logger.log('Getting canonical definition for cross-repo references')
-                            const definition: Location | undefined = asArray(
-                                await sendTracedRequest(
-                                    connection,
-                                    DefinitionRequest.type,
-                                    {
-                                        textDocument: { uri: serverTextDocumentUri.href },
-                                        position,
-                                    },
-                                    { span, tracer, token }
-                                )
-                            )[0]
+                            const definition: Location | undefined = asArray((await sendTracedRequest(
+                                connection,
+                                DefinitionRequest.type,
+                                {
+                                    textDocument: { uri: serverTextDocumentUri.href },
+                                    position,
+                                },
+                                { span, tracer, token }
+                            )) as Location[] | Location | null)[0]
                             if (!definition) {
                                 return
                             }
@@ -749,12 +747,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                             textDocument: { uri: serverTextDocumentUri.href },
                             position,
                         }
-                        const implementationResult = await sendTracedRequest(
+                        const implementationResult = (await sendTracedRequest(
                             connection,
                             ImplementationRequest.type,
                             implementationParams,
                             { span, tracer, token }
-                        )
+                        )) as Location[] | Location | null
                         rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
                         return convertLocations(implementationResult)
                     }),
