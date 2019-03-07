@@ -59,6 +59,7 @@ import {
     WindowProgressClientCapabilities,
     WindowProgressNotification,
 } from './protocol.progress.proposed'
+import { fetchResource } from './resources'
 import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
 import {
     parseSourcegraphRawUrl,
@@ -343,24 +344,33 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             })
             logger.log('TypeScript backend initialized')
             // Tell language server about all currently open text documents under this root
-            for (const textDocument of sourcegraph.workspace.textDocuments) {
-                if (!isTypeScriptFile(new URL(textDocument.uri))) {
-                    continue
-                }
-                const serverTextDocumentUri = toServerTextDocumentUri(new URL(textDocument.uri), serverSgEndpoint)
-                if (!serverTextDocumentUri.href.startsWith(rootUri.href)) {
-                    continue
-                }
-                const didOpenParams: DidOpenTextDocumentParams = {
-                    textDocument: {
-                        uri: serverTextDocumentUri.href,
-                        languageId: textDocument.languageId,
-                        text: textDocument.text,
-                        version: 1,
-                    },
-                }
-                connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
-            }
+            await Promise.all(
+                sourcegraph.workspace.textDocuments.map(async textDocument => {
+                    const textDocumentUri = new URL(textDocument.uri)
+                    if (!isTypeScriptFile(textDocumentUri)) {
+                        return
+                    }
+                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+                    if (!serverTextDocumentUri.href.startsWith(rootUri.href)) {
+                        return
+                    }
+                    const text =
+                        textDocument.text ||
+                        (await fetchResource(toServerTextDocumentUri(textDocumentUri, clientSgEndpoint), {
+                            span,
+                            tracer,
+                        }))
+                    const didOpenParams: DidOpenTextDocumentParams = {
+                        textDocument: {
+                            uri: serverTextDocumentUri.href,
+                            languageId: textDocument.languageId,
+                            text,
+                            version: 1,
+                        },
+                    }
+                    connection.sendNotification(DidOpenTextDocumentNotification.type, didOpenParams)
+                })
+            )
             return connection
         })
     }
@@ -439,7 +449,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         textDocument: {
                             uri: serverTextDocumentUri.href,
                             languageId: textDocument.languageId,
-                            text: textDocument.text,
+                            text:
+                                textDocument.text ||
+                                (await fetchResource(toServerTextDocumentUri(textDocumentUri, clientSgEndpoint), {
+                                    span,
+                                    tracer,
+                                })),
                             version: 1,
                         },
                     }
@@ -729,14 +744,18 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             })
         providers.add(
             sourcegraph.languages.registerReferenceProvider(documentSelector, {
-                provideReferences: (doc, pos, ctx) => observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
+                provideReferences: (
+                    doc: sourcegraph.TextDocument,
+                    pos: sourcegraph.Position,
+                    ctx: sourcegraph.ReferenceContext
+                ) => observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
             })
         )
 
         // Implementations
         providers.add(
             sourcegraph.languages.registerImplementationProvider(documentSelector, {
-                provideImplementation: (textDocument, position) =>
+                provideImplementation: (textDocument: sourcegraph.TextDocument, position: sourcegraph.Position) =>
                     tracePromise('Provide implementations', tracer, undefined, async span => {
                         if (canGenerateTraceUrl(span)) {
                             logger.log('Implementation trace', span.generateTraceURL())
