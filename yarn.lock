@@ -1277,7 +1277,7 @@ async-limiter@~1.0.0:
 
 async@1.5.0:
   version "1.5.0"
-  resolved "http://registry.npmjs.org/async/-/async-1.5.0.tgz#2796642723573859565633fc6274444bee2f8ce3"
+  resolved "https://registry.npmjs.org/async/-/async-1.5.0.tgz#2796642723573859565633fc6274444bee2f8ce3"
   integrity sha1-J5ZkJyNXOFlWVjP8YnRES+4vjOM=
 
 asynckit@^0.4.0:
@@ -1863,7 +1863,7 @@ commander@^2.10.0, commander@^2.11.0, commander@^2.12.1, commander@^2.19.0, comm
 
 commander@~2.1.0:
   version "2.1.0"
-  resolved "http://registry.npmjs.org/commander/-/commander-2.1.0.tgz#d121bbae860d9992a3d517ba96f56588e47c6781"
+  resolved "https://registry.npmjs.org/commander/-/commander-2.1.0.tgz#d121bbae860d9992a3d517ba96f56588e47c6781"
   integrity sha1-0SG7roYNmZKj1Re6lvVliOR8Z4E=
 
 commander@~2.17.1:
@@ -3287,7 +3287,7 @@ hex-color-regex@^1.1.0:
 
 hex2dec@1.0.1:
   version "1.0.1"
-  resolved "http://registry.npmjs.org/hex2dec/-/hex2dec-1.0.1.tgz#949bb33f1fdbbeab20e06403a00fc7d5ff284207"
+  resolved "https://registry.npmjs.org/hex2dec/-/hex2dec-1.0.1.tgz#949bb33f1fdbbeab20e06403a00fc7d5ff284207"
   integrity sha1-lJuzPx/bvqsg4GQDoA/H1f8oQgc=
 
 highlight.js@^9.13.1:
@@ -4493,7 +4493,7 @@ nan@^2.9.2:
 
 nan@~1.0.0:
   version "1.0.0"
-  resolved "http://registry.npmjs.org/nan/-/nan-1.0.0.tgz#ae24f8850818d662fcab5acf7f3b95bfaa2ccf38"
+  resolved "https://registry.npmjs.org/nan/-/nan-1.0.0.tgz#ae24f8850818d662fcab5acf7f3b95bfaa2ccf38"
   integrity sha1-riT4hQgY1mL8q1rPfzuVv6oszzg=
 
 nanomatch@^1.2.9:
@@ -7257,7 +7257,7 @@ ws@^6.1.0:
 
 ws@~0.4.32:
   version "0.4.32"
-  resolved "http://registry.npmjs.org/ws/-/ws-0.4.32.tgz#787a6154414f3c99ed83c5772153b20feb0cec32"
+  resolved "https://registry.npmjs.org/ws/-/ws-0.4.32.tgz#787a6154414f3c99ed83c5772153b20feb0cec32"
   integrity sha1-eHphVEFPPJntg8V3IVOyD+sM7DI=
   dependencies:
     commander "~2.1.0"
