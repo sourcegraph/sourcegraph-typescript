@@ -24,8 +24,8 @@ import { IterableX } from 'ix/iterable'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
-import { realpathSync } from 'mz/fs'
 import * as fs from 'mz/fs'
+import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT, SPAN_KIND_RPC_SERVER } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
@@ -53,6 +53,7 @@ import {
     InitializeRequest,
     InitializeResult,
     Location,
+    LocationLink,
     PublishDiagnosticsNotification,
     PublishDiagnosticsParams,
     Range,
@@ -928,7 +929,7 @@ webSocketServer.on('connection', connection => {
      * @param definition One or multiple locations on the file system.
      */
     async function mapFileLocations(
-        definition: Definition,
+        definition: Location | Location[] | null,
         { token }: { token: CancellationToken }
     ): Promise<Definition> {
         if (!definition) {
@@ -959,14 +960,16 @@ webSocketServer.on('connection', connection => {
      * It blocks on dependency installation if needed.
      * The returned locations get mapped to HTTP URLs and potentially to external repository URLs if they are in node_modules.
      */
-    function forwardLocationRequests<P extends TextDocumentPositionParams>(type: RequestType<P, Definition>): void {
+    function forwardLocationRequests<P extends TextDocumentPositionParams>(
+        type: RequestType<P, Location | Location[] | LocationLink[] | null>
+    ): void {
         dispatcher.setRequestHandler(type, async (params, token, span) => {
             const mappedParams = await mapTextDocumentPositionParams(params, { span, token })
             const fileUri = new URL(mappedParams.textDocument.uri)
             // The TypeScript language server cannot service requests for documents that were not opened first
             await openTextDocument(fileUri)
             const result = await mapFileLocations(
-                await sendServerRequest(type, mappedParams, { tracer, span, token }),
+                (await sendServerRequest(type, mappedParams, { tracer, span, token })) as Location | Location[] | null,
                 { token }
             )
             return result
