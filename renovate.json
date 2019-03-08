@@ -5,12 +5,9 @@
   "lockFileMaintenance": {
     "enabled": false
   },
-  "force": {
-    "rangeStrategy": "lockfile-update"
-  },
+  "rangeStrategy": "bump",
   "postUpdateOptions": ["yarnDedupeFewer"],
   "masterIssue": true,
-  "schedule": [],
   "semanticCommits": false,
   "docker": {
     "enabled": true,
