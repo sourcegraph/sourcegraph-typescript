@@ -355,7 +355,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     textDocument: {
                         uri: serverTextDocumentUri.href,
                         languageId: textDocument.languageId,
-                        text: textDocument.text,
+                        text: textDocument.text || '',
                         version: 1,
                     },
                 }
@@ -439,7 +439,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         textDocument: {
                             uri: serverTextDocumentUri.href,
                             languageId: textDocument.languageId,
-                            text: textDocument.text,
+                            text: textDocument.text || '',
                             version: 1,
                         },
                     }
