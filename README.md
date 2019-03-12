@@ -8,6 +8,74 @@ This extension is configured to talk to a language server over WebSockets. If yo
 private Sourcegraph instance, you should run your own language server. The server is available as a
 Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
+### 🔐 Secure deployment 🔐
+
+If you have private code, we recommend deploying the language server behind an
+auth proxy (such as the example below using HTTP basic authentication in NGINX), a firewall, or a VPN.
+
+### HTTP basic authentication
+
+You can prevent unauthorized access to the language server by enforcing HTTP basic authentication in nginx, which comes with the sourcegraph/server image. At a high level, you'll create a secret then put it in both the nginx config and in your Sourcegraph global settings so that logged-in users are authenticated when their browser makes requests to the TypeScript language server.
+
+Here's how to set it up:
+
+Create an `.htpasswd` file in the Sourcegraph config directory with one entry:
+
+```
+$ htpasswd -c ~/.sourcegraph/config/.htpasswd langserveruser
+New password:
+Re-type new password:
+Adding password for user langserveruser
+```
+
+Add a location directive the [nginx.conf](https://docs.sourcegraph.com/admin/nginx) that will route requests to the TypeScript language server:
+
+```nginx
+...
+http {
+    ...
+    server {
+        ...
+        location / {
+            ...
+        }
+
+        location /typescript {
+            proxy_pass http://host.docker.internal:8080;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "Upgrade";
+
+            auth_basic "basic authentication is required to access the language server";
+            auth_basic_user_file /etc/sourcegraph/.htpasswd;
+        }
+    }
+}
+```
+
+- If you're running the quickstart on Linux, change `host.docker.internal` to the output of `ip addr show docker0 | grep -Po 'inet \K[\d.]+'`.
+- If you're using [Kubernetes](#using-kubernetes) (e.g. [deploy-sourcegraph](https://github.com/sourcegraph/deploy-sourcegraph)), change `host.docker.internal` to `lang-typescript`.
+
+Add these to your Sourcegraph global settings:
+
+```
+  "typescript.serverUrl": "ws://langserveruser:PASSWORD@host.docker.internal:7080/typescript",
+  "typescript.sourcegraphUrl": "http://host.docker.internal:7080",
+```
+
+Fill in the `PASSWORD` that you created above.
+
+- If you're running the quickstart on Linux, change `host.docker.internal` to the output of `ip addr show docker0 | grep -Po 'inet \K[\d.]+'`.
+- If you're using [Kubernetes](#using-kubernetes) (e.g. [deploy-sourcegraph](https://github.com/sourcegraph/deploy-sourcegraph)):
+  - `typescript.serverUrl` is the address of the TypeScript language server from the perspective of a user's browser (e.g. https://sourcegraph.example.com/typescript)
+  - `typescript.sourcegraphUrl` is the address of the Sourcegraph instance from the perspective of the TypeScript language server (e.g. http://sourcegraph-frontend:30080)
+
+Finally, restart the sourcegraph/server container (or nginx deployment if deployed to Kubernetes) to pick up the configuration change.
+
+After deploying the language server, unauthenticated access to `http://localhost:7080/typescript` (or https://sourcegraph.example.com/typescript) should be blocked, but code intelligence should work when you're logged in.
+
+You can always revoke the `PASSWORD` by deleting the `.htpasswd` file and restarting nginx.
+
 ### Using Docker
 
 1.  Run the server listening on `ws://localhost:8080`:

@@ -38,6 +38,18 @@
           "iconURL": "https://raw.githubusercontent.com/remojansen/logo.ts/5b4f0df433a5301aee0180582a8782bfbc9a0739/ts.svg?sanitize=true",
           "pressed": "config.typescript.enable"
         }
+      },
+      {
+        "id": "impreciseResults",
+        "title": "Imprecise results",
+        "command": "open",
+        "commandArguments": [
+          "https://sourcegraph.com/extensions/sourcegraph/typescript"
+        ],
+        "actionItem": {
+          "label": "Imprecise results",
+          "description": "These locations are computed using heuristics. Use the TypeScript language server for precise results."
+        }
       }
     ],
     "menus": {
@@ -46,7 +58,13 @@
           "action": "typescript.toggle"
         }
       ],
-      "commandPalette": []
+      "commandPalette": [],
+      "panel/toolbar": [
+        {
+          "action": "impreciseResults",
+          "when": "isImprecise"
+        }
+      ]
     },
     "configuration": {
       "title": "LangTypescriptConfiguration",
@@ -178,7 +196,7 @@
     "yarn-deduplicate": "^1.1.1"
   },
   "dependencies": {
-    "@sourcegraph/basic-code-intel": "6.0.5",
+    "@sourcegraph/basic-code-intel": "^6.0.7",
     "@sourcegraph/lightstep-tracer-webworker": "^0.20.14-fork.3",
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
@@ -206,7 +224,7 @@
     "semver": "^5.6.0",
     "source-map": "^0.7.3",
     "source-map-support": "^0.5.9",
-    "sourcegraph": "^22.0.0",
+    "sourcegraph": "^23.0.0",
     "tagged-template-noop": "^2.1.0",
     "tail": "^2.0.1",
     "tar": "^4.4.8",
