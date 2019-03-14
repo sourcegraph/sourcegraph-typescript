@@ -41,14 +41,14 @@
       },
       {
         "id": "impreciseResults",
-        "title": "Imprecise results",
+        "title": "References: Search mode",
         "command": "open",
         "commandArguments": [
           "https://sourcegraph.com/extensions/sourcegraph/typescript"
         ],
         "actionItem": {
-          "label": "Imprecise results",
-          "description": "These locations are computed using heuristics. Use the TypeScript language server for precise results."
+          "label": "References: Search mode",
+          "description": "Results come from text search and heuristics. To use a language server for precise results, click to go to the README and follow the deployment instructions."
         }
       }
     ],
