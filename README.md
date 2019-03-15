@@ -105,7 +105,7 @@ You can always revoke the `PASSWORD` by deleting the `.htpasswd` file and restar
 
     The port should match that of the `docker run` command running Sourcegraph.
 
-### TLS in Docker
+#### TLS in Docker
 To enable the use of Websocket with SSL pass the key/certificate pair as environment variables to the docker container. 
 
 ```
