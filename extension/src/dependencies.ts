@@ -186,7 +186,7 @@ export async function findClosestPackageJson(
             rootUri = new URL(rootUri.href)
             rootUri.username = ''
             while (true) {
-                if (!parent.href.startsWith(rootUri.href)) {
+                if (!parent.href.startsWith(rootUri.href) || parent.href === rootUri.href) {
                     throw new Error(`No package.json found for ${resource} under root ${rootUri}`)
                 }
                 const packageJsonUri = new URL('package.json', parent.href)
