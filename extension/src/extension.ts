@@ -732,32 +732,53 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         )
 
         // Implementations
+        const IMPL_ID = 'ts.impl' // implementations panel and provider ID
+        const provideImpls = (
+            textDocument: sourcegraph.TextDocument,
+            position: sourcegraph.Position
+        ): Promise<sourcegraph.Location[] | null> =>
+            tracePromise('Provide implementations', tracer, undefined, async span => {
+                if (canGenerateTraceUrl(span)) {
+                    logger.log('Implementation trace', span.generateTraceURL())
+                }
+                const textDocumentUri = new URL(textDocument.uri)
+                const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+                const connection = await getOrCreateConnection(serverRootUri, { span, token })
+                const implementationParams: TextDocumentPositionParams = {
+                    textDocument: { uri: serverTextDocumentUri.href },
+                    position,
+                }
+                const implementationResult = (await sendTracedRequest(
+                    connection,
+                    ImplementationRequest.type,
+                    implementationParams,
+                    { span, tracer, token }
+                )) as Location[] | Location | null
+                rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
+                return convertLocations(implementationResult)
+            })
+        // Use both old registerImplementationProvider (pre-3.2) and registerLocationProvider (3.2+)
+        // for backcompat and forward-compat. This yields a deprecation console.warn on 3.2+. It is
+        // not possible to just use registerLocationProvider without breaking this functionality
+        // because of the bug fixed in 3.2 by https://github.com/sourcegraph/sourcegraph/pull/2733
+        // affects pre-3.2 versions. The registerImplementationProvider call can be removed when
+        // supporting backcompat for pre-3.2 is no longer needed.
         providers.add(
             sourcegraph.languages.registerImplementationProvider(documentSelector, {
-                provideImplementation: (textDocument, position) =>
-                    tracePromise('Provide implementations', tracer, undefined, async span => {
-                        if (canGenerateTraceUrl(span)) {
-                            logger.log('Implementation trace', span.generateTraceURL())
-                        }
-                        const textDocumentUri = new URL(textDocument.uri)
-                        const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-                        const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
-                        const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                        const implementationParams: TextDocumentPositionParams = {
-                            textDocument: { uri: serverTextDocumentUri.href },
-                            position,
-                        }
-                        const implementationResult = (await sendTracedRequest(
-                            connection,
-                            ImplementationRequest.type,
-                            implementationParams,
-                            { span, tracer, token }
-                        )) as Location[] | Location | null
-                        rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
-                        return convertLocations(implementationResult)
-                    }),
+                provideImplementation: provideImpls,
             })
         )
+        providers.add(
+            sourcegraph.languages.registerLocationProvider(IMPL_ID, documentSelector, {
+                provideLocations: provideImpls,
+            })
+        )
+        const panelView = sourcegraph.app.createPanelView(IMPL_ID)
+        panelView.title = 'Implementations'
+        panelView.component = { locationProvider: IMPL_ID }
+        panelView.priority = 160
+        providers.add(panelView)
     }
 }
 
