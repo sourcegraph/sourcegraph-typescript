@@ -62,7 +62,7 @@
       "panel/toolbar": [
         {
           "action": "impreciseResults",
-          "when": "isImprecise"
+          "when": "isImprecise && panel.activeView.hasLocations"
         }
       ]
     },
