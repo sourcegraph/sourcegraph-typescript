@@ -246,7 +246,7 @@ webSocketServer.on('connection', connection => {
     // yarn folders
     let globalFolderRoot: string
     let cacheFolderRoot: string
-    /** HTTP URIs for directories in the workspace that contain a package.json */
+    /** HTTP URIs for directories in the workspace that contain a package.json (and are not inside node_modules) */
     let packageRootUris: URLSet
     /** Map from HTTP URI for directory of package.json to Promise for its installation */
     const dependencyInstallationPromises = new URLMap<Promise<void>>()
@@ -599,6 +599,7 @@ webSocketServer.on('connection', connection => {
         ])
 
         // Fetch tar and extract into temp folder
+        /** Detected paths to package.jsons (that are not in node_modules) */
         const packageJsonPaths: string[] = []
         logger.info('Fetching archive from', httpRootUri.href)
         logger.log('Extracting to', extractPath)
@@ -636,8 +637,9 @@ webSocketServer.on('connection', connection => {
                         .on('entry', (entry: FileStat) => {
                             if (
                                 entry.header.path &&
-                                !entry.header.path.split('/').includes('node_modules') &&
-                                entry.header.path.endsWith('package.json')
+                                entry.header.path.endsWith('package.json') &&
+                                // Make sure to not capture package.json inside checked-in node_modules
+                                !entry.header.path.split('/').includes('node_modules')
                             ) {
                                 packageJsonPaths.push(entry.header.path)
                             }
