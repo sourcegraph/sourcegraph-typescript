@@ -634,7 +634,11 @@ webSocketServer.on('connection', connection => {
                         })
                         .pipe(extract({ cwd: extractPath, filter: isTypeScriptFile }))
                         .on('entry', (entry: FileStat) => {
-                            if (entry.header.path && entry.header.path.endsWith('package.json')) {
+                            if (
+                                entry.header.path &&
+                                !entry.header.path.split('/').includes('node_modules') &&
+                                entry.header.path.endsWith('package.json')
+                            ) {
                                 packageJsonPaths.push(entry.header.path)
                             }
                         })
