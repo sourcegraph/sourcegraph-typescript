@@ -157,7 +157,7 @@ export function* walkUp(start: URL): Iterable<URL> {
     let current = new URL('.', start)
     while (true) {
         yield current
-        const parent = new URL('..', start)
+        const parent = new URL('..', current)
         if (parent.href === current.href) {
             // Reached root
             return
