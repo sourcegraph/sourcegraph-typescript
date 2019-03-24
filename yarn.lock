@@ -714,14 +714,15 @@
   resolved "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz#9a06f4f137ee84d7df0460c1fdb1135ffa6c50fd"
   integrity sha512-ONhaKPIufzzrlNbqtWFFd+jlnemX6lJAgq9ZeiZtS7I1PIf/la7CW4m83rTXRnVnsMbW2k56pGYu7AUFJD9Pow==
 
-"@sourcegraph/basic-code-intel@^6.0.7":
-  version "6.0.7"
-  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.7.tgz#6ba8623c1c5e71f780a059ccea2120ffdc1e3600"
-  integrity sha512-+amGIq54N3aVOj7AxNtW6QtDfUVvtT253Ha+i9sofyo217L/7Ucwo/WoDGuded9Ng9FUxUM6UOS3MREW+lkUGQ==
+"@sourcegraph/basic-code-intel@^6.0.12":
+  version "6.0.12"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.12.tgz#5d6c1a301c73a19bf28f6d25b5f4846cc3db844f"
+  integrity sha512-G8IUx29UV1asiU3SZ3AMYKlZSZxX63nC7IR4ux+Jd+TBg2OW9WrRKOEaYKp2MWlwyWBc7Dpix3hv6GqMSMJNyA==
   dependencies:
     lodash "^4.17.11"
     rxjs "^6.3.3"
     sourcegraph "^23.0.0"
+    sprintf-js "^1.1.2"
 
 "@sourcegraph/lightstep-tracer-webworker@^0.20.14-fork.3":
   version "0.20.14-fork.3"
@@ -5056,6 +5057,11 @@ path-browserify@0.0.0:
   resolved "https://registry.npmjs.org/path-browserify/-/path-browserify-0.0.0.tgz#a0b870729aae214005b7d5032ec2cbbb0fb4451a"
   integrity sha1-oLhwcpquIUAFt9UDLsLLuw+0RRo=
 
+path-browserify@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.npmjs.org/path-browserify/-/path-browserify-1.0.0.tgz#40702a97af46ae00b0ea6fa8998c0b03c0af160d"
+  integrity sha512-Hkavx/nY4/plImrZPHRk2CL9vpOymZLgEbMNX1U0bjcBL7QN9wODxyx0yaMZURSQaUtSEvDrfAvxa9oPb0at9g==
+
 path-dirname@^1.0.0:
   version "1.0.2"
   resolved "https://registry.npmjs.org/path-dirname/-/path-dirname-1.0.2.tgz#cc33d24d525e099a5388c0336c6e32b9160609e0"
@@ -6366,6 +6372,11 @@ split-string@^3.0.1, split-string@^3.0.2:
   integrity sha512-NzNVhJDYpwceVVii8/Hu6DKfD2G+NrQHlS/V/qgv763EYudVwEcMQNxd2lh+0VrUByXN/oJkl5grOhYWvQUYiw==
   dependencies:
     extend-shallow "^3.0.0"
+
+sprintf-js@^1.1.2:
+  version "1.1.2"
+  resolved "https://registry.npmjs.org/sprintf-js/-/sprintf-js-1.1.2.tgz#da1765262bf8c0f571749f2ad6c26300207ae673"
+  integrity sha512-VE0SOVEHCk7Qc8ulkWw3ntAzXuqf7S2lvwQaDLRnUeIEaKNQJzV6BwmLKhOqT61aGhfUMrXeaBk+oDGCzvhcug==
 
 sprintf-js@~1.0.2:
   version "1.0.3"
