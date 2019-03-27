@@ -714,15 +714,14 @@
   resolved "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz#9a06f4f137ee84d7df0460c1fdb1135ffa6c50fd"
   integrity sha512-ONhaKPIufzzrlNbqtWFFd+jlnemX6lJAgq9ZeiZtS7I1PIf/la7CW4m83rTXRnVnsMbW2k56pGYu7AUFJD9Pow==
 
-"@sourcegraph/basic-code-intel@^6.0.12":
-  version "6.0.12"
-  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.12.tgz#5d6c1a301c73a19bf28f6d25b5f4846cc3db844f"
-  integrity sha512-G8IUx29UV1asiU3SZ3AMYKlZSZxX63nC7IR4ux+Jd+TBg2OW9WrRKOEaYKp2MWlwyWBc7Dpix3hv6GqMSMJNyA==
+"@sourcegraph/basic-code-intel@^6.0.13":
+  version "6.0.13"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.13.tgz#1fa7030d4b5813c8ede3a51dacd81647dd33edee"
+  integrity sha512-psxFy4lj8A8kRH2WMGFam0y1+VrBQqIgrOrTyH6At27Qpxwuz6OlHkKzTBUnc9HqNDkxGAEIuUSx5kMuLYoK4g==
   dependencies:
     lodash "^4.17.11"
     rxjs "^6.3.3"
     sourcegraph "^23.0.0"
-    sprintf-js "^1.1.2"
 
 "@sourcegraph/lightstep-tracer-webworker@^0.20.14-fork.3":
   version "0.20.14-fork.3"
@@ -6372,11 +6371,6 @@ split-string@^3.0.1, split-string@^3.0.2:
   integrity sha512-NzNVhJDYpwceVVii8/Hu6DKfD2G+NrQHlS/V/qgv763EYudVwEcMQNxd2lh+0VrUByXN/oJkl5grOhYWvQUYiw==
   dependencies:
     extend-shallow "^3.0.0"
-
-sprintf-js@^1.1.2:
-  version "1.1.2"
-  resolved "https://registry.npmjs.org/sprintf-js/-/sprintf-js-1.1.2.tgz#da1765262bf8c0f571749f2ad6c26300207ae673"
-  integrity sha512-VE0SOVEHCk7Qc8ulkWw3ntAzXuqf7S2lvwQaDLRnUeIEaKNQJzV6BwmLKhOqT61aGhfUMrXeaBk+oDGCzvhcug==
 
 sprintf-js@~1.0.2:
   version "1.0.3"
