@@ -78,6 +78,8 @@ import {
     throwIfAbortError,
 } from './util'
 
+const path = require('path-browserify')
+
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
 
@@ -108,15 +110,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         return activateBasicCodeIntel({
             languageID: 'typescript',
             fileExts: ['ts', 'tsx', 'js', 'jsx'],
-            definitionPatterns: [
-                'var\\s\\b%s\\b',
-                'let\\s\\b%s\\b',
-                'const\\s\\b%s\\b',
-                'function\\s\\b%s\\b',
-                'interface\\s\\b%s\\b',
-                'type\\s\\b%s\\b',
-                '\\b%s\\b:',
-            ],
             commentStyle: {
                 lineRegex: /\/\/\s?/,
                 block: {
@@ -124,6 +117,22 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     lineNoiseRegex: /(^\s*\*\s?)?/,
                     endRegex: /\*\//,
                 },
+            },
+            filterDefinitions: ({ filePath, fileContent, results }) => {
+                const imports = fileContent
+                    .split('\n')
+                    .map(line => {
+                        // Matches the import at index 1
+                        const match = /\bfrom ['"](.*)['"];?$/.exec(line) || /\brequire\(['"](.*)['"]\)/.exec(line)
+                        return match ? match[1] : undefined
+                    })
+                    .filter((x): x is string => Boolean(x))
+
+                const filteredResults = results.filter(result =>
+                    imports.some(i => path.join(path.dirname(filePath), i) === result.file.replace(/\.[^/.]+$/, ''))
+                )
+
+                return filteredResults.length === 0 ? results : filteredResults
             },
         })(ctx)
     }

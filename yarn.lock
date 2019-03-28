@@ -714,10 +714,10 @@
   resolved "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz#9a06f4f137ee84d7df0460c1fdb1135ffa6c50fd"
   integrity sha512-ONhaKPIufzzrlNbqtWFFd+jlnemX6lJAgq9ZeiZtS7I1PIf/la7CW4m83rTXRnVnsMbW2k56pGYu7AUFJD9Pow==
 
-"@sourcegraph/basic-code-intel@^6.0.7":
-  version "6.0.7"
-  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.7.tgz#6ba8623c1c5e71f780a059ccea2120ffdc1e3600"
-  integrity sha512-+amGIq54N3aVOj7AxNtW6QtDfUVvtT253Ha+i9sofyo217L/7Ucwo/WoDGuded9Ng9FUxUM6UOS3MREW+lkUGQ==
+"@sourcegraph/basic-code-intel@^6.0.13":
+  version "6.0.13"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.13.tgz#1fa7030d4b5813c8ede3a51dacd81647dd33edee"
+  integrity sha512-psxFy4lj8A8kRH2WMGFam0y1+VrBQqIgrOrTyH6At27Qpxwuz6OlHkKzTBUnc9HqNDkxGAEIuUSx5kMuLYoK4g==
   dependencies:
     lodash "^4.17.11"
     rxjs "^6.3.3"
@@ -5055,6 +5055,11 @@ path-browserify@0.0.0:
   version "0.0.0"
   resolved "https://registry.npmjs.org/path-browserify/-/path-browserify-0.0.0.tgz#a0b870729aae214005b7d5032ec2cbbb0fb4451a"
   integrity sha1-oLhwcpquIUAFt9UDLsLLuw+0RRo=
+
+path-browserify@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.npmjs.org/path-browserify/-/path-browserify-1.0.0.tgz#40702a97af46ae00b0ea6fa8998c0b03c0af160d"
+  integrity sha512-Hkavx/nY4/plImrZPHRk2CL9vpOymZLgEbMNX1U0bjcBL7QN9wODxyx0yaMZURSQaUtSEvDrfAvxa9oPb0at9g==
 
 path-dirname@^1.0.0:
   version "1.0.2"
