@@ -196,7 +196,7 @@
     "yarn-deduplicate": "^1.1.1"
   },
   "dependencies": {
-    "@sourcegraph/basic-code-intel": "^6.0.13",
+    "@sourcegraph/basic-code-intel": "^6.0.14",
     "@sourcegraph/lightstep-tracer-webworker": "^0.20.14-fork.3",
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",

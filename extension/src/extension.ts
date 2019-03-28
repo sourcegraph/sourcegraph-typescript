@@ -6,7 +6,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { activateBasicCodeIntel } from '@sourcegraph/basic-code-intel'
+import * as basicCodeIntel from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -20,7 +20,7 @@ import { merge } from 'ix/asynciterable/index'
 import { filter, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
-import { BehaviorSubject, from, fromEventPattern, Subscription } from 'rxjs'
+import { BehaviorSubject, from, fromEventPattern, Observable, ObservableInput, of, race, Subscription } from 'rxjs'
 import * as rxop from 'rxjs/operators'
 import * as sourcegraph from 'sourcegraph'
 import { Omit } from 'type-zoo'
@@ -95,6 +95,58 @@ const documentSelector: sourcegraph.DocumentSelector = [{ language: 'typescript'
 
 const logger: Logger = new RedactingLogger(console)
 
+/**
+ * Emits from `fallback` after `delayMilliseconds`. Useful for falling back to
+ * basic-code-intel while the language server is running.
+ */
+function withFallback<T>({
+    main,
+    fallback,
+    delayMilliseconds,
+}: {
+    main: ObservableInput<T>
+    fallback: ObservableInput<T>
+    delayMilliseconds: number
+}): Observable<T> {
+    return race(
+        of(null).pipe(rxop.switchMap(() => from(main))),
+        of(null).pipe(
+            rxop.delay(delayMilliseconds),
+            rxop.switchMap(() => from(fallback))
+        )
+    )
+}
+
+const basicCodeIntelHandlerArgs: basicCodeIntel.HandlerArgs = {
+    sourcegraph,
+    languageID: 'typescript',
+    fileExts: ['ts', 'tsx', 'js', 'jsx'],
+    commentStyle: {
+        lineRegex: /\/\/\s?/,
+        block: {
+            startRegex: /\/\*\*?/,
+            lineNoiseRegex: /(^\s*\*\s?)?/,
+            endRegex: /\*\//,
+        },
+    },
+    filterDefinitions: ({ filePath, fileContent, results }) => {
+        const imports = fileContent
+            .split('\n')
+            .map(line => {
+                // Matches the import at index 1
+                const match = /\bfrom ['"](.*)['"];?$/.exec(line) || /\brequire\(['"](.*)['"]\)/.exec(line)
+                return match ? match[1] : undefined
+            })
+            .filter((x): x is string => Boolean(x))
+
+        const filteredResults = results.filter(result =>
+            imports.some(i => path.join(path.dirname(filePath), i) === result.file.replace(/\.[^/.]+$/, ''))
+        )
+
+        return filteredResults.length === 0 ? results : filteredResults
+    },
+}
+
 export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void> {
     // Cancel everything whene extension is deactivated
     const cancellationTokenSource = new CancellationTokenSource()
@@ -104,37 +156,26 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const config = new BehaviorSubject(getConfig())
     ctx.subscriptions.add(sourcegraph.configuration.subscribe(() => config.next(getConfig())))
 
+    const basicCodeIntelHandler = new basicCodeIntel.Handler(basicCodeIntelHandlerArgs)
+
     if (!config.value['typescript.serverUrl']) {
         logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
-        // Fall back to basic-code-intel behavior
-        return activateBasicCodeIntel({
-            languageID: 'typescript',
-            fileExts: ['ts', 'tsx', 'js', 'jsx'],
-            commentStyle: {
-                lineRegex: /\/\/\s?/,
-                block: {
-                    startRegex: /\/\*\*?/,
-                    lineNoiseRegex: /(^\s*\*\s?)?/,
-                    endRegex: /\*\//,
-                },
-            },
-            filterDefinitions: ({ filePath, fileContent, results }) => {
-                const imports = fileContent
-                    .split('\n')
-                    .map(line => {
-                        // Matches the import at index 1
-                        const match = /\bfrom ['"](.*)['"];?$/.exec(line) || /\brequire\(['"](.*)['"]\)/.exec(line)
-                        return match ? match[1] : undefined
-                    })
-                    .filter((x): x is string => Boolean(x))
 
-                const filteredResults = results.filter(result =>
-                    imports.some(i => path.join(path.dirname(filePath), i) === result.file.replace(/\.[^/.]+$/, ''))
-                )
-
-                return filteredResults.length === 0 ? results : filteredResults
-            },
-        })(ctx)
+        ctx.subscriptions.add(
+            sourcegraph.languages.registerHoverProvider(documentSelector, {
+                provideHover: (doc, pos) => basicCodeIntelHandler.hover(doc, pos),
+            })
+        )
+        ctx.subscriptions.add(
+            sourcegraph.languages.registerDefinitionProvider(documentSelector, {
+                provideDefinition: (doc, pos) => basicCodeIntelHandler.definition(doc, pos),
+            })
+        )
+        ctx.subscriptions.add(
+            sourcegraph.languages.registerReferenceProvider(documentSelector, {
+                provideReferences: (doc, pos) => basicCodeIntelHandler.references(doc, pos),
+            })
+        )
     }
 
     const tracer: Tracer = config.value['lightstep.token']
@@ -508,7 +549,11 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         providers.add(
             sourcegraph.languages.registerHoverProvider(documentSelector, {
                 provideHover: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                    observableFromAsyncIterable(provideHover(textDocument, position))
+                    withFallback({
+                        main: observableFromAsyncIterable(provideHover(textDocument, position)),
+                        fallback: basicCodeIntelHandler.hover(textDocument, position),
+                        delayMilliseconds: 500,
+                    })
                 ),
             })
         )
@@ -544,7 +589,11 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         providers.add(
             sourcegraph.languages.registerDefinitionProvider(documentSelector, {
                 provideDefinition: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                    observableFromAsyncIterable(provideDefinition(textDocument, position))
+                    withFallback({
+                        main: observableFromAsyncIterable(provideDefinition(textDocument, position)),
+                        fallback: basicCodeIntelHandler.definition(textDocument, position),
+                        delayMilliseconds: 500,
+                    })
                 ),
             })
         )
@@ -736,7 +785,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             })
         providers.add(
             sourcegraph.languages.registerReferenceProvider(documentSelector, {
-                provideReferences: (doc, pos, ctx) => observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
+                provideReferences: (doc, pos, ctx) =>
+                    withFallback({
+                        main: observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
+                        fallback: basicCodeIntelHandler.references(doc, pos),
+                        delayMilliseconds: 2000,
+                    }),
             })
         )
 
