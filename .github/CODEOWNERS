@@ -1,0 +1,7 @@
+# https://help.github.com/en/articles/about-code-owners
+
+* @felixfbecker @lguychard @chrismwendt
+
+# Renovate PR reviewers are controlled with Renovate config
+package.json
+yarn.lock
