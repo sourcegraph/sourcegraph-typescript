@@ -216,7 +216,6 @@
     "mz": "^2.7.0",
     "npm-registry-fetch": "^3.8.0",
     "opentracing": "^0.14.3",
-    "path-browserify": "^1.0.0",
     "pretty-bytes": "^5.1.0",
     "prom-client": "^11.2.0",
     "relateurl": "^0.2.7",
