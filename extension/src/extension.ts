@@ -20,6 +20,7 @@ import { merge } from 'ix/asynciterable/index'
 import { filter, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs } from 'lodash'
 import { Span, Tracer } from 'opentracing'
+import * as path from 'path'
 import { BehaviorSubject, from, fromEventPattern, Subscription } from 'rxjs'
 import * as rxop from 'rxjs/operators'
 import * as sourcegraph from 'sourcegraph'
@@ -77,8 +78,6 @@ import {
     SourcegraphEndpoint,
     throwIfAbortError,
 } from './util'
-
-const path = require('path-browserify')
 
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
