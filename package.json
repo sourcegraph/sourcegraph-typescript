@@ -230,7 +230,7 @@
     "tar": "^4.4.8",
     "type-is": "^1.6.16",
     "type-zoo": "^3.2.1",
-    "typescript": "^3.2.1",
+    "typescript": "^3.4.1",
     "uuid": "^3.3.2",
     "vscode-languageserver-protocol": "^3.13.0",
     "vscode-languageserver-types": "^3.13.0",
