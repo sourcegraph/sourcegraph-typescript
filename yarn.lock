@@ -6614,7 +6614,7 @@ tagged-template-noop@^2.1.0:
   resolved "https://registry.npmjs.org/tagged-template-noop/-/tagged-template-noop-2.1.0.tgz#3501d67fd75612ab40e6040056ea881d1161c4f5"
   integrity sha512-VOPA7ZucOLvew9xq+AwABXil7AHQZa3G7T3QOQoUveNIl3EwNsMN79JHn8v7zgpM1Pd8R36MrntUvaWqLqjg1w==
 
-tail@^2.0.1:
+tail@^2.0.2:
   version "2.0.2"
   resolved "https://registry.npmjs.org/tail/-/tail-2.0.2.tgz#86073f3a9a568807b7fd886897a7350314275b5f"
   integrity sha512-raFipiKWdGKEzxbvZwnhUGqjvsv0gpa/1A479rL//NOxnNwYZDN4MPk6xJJdUFs8P2Xrff3nbH5fcyYRLU4UHQ==
