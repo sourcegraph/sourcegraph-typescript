@@ -226,7 +226,7 @@
     "source-map-support": "^0.5.9",
     "sourcegraph": "^23.0.0",
     "tagged-template-noop": "^2.1.0",
-    "tail": "^2.0.1",
+    "tail": "^2.0.2",
     "tar": "^4.4.8",
     "type-is": "^1.6.16",
     "type-zoo": "^3.2.1",
