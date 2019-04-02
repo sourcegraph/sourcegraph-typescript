@@ -598,6 +598,14 @@
     js-levenshtein "^1.1.3"
     semver "^5.3.0"
 
+"@babel/runtime-corejs2@^7.2.0":
+  version "7.4.2"
+  resolved "https://registry.npmjs.org/@babel/runtime-corejs2/-/runtime-corejs2-7.4.2.tgz#a0cec2c41717fa415e9c204f32b603d88b1796c2"
+  integrity sha512-y/Br/9uQnumcqcakkmobFqOTzYCWSS6Kuy1b2o7LTXR4lpeU0AhaOcPqIHW85LCxRWUDW5Vg0pU1KlE3YkORlg==
+  dependencies:
+    core-js "^2.6.5"
+    regenerator-runtime "^0.13.2"
+
 "@babel/runtime@^7.0.0 <7.4.0":
   version "7.3.4"
   resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.3.4.tgz#73d12ba819e365fcf7fd152aed56d6df97d21c83"
@@ -744,14 +752,14 @@
   resolved "https://registry.npmjs.org/@sourcegraph/tsconfig/-/tsconfig-4.0.0.tgz#dd2a406f90760bb789fd89fde4bd0a8d681f2767"
   integrity sha512-jxrhKbek4yu1HUDpUhqR9hAGFiUgaJ9NIM+c8JEkAnvpW67ab1AUFWb82aSVfZWX1UVqfR84AMr7xP3E8LlL+A==
 
-"@sourcegraph/tslint-config@^12.3.1":
-  version "12.3.1"
-  resolved "https://registry.npmjs.org/@sourcegraph/tslint-config/-/tslint-config-12.3.1.tgz#54570f56255c3c4139105fd18ea542e847e0710f"
-  integrity sha512-XG/H+QPARCTIXtL4bLBP1W93MniqBYIkDEkld6gdbRT3i4sBMXw+IwZwC3NdroEjEe5OKgXNBh1Y8edxBL/hdw==
+"@sourcegraph/tslint-config@^13.0.0":
+  version "13.0.0"
+  resolved "https://registry.npmjs.org/@sourcegraph/tslint-config/-/tslint-config-13.0.0.tgz#f75d2ea51972c9f8cab233de98824b954457729b"
+  integrity sha512-kDWngKXc7Qu8rdtsUP1pics0vOIx37e1ygjyrxMfhav722dhByxYowK3AxcbyECyaKEYt0wCp+bCqeVQX+XksQ==
   dependencies:
-    rxjs-tslint-rules "^4.12.0"
-    tslint-config-prettier "^1.6.0"
-    tslint-react "^3.2.0"
+    rxjs-tslint-rules "^4.19.1"
+    tslint-config-prettier "^1.18.0"
+    tslint-react "^4.0.0"
 
 "@sourcegraph/typescript-language-server@^0.3.7-fork":
   version "0.3.7-fork"
@@ -1960,7 +1968,7 @@ copy-descriptor@^0.1.0:
   resolved "https://registry.npmjs.org/copy-descriptor/-/copy-descriptor-0.1.1.tgz#676f6eb3c39997c2ee1ac3a924fd6124748f578d"
   integrity sha1-Z29us8OZl8LuGsOpJP1hJHSPV40=
 
-core-js@^2.4.0:
+core-js@^2.4.0, core-js@^2.6.5:
   version "2.6.5"
   resolved "https://registry.npmjs.org/core-js/-/core-js-2.6.5.tgz#44bc8d249e7fb2ff5d00e0341a7ffb94fbf67895"
   integrity sha512-klh/kDpwX8hryYL14M9w/xei6vrv6sE8gTHDG7/T/+SEovB/G4ejwcfE/CBzO6Edsu+OETZMZ3wcX/EjUkrl5A==
@@ -2296,12 +2304,12 @@ decamelize@^1.1.2:
   resolved "https://registry.npmjs.org/decamelize/-/decamelize-1.2.0.tgz#f6534d15148269b20352e7bee26f501f9a191290"
   integrity sha1-9lNNFRSCabIDUue+4m9QH5oZEpA=
 
-decamelize@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/decamelize/-/decamelize-2.0.0.tgz#656d7bbc8094c4c788ea53c5840908c9c7d063c7"
-  integrity sha512-Ikpp5scV3MSYxY39ymh45ZLEecsTdv/Xj2CaQfI8RLMuwi7XvjX9H/fhraiSuU+C5w5NTDu4ZU72xNiZnurBPg==
+decamelize@^3.0.0:
+  version "3.1.1"
+  resolved "https://registry.npmjs.org/decamelize/-/decamelize-3.1.1.tgz#ebf473c6f8607bd70fd9ed6d892da27c5eb8539e"
+  integrity sha512-pSJTQCBDZxv8siK5p/M42ZdhThhTtx3JU/OKli0yQSKebfM9q92op6zF7krYrWVKRtsE/RwTDiZLliMV3ECkXQ==
   dependencies:
-    xregexp "4.0.0"
+    xregexp "^4.2.4"
 
 decode-uri-component@^0.2.0:
   version "0.2.0"
@@ -5825,6 +5833,11 @@ regenerator-runtime@^0.12.0:
   resolved "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.12.1.tgz#fa1a71544764c036f8c49b13a08b2594c9f8a0de"
   integrity sha512-odxIc1/vDlo4iZcfXqRYFj0vpXFNoGdKMAUieAlFYO6m/nl5e9KR/beGf41z4a1FI+aQgtjhuaSlDxQ0hmkrHg==
 
+regenerator-runtime@^0.13.2:
+  version "0.13.2"
+  resolved "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.2.tgz#32e59c9a6fb9b1a4aff09b4930ca2d4477343447"
+  integrity sha512-S/TQAZJO+D3m9xeN1WTI8dLKBBiRgXBlTJvbWjCThHWZj9EvHK70Ff50/tYj2J/fvBY6JtFVwRuazHN2E7M9BA==
+
 regenerator-transform@^0.13.4:
   version "0.13.4"
   resolved "https://registry.npmjs.org/regenerator-transform/-/regenerator-transform-0.13.4.tgz#18f6763cf1382c69c36df76c6ce122cc694284fb"
@@ -6049,16 +6062,17 @@ run-queue@^1.0.0, run-queue@^1.0.3:
   dependencies:
     aproba "^1.1.1"
 
-rxjs-tslint-rules@^4.12.0:
-  version "4.12.0"
-  resolved "https://registry.npmjs.org/rxjs-tslint-rules/-/rxjs-tslint-rules-4.12.0.tgz#92cf4c26d53163afdc32d4d8a23c7c13faa9e988"
-  integrity sha512-JaCcoy7m4r/uktKjAdh70e+ijcTqozwKEU82N66tJ1dhSfzBgUX7bxopv/yQiHZ2BOeqRN61VfRMagqXTuzgdg==
+rxjs-tslint-rules@^4.19.1:
+  version "4.19.1"
+  resolved "https://registry.npmjs.org/rxjs-tslint-rules/-/rxjs-tslint-rules-4.19.1.tgz#e5328cface0a0d0b52f2601082fa1ffd617f7869"
+  integrity sha512-TwosfLg5HgG6vSq6uHM49cUMJxX6ZfF8Cd4/r7TPc/h4hV2vm675T7zwO49MD2YxNpQbge4Xi8EOzn8XvJwYAA==
   dependencies:
     "@phenomnomnominal/tsquery" "^3.0.0"
-    decamelize "^2.0.0"
+    decamelize "^3.0.0"
     resolve "^1.4.0"
     tslib "^1.8.0"
     tsutils "^3.0.0"
+    tsutils-etc "^1.1.0"
 
 rxjs@^6.3.3, rxjs@^6.4.0:
   version "6.4.0"
@@ -6788,17 +6802,17 @@ tslib@^1.8.0, tslib@^1.8.1, tslib@^1.9.0, tslib@^1.9.3:
   resolved "https://registry.npmjs.org/tslib/-/tslib-1.9.3.tgz#d7e4dd79245d85428c4d7e4822a79917954ca286"
   integrity sha512-4krF8scpejhaOgqzBEcGM7yDIEfi0/8+8zDRZhNZZ2kjmHJ4hv3zCbQWxoJGz1iw5U0Jl0nma13xzHXcncMavQ==
 
-tslint-config-prettier@^1.6.0:
-  version "1.16.0"
-  resolved "https://registry.npmjs.org/tslint-config-prettier/-/tslint-config-prettier-1.16.0.tgz#4627d0e2639554d89210e480093c381b5186963f"
-  integrity sha512-zu6RAcpBtqdvhT6KpBh9kRPYATjOf9BnRi718kNqVKFjEgSE4rFrPprFju1YJrkOa3RbtbWI1ZSuLd2NBX1MDw==
+tslint-config-prettier@^1.18.0:
+  version "1.18.0"
+  resolved "https://registry.npmjs.org/tslint-config-prettier/-/tslint-config-prettier-1.18.0.tgz#75f140bde947d35d8f0d238e0ebf809d64592c37"
+  integrity sha512-xPw9PgNPLG3iKRxmK7DWr+Ea/SzrvfHtjFt5LBl61gk2UBG/DB9kCXRjv+xyIU1rUtnayLeMUVJBcMX8Z17nDg==
 
-tslint-react@^3.2.0:
-  version "3.6.0"
-  resolved "https://registry.npmjs.org/tslint-react/-/tslint-react-3.6.0.tgz#7f462c95c4a0afaae82507f06517ff02942196a1"
-  integrity sha512-AIv1QcsSnj7e9pFir6cJ6vIncTqxfqeFF3Lzh8SuuBljueYzEAtByuB6zMaD27BL0xhMEqsZ9s5eHuCONydjBw==
+tslint-react@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.npmjs.org/tslint-react/-/tslint-react-4.0.0.tgz#b4bb4c01c32448cb14d23f143a2f5e4989bb961e"
+  integrity sha512-9fNE0fm9zNDx1+b6hgy8rgDN2WsQLRiIrn3+fbqm0tazBVF6jiaCFAITxmU+WSFWYE03Xhp1joCircXOe1WVAQ==
   dependencies:
-    tsutils "^2.13.1"
+    tsutils "^3.9.1"
 
 tslint@^5.15.0:
   version "5.15.0"
@@ -6819,17 +6833,22 @@ tslint@^5.15.0:
     tslib "^1.8.0"
     tsutils "^2.29.0"
 
-tsutils@^2.13.1, tsutils@^2.29.0:
+tsutils-etc@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.npmjs.org/tsutils-etc/-/tsutils-etc-1.1.0.tgz#82ce1c92da29e07d3cde95692d5c5e8dbdc92fd0"
+  integrity sha512-pJlLtLmQPUyGHqY/Pq6EGnpGmQCnnTDZetQ7eWkeQ5xaw4GtfcR1Zt7HMKFHGDDp53HzQfbqQ+7ps6iJbfa9Hw==
+
+tsutils@^2.29.0:
   version "2.29.0"
   resolved "https://registry.npmjs.org/tsutils/-/tsutils-2.29.0.tgz#32b488501467acbedd4b85498673a0812aca0b99"
   integrity sha512-g5JVHCIJwzfISaXpXE1qvNalca5Jwob6FjI4AoPlqMusJ6ftFE7IkkFoMhVLRgK+4Kx3gkzb8UZK5t5yTTvEmA==
   dependencies:
     tslib "^1.8.1"
 
-tsutils@^3.0.0:
-  version "3.5.0"
-  resolved "https://registry.npmjs.org/tsutils/-/tsutils-3.5.0.tgz#42602f7df241e753a2105cc3627a664abf11f745"
-  integrity sha512-/FZ+pEJQixWruFejFxNPRSwg+iF6aw7PYZVRqUscJ7EnzV3zieI8byfZziUR7QjCuJFulq8SEe9JcGflO4ze4Q==
+tsutils@^3.0.0, tsutils@^3.9.1:
+  version "3.9.1"
+  resolved "https://registry.npmjs.org/tsutils/-/tsutils-3.9.1.tgz#2a40dc742943c71eca6d5c1994fcf999956be387"
+  integrity sha512-hrxVtLtPqQr//p8/msPT1X1UYXUjizqSit5d9AQ5k38TcV38NyecL5xODNxa73cLe/5sdiJ+w1FqzDhRBA/anA==
   dependencies:
     tslib "^1.8.1"
 
@@ -7270,10 +7289,12 @@ xml-name-validator@^3.0.0:
   resolved "https://registry.npmjs.org/xml-name-validator/-/xml-name-validator-3.0.0.tgz#6ae73e06de4d8c6e47f9fb181f78d648ad457c6a"
   integrity sha512-A5CUptxDsvxKJEU3yO6DuWBSJz/qizqzJKOMIfUJHETbBw/sFaDxgd6fxm1ewUaM0jZ444Fc5vC5ROYurg/4Pw==
 
-xregexp@4.0.0:
-  version "4.0.0"
-  resolved "https://registry.npmjs.org/xregexp/-/xregexp-4.0.0.tgz#e698189de49dd2a18cc5687b05e17c8e43943020"
-  integrity sha512-PHyM+sQouu7xspQQwELlGwwd05mXUFqwFYfqPO0cC7x4fxyHnnuetmQr6CjJiafIDoH4MogHb9dOoJzR/Y4rFg==
+xregexp@^4.2.4:
+  version "4.2.4"
+  resolved "https://registry.npmjs.org/xregexp/-/xregexp-4.2.4.tgz#02a4aea056d65a42632c02f0233eab8e4d7e57ed"
+  integrity sha512-sO0bYdYeJAJBcJA8g7MJJX7UrOZIfJPd8U2SC7B2Dd/J24U0aQNoGp33shCaBSWeb0rD5rh6VBUIXOkGal1TZA==
+  dependencies:
+    "@babel/runtime-corejs2" "^7.2.0"
 
 xtend@^4.0.0, xtend@~4.0.1:
   version "4.0.1"

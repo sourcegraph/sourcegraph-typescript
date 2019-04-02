@@ -25,7 +25,6 @@ import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
 import * as fs from 'mz/fs'
-import { realpathSync } from 'mz/fs'
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_URL, SPAN_KIND, SPAN_KIND_RPC_CLIENT, SPAN_KIND_RPC_SERVER } from 'opentracing/lib/ext/tags'
 import { tmpdir } from 'os'
@@ -39,7 +38,7 @@ import { extract, FileStat } from 'tar'
 import * as type from 'type-is'
 import { fileURLToPath, pathToFileURL, URL } from 'url'
 import { inspect } from 'util'
-import uuid = require('uuid')
+import uuid from 'uuid'
 import {
     CancellationToken,
     ClientCapabilities,
@@ -100,7 +99,7 @@ process.on('uncaughtException', err => {
     process.exit(1)
 })
 
-const CACHE_DIR = process.env.CACHE_DIR || realpathSync(tmpdir())
+const CACHE_DIR = process.env.CACHE_DIR || fs.realpathSync(tmpdir())
 globalLogger.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
 let tracer = new Tracer()
