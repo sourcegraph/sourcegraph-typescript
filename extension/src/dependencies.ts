@@ -194,7 +194,8 @@ export async function findClosestPackageJson(
                 if (response.status === 404) {
                     parent = new URL('..', parent.href)
                     continue
-                } else if (!response.ok) {
+                }
+                if (!response.ok) {
                     throw new Error(`${response.status} ${response.statusText}`)
                 }
                 return [packageJsonUri, await response.json()]
@@ -216,9 +217,8 @@ export async function findPackageName(
         const dtMatch = uri.pathname.match(/\/types\/([^\/]+)\//)
         if (dtMatch) {
             return '@types/' + dtMatch[1]
-        } else {
-            logger.warn(`Unexpected DefinitelyTyped URL ${uri}`)
         }
+        logger.warn(`Unexpected DefinitelyTyped URL ${uri}`)
     }
     // Special case: vscode.d.ts
     if (uri.pathname.endsWith('/vscode.d.ts')) {
