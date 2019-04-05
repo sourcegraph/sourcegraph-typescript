@@ -107,6 +107,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
         // Fall back to basic-code-intel behavior
         return activateBasicCodeIntel({
+            sourcegraph,
             languageID: 'typescript',
             fileExts: ['ts', 'tsx', 'js', 'jsx'],
             commentStyle: {
