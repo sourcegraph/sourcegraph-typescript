@@ -144,11 +144,11 @@ kind: Deployment
 metadata:
   name: lang-typescript
 spec:
+  replicas: 4 # adjust as needed
   selector:
     matchLabels:
       app: lang-typescript
   template:
-    replicas: 4 # adjust as needed
     metadata:
       labels:
         app: lang-typescript
