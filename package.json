@@ -50,12 +50,28 @@
           "label": "References: Search mode",
           "description": "Results come from text search and heuristics. To use a language server for precise results, click to go to the README and follow the deployment instructions."
         }
+      },
+      {
+        "id": "feedback",
+        "command": "open",
+        "title": "Submit code intel feedback",
+        "commandArguments": [
+          "${get(context, `codeIntel.feedbackLink`)}"
+        ],
+        "actionItem": {
+          "description": "Submit code intel feedback",
+          "iconURL": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMCAwaDI0djI0SDB6IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTExLjk5IDJDNi40NyAyIDIgNi40OCAyIDEyczQuNDcgMTAgOS45OSAxMEMxNy41MiAyMiAyMiAxNy41MiAyMiAxMlMxNy41MiAyIDExLjk5IDJ6TTEyIDIwYy00LjQyIDAtOC0zLjU4LTgtOHMzLjU4LTggOC04IDggMy41OCA4IDgtMy41OCA4LTggOHptMy41LTljLjgzIDAgMS41LS42NyAxLjUtMS41UzE2LjMzIDggMTUuNSA4IDE0IDguNjcgMTQgOS41cy42NyAxLjUgMS41IDEuNXptLTcgMGMuODMgMCAxLjUtLjY3IDEuNS0xLjVTOS4zMyA4IDguNSA4IDcgOC42NyA3IDkuNSA3LjY3IDExIDguNSAxMXptMy41IDYuNWMyLjMzIDAgNC4zMS0xLjQ2IDUuMTEtMy41SDYuODljLjggMi4wNCAyLjc4IDMuNSA1LjExIDMuNXoiLz48L3N2Zz4="
+        }
       }
     ],
     "menus": {
       "editor/title": [
         {
           "action": "typescript.toggle"
+        },
+        {
+          "action": "feedback",
+          "when": "showFeedback"
         }
       ],
       "commandPalette": [],
@@ -196,7 +212,7 @@
     "yarn-deduplicate": "^1.1.1"
   },
   "dependencies": {
-    "@sourcegraph/basic-code-intel": "^6.0.15",
+    "@sourcegraph/basic-code-intel": "^6.0.17",
     "@sourcegraph/lightstep-tracer-webworker": "^0.20.14-fork.3",
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
