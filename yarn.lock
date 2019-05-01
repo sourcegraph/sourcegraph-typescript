@@ -840,10 +840,10 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
-"@types/got@9.4.1":
-  version "9.4.1"
-  resolved "https://registry.npmjs.org/@types/got/-/got-9.4.1.tgz#7479a3a321599b5e17647f3bd9d402b8c55bfee1"
-  integrity sha512-m7Uc07bG/bZ+Dis7yI3mGssYDcAdUvP4irF3ZmBzf0ig7zEd1FyADfnELVGcf+p1Ol/iPCXbZYwcSNOJA2a+Qg==
+"@types/got@9.4.4":
+  version "9.4.4"
+  resolved "https://registry.npmjs.org/@types/got/-/got-9.4.4.tgz#78129553f6a41715df601db43532cd0b87a55d3f"
+  integrity sha512-IGAJokJRE9zNoBdY5csIwN4U5qQn+20HxC0kM+BbUdfTKIXa7bOX/pdhy23NnLBRP8Wvyhx7X5e6EHJs+4d8HA==
   dependencies:
     "@types/node" "*"
     "@types/tough-cookie" "*"
