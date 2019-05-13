@@ -4,6 +4,6 @@
     "target": "es2016",
     "module": "esnext",
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
-  }
+    "allowSyntheticDefaultImports": true,
+  },
 }
