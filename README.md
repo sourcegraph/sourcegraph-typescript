@@ -306,7 +306,6 @@ metadata:
   annotations:
     volume.beta.kubernetes.io/storage-class: default
   name: npm-proxy
-  namespace: prod
 spec:
   accessModes:
     - ReadWriteOnce
@@ -346,7 +345,6 @@ data:
 kind: ConfigMap
 metadata:
   name: yarn-config
-  namespace: prod
 ```
 
 and mount it into the container:
