@@ -217,7 +217,7 @@
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^2.0.3",
-    "axios": "^0.18.0",
+    "axios": "^0.19.0",
     "delay": "^4.1.0",
     "express": "^4.16.4",
     "fast-glob": "^2.2.6",
