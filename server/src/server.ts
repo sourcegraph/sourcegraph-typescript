@@ -42,6 +42,8 @@ import uuid from 'uuid'
 import {
     CancellationToken,
     ClientCapabilities,
+    CodeActionParams,
+    CodeActionRequest,
     Definition,
     DefinitionRequest,
     DidOpenTextDocumentNotification,
@@ -985,6 +987,21 @@ webSocketServer.on('connection', connection => {
     forwardLocationRequests(TypeDefinitionRequest.type)
     forwardLocationRequests(ReferencesRequest.type)
     forwardLocationRequests(ImplementationRequest.type)
+
+    dispatcher.setRequestHandler(CodeActionRequest.type, async (params, token, span) => {
+        const uri = new URL(params.textDocument.uri)
+        const mappedParams: CodeActionParams = {
+            ...params,
+            textDocument: {
+                uri: mapHttpToFileUrlSimple(uri).href,
+            },
+        }
+        const fileUri = new URL(mappedParams.textDocument.uri)
+        // The TypeScript language server cannot service requests for documents that were not opened first
+        await openTextDocument(fileUri)
+        const result = await sendServerRequest(CodeActionRequest.type, mappedParams, { tracer, span, token })
+        return result
+    })
 
     connectionDisposables.add(
         dispatcher.observeNotification(DidOpenTextDocumentNotification.type).subscribe(params => {
