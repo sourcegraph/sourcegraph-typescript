@@ -182,12 +182,14 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     })
 
     const enabled = new BehaviorSubject(config.value['typescript.enable'] !== false)
-    from(config)
-        .pipe(
-            rxop.map(config => config['typescript.enable'] !== false),
-            rxop.distinctUntilChanged()
-        )
-        .subscribe(enabled)
+    ctx.subscriptions.add(
+        from(config)
+            .pipe(
+                rxop.map(config => config['typescript.enable'] !== false),
+                rxop.distinctUntilChanged()
+            )
+            .subscribe(enabled)
+    )
 
     /**
      * @param rootUri The server HTTP root URI
