@@ -18,7 +18,7 @@ import {
 import delayPromise from 'delay'
 import { merge } from 'ix/asynciterable/index'
 import { filter, map, scan, tap } from 'ix/asynciterable/pipe/index'
-import { fromPairs } from 'lodash'
+import { fromPairs, uniqBy, uniqWith, isEqual } from 'lodash'
 import { Span, Tracer } from 'opentracing'
 import * as path from 'path'
 import { BehaviorSubject, from, fromEventPattern, Subscription } from 'rxjs'
@@ -276,7 +276,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     try {
                         const codeActions = await connection.sendRequest(CodeActionRequest.type, codeActionParams)
                         codeActionDecorations.push(
-                            ...asArray(codeActions).map(
+                            ...uniqWith(asArray(codeActions), isEqual).map(
                                 (codeAction): sourcegraph.TextDocumentDecoration => ({
                                     range: convertRange(diagnostic.range),
                                     after: {
