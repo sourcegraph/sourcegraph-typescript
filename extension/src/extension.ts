@@ -29,6 +29,9 @@ import {
     CancellationToken,
     CancellationTokenSource,
     ClientCapabilities,
+    CodeActionKind,
+    CodeActionParams,
+    CodeActionRequest,
     DefinitionRequest,
     Diagnostic,
     DidOpenTextDocumentNotification,
@@ -54,7 +57,13 @@ import {
 } from './dependencies'
 import { resolveRev } from './graphql'
 import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from './logging'
-import { convertDiagnosticToDecoration, convertHover, convertLocation, convertLocations } from './lsp-conversion'
+import {
+    convertDiagnosticToDecoration,
+    convertHover,
+    convertLocation,
+    convertLocations,
+    convertRange,
+} from './lsp-conversion'
 import {
     ProgressParams,
     WindowProgressClientCapabilities,
@@ -164,7 +173,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         accessToken,
     }
 
-    const decorationType = sourcegraph.app.createDecorationType()
+    const diagnosticsDecorationType = sourcegraph.app.createDecorationType()
+    const codeActionsDecorationType = sourcegraph.app.createDecorationType()
 
     sourcegraph.commands.registerCommand('typescript.toggle', async () => {
         const config = sourcegraph.configuration.get<LangTypescriptConfiguration>()
@@ -239,20 +249,51 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 for (const appWindow of sourcegraph.app.windows) {
                     for (const viewComponent of appWindow.visibleViewComponents) {
                         if (diagnosticsByUri.has(viewComponent.document.uri)) {
-                            viewComponent.setDecorations(decorationType, [])
+                            viewComponent.setDecorations(diagnosticsDecorationType, [])
                         }
                     }
                 }
             })
-            connection.onNotification(PublishDiagnosticsNotification.type, params => {
+            connection.onNotification(PublishDiagnosticsNotification.type, async params => {
                 const uri = new URL(params.uri)
                 const sourcegraphTextDocumentUri = toSourcegraphTextDocumentUri(uri)
                 diagnosticsByUri.set(sourcegraphTextDocumentUri.href, params.diagnostics)
+                // Mark quick fixes with a light bulb
+                const codeActionDecorations: sourcegraph.TextDocumentDecoration[] = []
+                for (const diagnostic of params.diagnostics) {
+                    const codeActionParams: CodeActionParams = {
+                        textDocument: {
+                            uri: uri.href,
+                        },
+                        range: diagnostic.range,
+                        context: {
+                            diagnostics: [diagnostic],
+                            only: [CodeActionKind.QuickFix],
+                        },
+                    }
+                    try {
+                        const codeActions = await connection.sendRequest(CodeActionRequest.type, codeActionParams)
+                        codeActionDecorations.push(
+                            ...asArray(codeActions).map(
+                                (codeAction): sourcegraph.TextDocumentDecoration => ({
+                                    range: convertRange(diagnostic.range),
+                                    after: {
+                                        contentText: '💡',
+                                        hoverMessage: codeAction.title,
+                                    },
+                                })
+                            )
+                        )
+                    } catch (err) {
+                        logger.error('Error getting code actions', err)
+                    }
+                }
                 for (const appWindow of sourcegraph.app.windows) {
                     for (const viewComponent of appWindow.visibleViewComponents) {
                         if (viewComponent.document.uri === sourcegraphTextDocumentUri.href) {
+                            viewComponent.setDecorations(codeActionsDecorationType, codeActionDecorations)
                             viewComponent.setDecorations(
-                                decorationType,
+                                diagnosticsDecorationType,
                                 params.diagnostics.map(convertDiagnosticToDecoration)
                             )
                         }
@@ -264,7 +305,10 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     for (const appWindow of sourcegraph.app.windows) {
                         for (const viewComponent of appWindow.visibleViewComponents) {
                             const diagnostics = diagnosticsByUri.get(viewComponent.document.uri) || []
-                            viewComponent.setDecorations(decorationType, diagnostics.map(convertDiagnosticToDecoration))
+                            viewComponent.setDecorations(
+                                diagnosticsDecorationType,
+                                diagnostics.map(convertDiagnosticToDecoration)
+                            )
                         }
                     }
                 })
