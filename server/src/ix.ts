@@ -10,20 +10,3 @@ export const flatMapConcurrent = <T, R>(
     selector: (value: T) => AsyncIterable<R>
 ): AsyncIterableX<R> =>
     new MergeAsyncIterable(new Array<AsyncIterable<R>>(concurrency).fill(share(flatMap(source, selector))))
-
-export const filterConcurrent = <T>(
-    source: AsyncIterable<T>,
-    concurrency: number,
-    predicate: (value: T) => boolean | Promise<boolean>
-): AsyncIterableX<T> =>
-    flatMapConcurrent(source, concurrency, async function*(value) {
-        if (await predicate(value)) {
-            yield value
-        }
-    })
-
-export const findConcurrent = <T>(
-    source: AsyncIterable<T>,
-    concurrency: number,
-    predicate: (value: T) => boolean | Promise<boolean>
-): Promise<T | undefined> => filterConcurrent(source, concurrency, predicate).first()
