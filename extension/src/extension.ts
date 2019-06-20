@@ -104,6 +104,8 @@ const documentSelector: sourcegraph.DocumentSelector = [{ language: 'typescript'
 const logger: Logger = new RedactingLogger(console)
 
 export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void> {
+    logger.log('TypeScript extension activated')
+
     // Cancel everything whene extension is deactivated
     const cancellationTokenSource = new CancellationTokenSource()
     ctx.subscriptions.add(() => cancellationTokenSource.cancel())
