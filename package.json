@@ -199,7 +199,7 @@
     "@types/tail": "1.2.1",
     "@types/tar": "4.0.0",
     "@types/type-is": "1.6.2",
-    "@types/uuid": "3.4.4",
+    "@types/uuid": "3.4.5",
     "@types/whatwg-url": "6.4.0",
     "@types/ws": "6.0.1",
     "dot-json": "^1.1.0",
