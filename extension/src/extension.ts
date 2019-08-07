@@ -6,7 +6,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { activateBasicCodeIntel, registerFeedbackButton } from '@sourcegraph/basic-code-intel'
+import { activateBasicCodeIntel } from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -118,14 +118,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
         // Fall back to basic-code-intel behavior
 
-        ctx.subscriptions.add(
-            registerFeedbackButton({
-                languageID: 'typescript',
-                sourcegraph,
-                isPrecise: false,
-            })
-        )
-
         return activateBasicCodeIntel({
             sourcegraph,
             languageID: 'typescript',
@@ -156,8 +148,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             },
         })(ctx)
     }
-
-    ctx.subscriptions.add(registerFeedbackButton({ languageID: 'typescript', sourcegraph, isPrecise: true }))
 
     const tracer: Tracer = config.value['lightstep.token']
         ? new LightstepTracer({ access_token: config.value['lightstep.token'], component_name: 'ext-lang-typescript' })
