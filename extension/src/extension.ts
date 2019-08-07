@@ -819,17 +819,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
                 return convertLocations(implementationResult)
             })
-        // Use both old registerImplementationProvider (pre-3.2) and registerLocationProvider (3.2+)
-        // for backcompat and forward-compat. This yields a deprecation console.warn on 3.2+. It is
-        // not possible to just use registerLocationProvider without breaking this functionality
-        // because of the bug fixed in 3.2 by https://github.com/sourcegraph/sourcegraph/pull/2733
-        // affects pre-3.2 versions. The registerImplementationProvider call can be removed when
-        // supporting backcompat for pre-3.2 is no longer needed.
-        providers.add(
-            sourcegraph.languages.registerImplementationProvider(documentSelector, {
-                provideImplementation: provideImpls,
-            })
-        )
         providers.add(
             sourcegraph.languages.registerLocationProvider(IMPL_ID, documentSelector, {
                 provideLocations: provideImpls,
