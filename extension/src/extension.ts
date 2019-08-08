@@ -6,7 +6,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { Handler } from '@sourcegraph/basic-code-intel'
+import { asyncFirst, Handler, initLSIF, wrapMaybe } from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -91,7 +91,8 @@ import {
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
 
-const getConfig = () => sourcegraph.configuration.get().value as LangTypescriptConfiguration
+const getConfig = () =>
+    sourcegraph.configuration.get().value as LangTypescriptConfiguration & { 'codeIntel.lsif': boolean }
 
 type NonDisposableMessageConnection = Omit<MessageConnection, 'dispose'>
 
@@ -102,6 +103,50 @@ const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.te
 const documentSelector: sourcegraph.DocumentSelector = [{ language: 'typescript' }, { language: 'javascript' }]
 
 const logger: Logger = new RedactingLogger(console)
+
+interface Providers {
+    hover: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Hover | null>
+    definition: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Definition | null>
+    references: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Location[] | null>
+}
+
+function initBasicCodeIntel(): Providers {
+    const handler = new Handler({
+        sourcegraph,
+        languageID: 'typescript',
+        fileExts: ['ts', 'tsx', 'js', 'jsx'],
+        commentStyle: {
+            lineRegex: /\/\/\s?/,
+            block: {
+                startRegex: /\/\*\*?/,
+                lineNoiseRegex: /(^\s*\*\s?)?/,
+                endRegex: /\*\//,
+            },
+        },
+        filterDefinitions: ({ filePath, fileContent, results }) => {
+            const imports = fileContent
+                .split('\n')
+                .map(line => {
+                    // Matches the import at index 1
+                    const match = /\bfrom ['"](.*)['"];?$/.exec(line) || /\brequire\(['"](.*)['"]\)/.exec(line)
+                    return match ? match[1] : undefined
+                })
+                .filter((x): x is string => Boolean(x))
+
+            const filteredResults = results.filter(result =>
+                imports.some(i => path.join(path.dirname(filePath), i) === result.file.replace(/\.[^/.]+$/, ''))
+            )
+
+            return filteredResults.length === 0 ? results : filteredResults
+        },
+    })
+
+    return {
+        hover: handler.hover.bind(handler),
+        definition: handler.definition.bind(handler),
+        references: handler.references.bind(handler),
+    }
+}
 
 export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void> {
     logger.log('TypeScript extension activated')
@@ -114,52 +159,46 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const config = new BehaviorSubject(getConfig())
     ctx.subscriptions.add(sourcegraph.configuration.subscribe(() => config.next(getConfig())))
 
-    if (!config.value['typescript.serverUrl']) {
-        logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
-        // Fall back to basic-code-intel behavior
+    if (config.value['codeIntel.lsif']) {
+        const lsif = initLSIF()
+        const basicCodeIntel = initBasicCodeIntel()
 
-        const handler = new Handler({
-            sourcegraph,
-            languageID: 'typescript',
-            fileExts: ['ts', 'tsx', 'js', 'jsx'],
-            commentStyle: {
-                lineRegex: /\/\/\s?/,
-                block: {
-                    startRegex: /\/\*\*?/,
-                    lineNoiseRegex: /(^\s*\*\s?)?/,
-                    endRegex: /\*\//,
-                },
-            },
-            filterDefinitions: ({ filePath, fileContent, results }) => {
-                const imports = fileContent
-                    .split('\n')
-                    .map(line => {
-                        // Matches the import at index 1
-                        const match = /\bfrom ['"](.*)['"];?$/.exec(line) || /\brequire\(['"](.*)['"]\)/.exec(line)
-                        return match ? match[1] : undefined
-                    })
-                    .filter((x): x is string => Boolean(x))
-
-                const filteredResults = results.filter(result =>
-                    imports.some(i => path.join(path.dirname(filePath), i) === result.file.replace(/\.[^/.]+$/, ''))
-                )
-
-                return filteredResults.length === 0 ? results : filteredResults
-            },
-        })
         ctx.subscriptions.add(
             sourcegraph.languages.registerHoverProvider(documentSelector, {
-                provideHover: handler.hover.bind(handler),
+                provideHover: asyncFirst([lsif.hover, wrapMaybe(basicCodeIntel.hover)], null),
             })
         )
         ctx.subscriptions.add(
             sourcegraph.languages.registerDefinitionProvider(documentSelector, {
-                provideDefinition: handler.definition.bind(handler),
+                provideDefinition: asyncFirst([lsif.definition, wrapMaybe(basicCodeIntel.definition)], null),
             })
         )
         ctx.subscriptions.add(
             sourcegraph.languages.registerReferenceProvider(documentSelector, {
-                provideReferences: handler.references.bind(handler),
+                provideReferences: asyncFirst([lsif.references, wrapMaybe(basicCodeIntel.references)], null),
+            })
+        )
+        return
+    }
+
+    if (!config.value['typescript.serverUrl']) {
+        logger.warn('No typescript.serverUrl configured, falling back to basic code intelligence')
+        // Fall back to basic-code-intel behavior
+        const basicCodeIntel = initBasicCodeIntel()
+
+        ctx.subscriptions.add(
+            sourcegraph.languages.registerHoverProvider(documentSelector, {
+                provideHover: basicCodeIntel.hover.bind(basicCodeIntel),
+            })
+        )
+        ctx.subscriptions.add(
+            sourcegraph.languages.registerDefinitionProvider(documentSelector, {
+                provideDefinition: basicCodeIntel.definition.bind(basicCodeIntel),
+            })
+        )
+        ctx.subscriptions.add(
+            sourcegraph.languages.registerReferenceProvider(documentSelector, {
+                provideReferences: basicCodeIntel.references.bind(basicCodeIntel),
             })
         )
     }
