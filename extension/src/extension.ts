@@ -464,11 +464,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         return
                     }
 
-                    // This dummy arg will not be necessary once
-                    // https://github.com/sourcegraph/sourcegraph-basic-code-intel/pull/132
-                    // is merged.
-                    const dummyPosition = new sourcegraph.Position(0, 0)
-                    if (!(await isLSIFAvailable(textDocument, dummyPosition)) && config.value['typescript.serverUrl']) {
+                    if (!(await isLSIFAvailable(textDocument)) && config.value['typescript.serverUrl']) {
                         const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
                         const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
                         const connection = await getOrCreateConnection(serverRootUri, { token, span })
@@ -513,7 +509,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     logger.log('Hover trace', span.generateTraceURL())
                 }
 
-                if (await isLSIFAvailable(textDocument, position)) {
+                if (await isLSIFAvailable(textDocument)) {
                     const lsifResult = await lsif.hover(textDocument, position)
                     yield lsifResult && lsifResult.value
                 } else if (!config.value['typescript.serverUrl']) {
@@ -558,7 +554,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         logger.log('Definition trace', span.generateTraceURL())
                     }
 
-                    if (await isLSIFAvailable(textDocument, position)) {
+                    if (await isLSIFAvailable(textDocument)) {
                         const lsifResult = await lsif.definition(textDocument, position)
                         yield lsifResult ? lsifResult.value : null
                     } else if (!config.value['typescript.serverUrl']) {
@@ -605,7 +601,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     logger.log('References trace', span.generateTraceURL())
                 }
 
-                if (await isLSIFAvailable(textDocument, position)) {
+                if (await isLSIFAvailable(textDocument)) {
                     const lsifResult = await lsif.references(textDocument, position)
                     yield (lsifResult && lsifResult.value) || []
                 } else if (!config.value['typescript.serverUrl']) {
@@ -811,7 +807,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         logger.log('Implementation trace', span.generateTraceURL())
                     }
 
-                    if (await isLSIFAvailable(textDocument, position)) {
+                    if (await isLSIFAvailable(textDocument)) {
                         return null
                     }
 
