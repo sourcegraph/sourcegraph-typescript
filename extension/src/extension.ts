@@ -6,7 +6,8 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { asyncFirst, Handler, initLSIF, wrapMaybe } from '@sourcegraph/basic-code-intel'
+import { initLSIF } from '@sourcegraph/basic-code-intel'
+import { mkIsLSIFAvailable } from '@sourcegraph/basic-code-intel/lib/lsif'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -20,7 +21,6 @@ import { merge } from 'ix/asynciterable/index'
 import { filter, map, scan, tap } from 'ix/asynciterable/pipe/index'
 import { fromPairs, isEqual, uniqWith } from 'lodash'
 import { Span, Tracer } from 'opentracing'
-import * as path from 'path'
 import { BehaviorSubject, from, fromEventPattern, Subscription } from 'rxjs'
 import * as rxop from 'rxjs/operators'
 import * as sourcegraph from 'sourcegraph'
@@ -48,6 +48,7 @@ import {
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
+import { initBasicCodeIntel } from './basic-code-intel';
 import { LangTypescriptConfiguration } from './config'
 import {
     findPackageDependentsWithNpm,
@@ -87,54 +88,9 @@ import {
     SourcegraphEndpoint,
     throwIfAbortError,
 } from './util'
-import { mkIsLSIFAvailable } from '@sourcegraph/basic-code-intel/lib/lsif'
 
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
-
-interface Providers {
-    hover: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Hover | null>
-    definition: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Definition | null>
-    references: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Location[] | null>
-}
-
-function initBasicCodeIntel(): Providers {
-    const handler = new Handler({
-        sourcegraph,
-        languageID: 'typescript',
-        fileExts: ['ts', 'tsx', 'js', 'jsx'],
-        commentStyle: {
-            lineRegex: /\/\/\s?/,
-            block: {
-                startRegex: /\/\*\*?/,
-                lineNoiseRegex: /(^\s*\*\s?)?/,
-                endRegex: /\*\//,
-            },
-        },
-        filterDefinitions: ({ filePath, fileContent, results }) => {
-            const imports = fileContent
-                .split('\n')
-                .map(line => {
-                    // Matches the import at index 1
-                    const match = /\bfrom ['"](.*)['"];?$/.exec(line) || /\brequire\(['"](.*)['"]\)/.exec(line)
-                    return match ? match[1] : undefined
-                })
-                .filter((x): x is string => Boolean(x))
-
-            const filteredResults = results.filter(result =>
-                imports.some(i => path.join(path.dirname(filePath), i) === result.file.replace(/\.[^/.]+$/, ''))
-            )
-
-            return filteredResults.length === 0 ? results : filteredResults
-        },
-    })
-
-    return {
-        hover: handler.hover.bind(handler),
-        definition: handler.definition.bind(handler),
-        references: handler.references.bind(handler),
-    }
-}
 
 const getConfig = () =>
     sourcegraph.configuration.get().value as LangTypescriptConfiguration & { 'codeIntel.lsif': boolean }
