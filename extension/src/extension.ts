@@ -48,7 +48,7 @@ import {
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
 import { getOrCreateAccessToken } from './auth'
-import { initBasicCodeIntel } from './basic-code-intel';
+import { initBasicCodeIntel } from './basic-code-intel'
 import { LangTypescriptConfiguration } from './config'
 import {
     findPackageDependentsWithNpm,
