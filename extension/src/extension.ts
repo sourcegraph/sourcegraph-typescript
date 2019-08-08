@@ -92,19 +92,6 @@ import { mkIsLSIFAvailable } from '@sourcegraph/basic-code-intel/lib/lsif'
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
 
-const getConfig = () =>
-    sourcegraph.configuration.get().value as LangTypescriptConfiguration & { 'codeIntel.lsif': boolean }
-
-type NonDisposableMessageConnection = Omit<MessageConnection, 'dispose'>
-
-const connectionsByRootUri = new Map<string, Promise<NonDisposableMessageConnection>>()
-
-const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
-
-const documentSelector: sourcegraph.DocumentSelector = [{ language: 'typescript' }, { language: 'javascript' }]
-
-const logger: Logger = new RedactingLogger(console)
-
 interface Providers {
     hover: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Hover | null>
     definition: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Definition | null>
@@ -148,6 +135,19 @@ function initBasicCodeIntel(): Providers {
         references: handler.references.bind(handler),
     }
 }
+
+const getConfig = () =>
+    sourcegraph.configuration.get().value as LangTypescriptConfiguration & { 'codeIntel.lsif': boolean }
+
+type NonDisposableMessageConnection = Omit<MessageConnection, 'dispose'>
+
+const connectionsByRootUri = new Map<string, Promise<NonDisposableMessageConnection>>()
+
+const isTypeScriptFile = (textDocumentUri: URL): boolean => /\.m?(?:t|j)sx?$/.test(textDocumentUri.hash)
+
+const documentSelector: sourcegraph.DocumentSelector = [{ language: 'typescript' }, { language: 'javascript' }]
+
+const logger: Logger = new RedactingLogger(console)
 
 export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void> {
     logger.log('TypeScript extension activated')
