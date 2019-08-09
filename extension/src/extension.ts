@@ -6,8 +6,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { initLSIF } from '@sourcegraph/basic-code-intel'
-import { mkIsLSIFAvailable } from '@sourcegraph/basic-code-intel/lib/lsif'
+import { initLSIF, mkIsLSIFAvailable } from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,

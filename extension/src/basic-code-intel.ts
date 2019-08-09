@@ -1,15 +1,9 @@
-import { Handler } from '@sourcegraph/basic-code-intel'
+import { Handler, Providers } from '@sourcegraph/basic-code-intel'
 import * as path from 'path'
 import * as sourcegraph from 'sourcegraph'
 
-export interface Providers {
-    hover: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Hover | null>
-    definition: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Definition | null>
-    references: (doc: sourcegraph.TextDocument, pos: sourcegraph.Position) => Promise<sourcegraph.Location[] | null>
-}
-
 export function initBasicCodeIntel(): Providers {
-    const handler = new Handler({
+    return new Handler({
         sourcegraph,
         languageID: 'typescript',
         fileExts: ['ts', 'tsx', 'js', 'jsx'],
@@ -38,10 +32,4 @@ export function initBasicCodeIntel(): Providers {
             return filteredResults.length === 0 ? results : filteredResults
         },
     })
-
-    return {
-        hover: handler.hover.bind(handler),
-        definition: handler.definition.bind(handler),
-        references: handler.references.bind(handler),
-    }
 }
