@@ -722,14 +722,15 @@
   resolved "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz#9a06f4f137ee84d7df0460c1fdb1135ffa6c50fd"
   integrity sha512-ONhaKPIufzzrlNbqtWFFd+jlnemX6lJAgq9ZeiZtS7I1PIf/la7CW4m83rTXRnVnsMbW2k56pGYu7AUFJD9Pow==
 
-"@sourcegraph/basic-code-intel@^6.0.18":
-  version "6.0.18"
-  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-6.0.18.tgz#ca8a658213bab7295b98619af5623c51d39b6ea8"
-  integrity sha512-PE9mWg/HNBesShKZrILVtxF2VQjtQ9nV9DHECvqqiJ70savcRphcpAmdpPICFvqh5GxYUIoRo3AkzdPGI0DUjw==
+"@sourcegraph/basic-code-intel@^7.0.5":
+  version "7.0.5"
+  resolved "https://registry.npmjs.org/@sourcegraph/basic-code-intel/-/basic-code-intel-7.0.5.tgz#eb17ef2a29e4fe3a935a9cf8b385d3737fa64148"
+  integrity sha512-FmGIdATsr9hvIivvJ4yu216YiyPbQn4+lPTe0eKlbIXM5eTK5OUgVSIH57wAeAkCvscy/Jzg03d8rqmkAFtz8g==
   dependencies:
     lodash "^4.17.11"
     rxjs "^6.3.3"
-    sourcegraph "^23.0.0"
+    sourcegraph "^23.0.1"
+    vscode-languageserver-types "^3.14.0"
 
 "@sourcegraph/lightstep-tracer-webworker@^0.20.14-fork.3":
   version "0.20.14-fork.3"
@@ -6356,10 +6357,10 @@ source-map@^0.7.3:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.7.3.tgz#5302f8169031735226544092e64981f751750383"
   integrity sha512-CkCj6giN3S+n9qrYiBTX5gystlENnRW5jZeNLHpe6aue+SrHcG5VYwujhW9s4dY31mEGsxBDrHR6oI69fTXsaQ==
 
-sourcegraph@^23.0.0:
-  version "23.0.0"
-  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-23.0.0.tgz#1fb96015af3e84cc9cc2944823f04a7e952ed565"
-  integrity sha512-hQALHrTt+AK5ZAqUAUNhxO7ClSv/xyTjMQPBb+hQykKJrMaHTk+CnJNHs7dRfXYKnbnZeisQRjaxKGX8UecU0Q==
+sourcegraph@^23.0.0, sourcegraph@^23.0.1:
+  version "23.0.1"
+  resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-23.0.1.tgz#715fcf4129a6d94bc3bfd2740d9c706ae6357ffe"
+  integrity sha512-4We7zqhOagOVxNFdS6/xT/Crhb0Arw/9ytGBu8JuHfjo5yjMtcUYt22kZyu2TaPHXwyPW9muUi1eKSFA6Qg4lw==
 
 spdx-correct@^3.0.0:
   version "3.1.0"
@@ -7187,7 +7188,7 @@ vscode-languageserver-protocol@^3.10.3, vscode-languageserver-protocol@^3.13.0:
     vscode-jsonrpc "^4.0.0"
     vscode-languageserver-types "3.14.0"
 
-vscode-languageserver-types@3.14.0, vscode-languageserver-types@^3.13.0:
+vscode-languageserver-types@3.14.0, vscode-languageserver-types@^3.13.0, vscode-languageserver-types@^3.14.0:
   version "3.14.0"
   resolved "https://registry.npmjs.org/vscode-languageserver-types/-/vscode-languageserver-types-3.14.0.tgz#d3b5952246d30e5241592b6dde8280e03942e743"
   integrity sha512-lTmS6AlAlMHOvPQemVwo3CezxBp0sNB95KNPkqp3Nxd5VFEnuG1ByM0zlRWos0zjO3ZWtkvhal0COgiV1xIA4A==
