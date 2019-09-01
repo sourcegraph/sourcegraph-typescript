@@ -975,10 +975,10 @@
     "@types/express-serve-static-core" "*"
     "@types/mime" "*"
 
-"@types/tail@1.2.1":
-  version "1.2.1"
-  resolved "https://registry.npmjs.org/@types/tail/-/tail-1.2.1.tgz#d42d582558f9e138c23d8194216ae3a7f64b34bf"
-  integrity sha512-v7z6nE6QS634ugD9QZofcPXADgbpB/Wd+hIVt14UrN267/UzimHhnQ8tfitxdosOYycTzgFXP2s+XdZTo2d7/w==
+"@types/tail@1.2.2":
+  version "1.2.2"
+  resolved "https://registry.npmjs.org/@types/tail/-/tail-1.2.2.tgz#93651a2ae3353e8be1b94433cb1cf6eca50c9cd9"
+  integrity sha512-I0GyFDwPtTP7/cv2WR43oItLsQcIxTafPGuObYElMuDzSu28EP4NOE+Mz2NuntrcII1Q3W30QhTSKEf+zU45aA==
 
 "@types/tar@4.0.0":
   version "4.0.0"

@@ -196,7 +196,7 @@
     "@types/relateurl": "0.2.28",
     "@types/rmfr": "2.0.0",
     "@types/semver": "5.5.0",
-    "@types/tail": "1.2.1",
+    "@types/tail": "1.2.2",
     "@types/tar": "4.0.0",
     "@types/type-is": "1.6.2",
     "@types/uuid": "3.4.5",
