@@ -208,7 +208,7 @@
     "lnfs-cli": "^2.1.0",
     "parcel-bundler": "^1.12.3",
     "prettier": "^1.17.1",
-    "tslint": "^5.18.0",
+    "tslint": "^5.19.0",
     "yarn-deduplicate": "^1.1.1"
   },
   "dependencies": {
