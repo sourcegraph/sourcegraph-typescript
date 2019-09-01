@@ -201,7 +201,7 @@
     "@types/type-is": "1.6.2",
     "@types/uuid": "3.4.5",
     "@types/whatwg-url": "6.4.0",
-    "@types/ws": "6.0.2",
+    "@types/ws": "6.0.3",
     "dot-json": "^1.1.0",
     "husky": "^1.1.2",
     "json-schema-to-typescript": "^6.1.3",
