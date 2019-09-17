@@ -540,7 +540,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         providers.add(
             sourcegraph.languages.registerHoverProvider(documentSelector, {
                 provideHover: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                    observableFromAsyncIterable(provideHover(textDocument, position))
+                    observableFromAsyncIterable(provideHover(textDocument, position)).pipe(rxop.shareReplay(1))
                 ),
             })
         )
