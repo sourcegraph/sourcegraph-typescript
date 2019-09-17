@@ -584,7 +584,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         providers.add(
             sourcegraph.languages.registerDefinitionProvider(documentSelector, {
                 provideDefinition: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                    observableFromAsyncIterable(provideDefinition(textDocument, position))
+                    observableFromAsyncIterable(provideDefinition(textDocument, position)).pipe(rxop.shareReplay(1))
                 ),
             })
         )
