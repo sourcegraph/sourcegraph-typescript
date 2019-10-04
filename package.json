@@ -230,7 +230,7 @@
     "lodash": "^4.17.11",
     "mkdirp-promise": "^5.0.1",
     "mz": "^2.7.0",
-    "npm-registry-fetch": "^4.0.0",
+    "npm-registry-fetch": "^4.0.2",
     "opentracing": "^0.14.3",
     "pretty-bytes": "^5.1.0",
     "prom-client": "^11.2.0",
