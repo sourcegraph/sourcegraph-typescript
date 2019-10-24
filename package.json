@@ -233,7 +233,7 @@
     "npm-registry-fetch": "^5.0.0",
     "opentracing": "^0.14.3",
     "pretty-bytes": "^5.1.0",
-    "prom-client": "^11.2.0",
+    "prom-client": "^11.5.3",
     "relateurl": "^0.2.7",
     "rmfr": "^2.0.0",
     "rxjs": "^6.5.3",
