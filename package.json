@@ -180,7 +180,7 @@
     "sourcegraph:prepublish": "npm run build-ext"
   },
   "devDependencies": {
-    "@sourcegraph/prettierrc": "^2.2.0",
+    "@sourcegraph/prettierrc": "^3.0.0",
     "@sourcegraph/tsconfig": "^4.0.0",
     "@sourcegraph/tslint-config": "^13.4.0",
     "@types/express": "4.16.1",

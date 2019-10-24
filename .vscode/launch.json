@@ -10,7 +10,7 @@
       "name": "Launch Server",
       "program": "${workspaceFolder}/server/dist/server.js",
       "outFiles": ["${workspaceFolder}/server/dist/**/*.js"],
-      "skipFiles": ["async_hooks.js"]
-    }
-  ]
+      "skipFiles": ["async_hooks.js"],
+    },
+  ],
 }

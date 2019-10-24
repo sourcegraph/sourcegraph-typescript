@@ -7,11 +7,11 @@
       "type": "npm",
       "script": "build-server",
       "label": "Build server",
-      "problemMatcher": ["$tsc"]
+      "problemMatcher": ["$tsc"],
     },
     {
       "type": "typescript",
-      "label": "Build server on file changes",
+      "label": "Watch server",
       "tsconfig": "server/tsconfig.json",
       "option": "watch",
       "isBackground": true,
@@ -21,16 +21,16 @@
         "reveal": "never",
         "panel": "dedicated",
         "showReuseMessage": false,
-        "clear": true
+        "clear": true,
       },
       "runOptions": {
-        "runOn": "folderOpen"
-      }
+        "runOn": "folderOpen",
+      },
     },
     {
       "type": "typescript",
       "option": "watch",
-      "label": "Typecheck extension on file changes",
+      "label": "Watch and typecheck extension",
       "tsconfig": "extension/tsconfig.json",
       "isBackground": true,
       "problemMatcher": ["$tsc-watch"],
@@ -39,21 +39,21 @@
         "reveal": "never",
         "panel": "dedicated",
         "showReuseMessage": false,
-        "clear": true
+        "clear": true,
       },
       "runOptions": {
-        "runOn": "folderOpen"
-      }
+        "runOn": "folderOpen",
+      },
     },
     {
       "type": "npm",
       "script": "serve-ext",
-      "label": "Build extension on file changes and serve on localhost",
+      "label": "Serve and watch extension",
       "problemMatcher": [],
       "presentation": {
         "reveal": "never",
-        "panel": "dedicated"
-      }
-    }
-  ]
+        "panel": "dedicated",
+      },
+    },
+  ],
 }
