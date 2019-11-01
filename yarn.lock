@@ -3345,10 +3345,10 @@ hex2dec@1.0.1:
   resolved "http://registry.npmjs.org/hex2dec/-/hex2dec-1.0.1.tgz#949bb33f1fdbbeab20e06403a00fc7d5ff284207"
   integrity sha1-lJuzPx/bvqsg4GQDoA/H1f8oQgc=
 
-highlight.js@^9.13.1:
-  version "9.13.1"
-  resolved "https://registry.npmjs.org/highlight.js/-/highlight.js-9.13.1.tgz#054586d53a6863311168488a0f58d6c505ce641e"
-  integrity sha512-Sc28JNQNDzaH6PORtRLMvif9RSn1mYuOoX3omVjnb0+HbpPygU2ALBI0R/wsiqCb4/fcp07Gdo8g+fhtFrQl6A==
+highlight.js@^9.16.2:
+  version "9.16.2"
+  resolved "https://registry.npmjs.org/highlight.js/-/highlight.js-9.16.2.tgz#68368d039ffe1c6211bcc07e483daf95de3e403e"
+  integrity sha512-feMUrVLZvjy0oC7FVJQcSQRqbBq9kwqnYE4+Kj9ZjbHh3g+BisiPgF49NyQbVLNdrL/qqZr3Ca9yOKwgn2i/tw==
 
 hmac-drbg@^1.0.0:
   version "1.0.1"
