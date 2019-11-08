@@ -42,7 +42,7 @@ export async function* findPackageDependentsWithNpm(
     packageName: string,
     sgEndpoint: SourcegraphEndpoint,
     { logger, tracer, span }: { logger: Logger; span: Span; tracer: Tracer }
-): AsyncIterable<string> {
+): AsyncGenerator<string, void, void> {
     span.setTag('packageName', packageName)
     logger.log(`Searching for dependents of package "${packageName}" through npm`)
     const limit = 100
@@ -92,7 +92,7 @@ export async function* findPackageDependentsWithSourcegraphSearch(
     packageName: string,
     sgEndpoint: SourcegraphEndpoint,
     { logger, span, tracer }: { logger: Logger; span: Span; tracer: Tracer }
-): AsyncIterable<string> {
+): AsyncGenerator<string, void, void> {
     span.setTag('packageName', packageName)
     logger.log(`Searching for dependents of ${packageName} through Sourcegraph`)
     const results = await search(`file:package.json$ ${packageName} max:1000`, sgEndpoint, { span, tracer })
@@ -112,7 +112,7 @@ export async function* findPackageDependentsWithSourcegraphSearch(
 export async function* findPackageDependentsWithSourcegraphExtensionRegistry(
     sgEndpoint: SourcegraphEndpoint,
     { logger, tracer, span }: { logger: Logger; tracer: Tracer; span: Span }
-): AsyncIterable<string> {
+): AsyncGenerator<string, void, void> {
     logger.log(`Searching for dependents to "sourcegraph" through Sourcegraph extension registry`)
     const extensions = await queryExtensions(sgEndpoint, { span, tracer })
     logger.log(`Found ${extensions.length} extensions`)

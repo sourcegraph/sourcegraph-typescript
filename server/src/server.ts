@@ -336,7 +336,7 @@ webSocketServer.on('connection', connection => {
                                 )
                                 await flatMapConcurrent(projectRoots, 10, async function*(
                                     projectRoot
-                                ): AsyncIterable<never> {
+                                ): AsyncGenerator<never, void, void> {
                                     const pattern = new URL('**/*.ts?(x)', projectRoot)
                                     // Find a random TS file in the project and open it
                                     const typescriptFile = await AsyncIterableX.from(

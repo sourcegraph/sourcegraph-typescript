@@ -90,7 +90,7 @@ import {
     areProviderParamsEqual,
     asArray,
     distinctUntilChanged,
-    observableFromAsyncIterable,
+    observableFromAsyncGenerator,
     SourcegraphEndpoint,
 } from './util'
 
@@ -546,7 +546,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         providers.add(
             sourcegraph.languages.registerHoverProvider(documentSelector, {
                 provideHover: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                    observableFromAsyncIterable(provideHover(textDocument, position)).pipe(rxop.shareReplay(1))
+                    observableFromAsyncGenerator(provideHover.bind(null, textDocument, position)).pipe(
+                        rxop.shareReplay(1)
+                    )
                 ),
             })
         )
@@ -590,7 +592,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
         providers.add(
             sourcegraph.languages.registerDefinitionProvider(documentSelector, {
                 provideDefinition: distinctUntilChanged(areProviderParamsEqual, (textDocument, position) =>
-                    observableFromAsyncIterable(provideDefinition(textDocument, position)).pipe(rxop.shareReplay(1))
+                    observableFromAsyncGenerator(provideDefinition.bind(null, textDocument, position)).pipe(
+                        rxop.shareReplay(1)
+                    )
                 ),
             })
         )
@@ -600,7 +604,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             textDocument: sourcegraph.TextDocument,
             position: sourcegraph.Position,
             context: sourcegraph.ReferenceContext
-        ): AsyncIterable<sourcegraph.Location[]> =>
+        ): AsyncGenerator<sourcegraph.Location[], void, void> =>
             traceAsyncGenerator('Provide references', tracer, undefined, async function*(span) {
                 if (canGenerateTraceUrl(span)) {
                     logger.log('References trace', span.generateTraceURL())
@@ -796,7 +800,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
             })
         providers.add(
             sourcegraph.languages.registerReferenceProvider(documentSelector, {
-                provideReferences: (doc, pos, ctx) => observableFromAsyncIterable(provideReferences(doc, pos, ctx)),
+                provideReferences: (doc, pos, ctx) =>
+                    observableFromAsyncGenerator(provideReferences.bind(null, doc, pos, ctx)),
             })
         )
 

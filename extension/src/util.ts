@@ -13,22 +13,22 @@ export const areProviderParamsEqual = (
     [doc2, pos2]: [sourcegraph.TextDocument, sourcegraph.Position]
 ): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
 
-export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Observable<T> =>
+export const observableFromAsyncGenerator = <T>(generator: () => AsyncGenerator<T, unknown, void>): Observable<T> =>
     new Observable(observer => {
-        const iterator = iterable[Symbol.asyncIterator]()
+        const iterator = generator()
         let unsubscribed = false
         let iteratorDone = false
         function next(): void {
             iterator.next().then(
-                ({ value, done }) => {
+                result => {
                     if (unsubscribed) {
                         return
                     }
-                    if (done) {
+                    if (result.done) {
                         iteratorDone = true
                         observer.complete()
                     } else {
-                        observer.next(value)
+                        observer.next(result.value)
                         next()
                     }
                 },
@@ -54,8 +54,8 @@ export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Obse
  * Workaround for https://github.com/sourcegraph/sourcegraph/issues/1190
  */
 export const abortPrevious = <P extends any[], R>(
-    fn: (...args: P) => AsyncIterable<R>
-): ((...args: P) => AsyncIterable<R>) => {
+    fn: (...args: P) => AsyncGenerator<R, void, void>
+): ((...args: P) => AsyncGenerator<R, void, void>) => {
     let abort = noop
     return async function*(...args) {
         abort()

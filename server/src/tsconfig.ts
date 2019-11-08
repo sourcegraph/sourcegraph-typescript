@@ -29,7 +29,7 @@ export async function sanitizeTsConfigs({
         const pattern = new URL('**/tsconfig.json', dir)
         flatMapConcurrent(pickResourceRetriever(pattern).glob(pattern), 10, async function*(
             tsconfigUri
-        ): AsyncIterable<never> {
+        ): AsyncGenerator<never, void, void> {
             throwIfCancelled(token)
             let json: string | undefined
             try {

@@ -1,4 +1,4 @@
-import { FORMAT_TEXT_MAP, Span, SpanContext, Tracer } from 'opentracing'
+import { FORMAT_TEXT_MAP, Span, SpanContext, SpanOptions, Tracer } from 'opentracing'
 import { ERROR, SPAN_KIND, SPAN_KIND_RPC_CLIENT } from 'opentracing/lib/ext/tags'
 import { CancellationToken, MessageConnection, NotificationType1, RequestType1 } from 'vscode-jsonrpc'
 
@@ -79,8 +79,8 @@ export async function* traceAsyncGenerator<T>(
     operationName: string,
     tracer: Tracer,
     childOf: Span | undefined,
-    asyncGenerator: (span: Span) => AsyncIterable<T>
-): AsyncIterable<T> {
+    asyncGenerator: (span: Span) => AsyncGenerator<T, void, void>
+): AsyncGenerator<T, void, void> {
     const span = tracer.startSpan(operationName, { childOf })
     try {
         yield* asyncGenerator(span)
