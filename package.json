@@ -222,7 +222,7 @@
     "ini": "^1.3.5",
     "ix": "^2.3.5",
     "json5": "^2.1.1",
-    "lightstep-tracer": "^0.20.13",
+    "lightstep-tracer": "^0.22.3",
     "lodash": "^4.17.11",
     "mkdirp-promise": "^5.0.1",
     "mz": "^2.7.0",
