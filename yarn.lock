@@ -6477,7 +6477,7 @@ source-map@^0.7.3:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.7.3.tgz#5302f8169031735226544092e64981f751750383"
   integrity sha512-CkCj6giN3S+n9qrYiBTX5gystlENnRW5jZeNLHpe6aue+SrHcG5VYwujhW9s4dY31mEGsxBDrHR6oI69fTXsaQ==
 
-sourcegraph@^23.0.0, sourcegraph@^23.0.1:
+sourcegraph@^23.0.1:
   version "23.0.1"
   resolved "https://registry.npmjs.org/sourcegraph/-/sourcegraph-23.0.1.tgz#715fcf4129a6d94bc3bfd2740d9c706ae6357ffe"
   integrity sha512-4We7zqhOagOVxNFdS6/xT/Crhb0Arw/9ytGBu8JuHfjo5yjMtcUYt22kZyu2TaPHXwyPW9muUi1eKSFA6Qg4lw==
