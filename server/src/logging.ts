@@ -13,7 +13,7 @@ export class LSPLogger extends AbstractLogger {
         super()
     }
 
-    protected logType(type: LogLevel, values: any[]): void {
+    protected logType(type: LogLevel, values: unknown[]): void {
         try {
             this.client.sendNotification(LogMessageNotification.type, {
                 type: LOG_LEVEL_TO_LSP[type],

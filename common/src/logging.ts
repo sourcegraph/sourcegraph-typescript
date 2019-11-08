@@ -2,24 +2,24 @@ import { inspect } from 'util'
 import { MessageType } from 'vscode-languageserver-protocol'
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'log'
-export type Logger = Record<LogLevel, (...values: any[]) => void>
+export type Logger = Record<LogLevel, (...values: unknown[]) => void>
 
 export abstract class AbstractLogger implements Logger {
-    protected abstract logType(type: LogLevel, values: any[]): void
+    protected abstract logType(type: LogLevel, values: unknown[]): void
 
-    public log(...values: any[]): void {
+    public log(...values: unknown[]): void {
         this.logType('log', values)
     }
 
-    public info(...values: any[]): void {
+    public info(...values: unknown[]): void {
         this.logType('info', values)
     }
 
-    public warn(...values: any[]): void {
+    public warn(...values: unknown[]): void {
         this.logType('warn', values)
     }
 
-    public error(...values: any[]): void {
+    public error(...values: unknown[]): void {
         this.logType('error', values)
     }
 }
@@ -50,7 +50,8 @@ export const LSP_TO_LOG_LEVEL: Record<MessageType, LogLevel> = {
 /**
  * Formats values to a message by pretty-printing objects
  */
-export const format = (value: any): string => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))
+export const format = (value: unknown): string =>
+    typeof value === 'string' ? value : inspect(value, { depth: Infinity })
 
 /**
  * Removes auth info from URLs
@@ -65,7 +66,7 @@ export class RedactingLogger extends AbstractLogger {
         super()
     }
 
-    protected logType(type: LogLevel, values: any[]): void {
+    protected logType(type: LogLevel, values: unknown[]): void {
         // TODO ideally this would not format the value to a string before redacting,
         // because that prevents expanding objects in devtools
         this.logger[type](...values.map(value => redact(format(value))))
@@ -77,7 +78,7 @@ export class PrefixedLogger extends AbstractLogger {
         super()
     }
 
-    protected logType(type: LogLevel, values: any[]): void {
+    protected logType(type: LogLevel, values: unknown[]): void {
         this.logger[type](`[${this.prefix}]`, ...values)
     }
 }
@@ -87,7 +88,7 @@ export class MultiLogger extends AbstractLogger {
         super()
     }
 
-    protected logType(type: LogLevel, values: any[]): void {
+    protected logType(type: LogLevel, values: unknown[]): void {
         for (const logger of this.loggers) {
             logger[type](...values)
         }
