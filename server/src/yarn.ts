@@ -6,11 +6,11 @@ import { combineLatest, concat, fromEvent, merge, Unsubscribable } from 'rxjs'
 import { filter, map, switchMap, withLatestFrom } from 'rxjs/operators'
 import { Readable } from 'stream'
 import { CancellationToken, Disposable } from 'vscode-jsonrpc'
-import { createAbortError, throwIfCancelled } from './cancellation'
+import { createAbortError, throwIfCancelled } from '../../common/src/cancellation'
+import { Logger, NoopLogger } from '../../common/src/logging'
+import { tracePromise } from '../../common/src/tracing'
 import { disposeAll } from './disposable'
-import { Logger, NoopLogger } from './logging'
 import { Progress, ProgressProvider } from './progress'
-import { tracePromise } from './tracing'
 
 export interface YarnStep {
     message: string
@@ -227,10 +227,10 @@ export async function install({
                     const steps = fromEvent<YarnStep>(yarn, 'step')
                     using.push(
                         merge<Progress>(
-                            combineLatest(
+                            combineLatest([
                                 concat([''], fromEvent<YarnActivityTick>(yarn, 'activityTick').pipe(map(a => a.name))),
-                                steps
-                            ).pipe(
+                                steps,
+                            ]).pipe(
                                 map(([activityName, step]) => ({
                                     message: [step.message, activityName].filter(Boolean).join(' - '),
                                     percentage: Math.round(((step.current - 1) / step.total) * 100),

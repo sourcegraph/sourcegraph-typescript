@@ -1,5 +1,5 @@
 import { Unsubscribable } from 'rxjs'
-import { Logger } from './logging'
+import { Logger } from '../../common/src/logging'
 
 export interface Disposable {
     dispose(): void

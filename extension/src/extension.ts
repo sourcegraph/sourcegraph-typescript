@@ -46,9 +46,19 @@ import {
     ReferencesRequest,
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
+import { throwIfAbortError } from '../../common/src/cancellation'
+import { LangTypescriptConfiguration } from '../../common/src/config'
+import { flatMapConcurrent } from '../../common/src/ix'
+import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from '../../common/src/logging'
+import {
+    canGenerateTraceUrl,
+    logErrorEvent,
+    sendTracedRequest,
+    traceAsyncGenerator,
+    tracePromise,
+} from '../../common/src/tracing'
 import { getOrCreateAccessToken } from './auth'
 import { initBasicCodeIntel } from './basic-code-intel'
-import { LangTypescriptConfiguration } from './config'
 import {
     findPackageDependentsWithNpm,
     findPackageDependentsWithSourcegraphExtensionRegistry as findDependentsWithSourcegraphExtensionRegistry,
@@ -56,7 +66,6 @@ import {
     findPackageName,
 } from './dependencies'
 import { resolveRev } from './graphql'
-import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from './logging'
 import {
     convertDiagnosticToDecoration,
     convertHover,
@@ -69,7 +78,6 @@ import {
     WindowProgressClientCapabilities,
     WindowProgressNotification,
 } from './protocol.progress.proposed'
-import { canGenerateTraceUrl, logErrorEvent, sendTracedRequest, traceAsyncGenerator, tracePromise } from './tracing'
 import {
     parseSourcegraphRawUrl,
     resolveServerRootUri,
@@ -82,10 +90,8 @@ import {
     areProviderParamsEqual,
     asArray,
     distinctUntilChanged,
-    flatMapConcurrent,
     observableFromAsyncIterable,
     SourcegraphEndpoint,
-    throwIfAbortError,
 } from './util'
 
 const HOVER_DEF_POLL_INTERVAL = 2000

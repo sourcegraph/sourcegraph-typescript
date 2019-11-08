@@ -1,17 +1,12 @@
 {
-  "extends": "@sourcegraph/tsconfig",
+  "extends": "../tsconfig.json",
+  "references": [{ "path": "../common" }],
   "compilerOptions": {
-    "target": "esnext",
     "module": "commonjs",
-    "moduleResolution": "node",
     "lib": ["es2018", "esnext.asynciterable", "dom"],
     "typeRoots": ["../node_modules/@types", "./src/types"],
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
-    "outDir": "dist",
+    "outDir": "out",
     "rootDir": "src",
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*"],
 }

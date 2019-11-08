@@ -1,5 +1,7 @@
 {
   "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.format.semicolons": "remove",
+  "typescript.preferences.quoteStyle": "single",
   "tslint.autoFixOnSave": true,
   "editor.formatOnSave": true,
   "files.eol": "\n",

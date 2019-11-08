@@ -4,10 +4,10 @@ import { Span, Tracer } from 'opentracing'
 import * as semver from 'semver'
 import { URL } from 'url'
 import { CancellationToken } from 'vscode-jsonrpc'
-import { throwIfCancelled } from './cancellation'
-import { Logger } from './logging'
+import { throwIfCancelled } from '../../common/src/cancellation'
+import { Logger } from '../../common/src/logging'
+import { logErrorEvent, tracePromise } from '../../common/src/tracing'
 import { ResourceNotFoundError, ResourceRetrieverPicker, walkUp } from './resources'
-import { logErrorEvent, tracePromise } from './tracing'
 
 export async function fetchPackageMeta(
     packageName: string,

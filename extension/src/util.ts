@@ -1,8 +1,7 @@
-import { flatMap, share } from 'ix/asynciterable'
-import { MergeAsyncIterable } from 'ix/asynciterable/merge'
 import { noop } from 'lodash'
 import { Observable } from 'rxjs'
 import * as sourcegraph from 'sourcegraph'
+import { createAbortError } from '../../common/src/cancellation'
 
 export interface SourcegraphEndpoint {
     url: URL
@@ -13,16 +12,6 @@ export const areProviderParamsEqual = (
     [doc1, pos1]: [sourcegraph.TextDocument, sourcegraph.Position],
     [doc2, pos2]: [sourcegraph.TextDocument, sourcegraph.Position]
 ): boolean => doc1.uri === doc2.uri && pos1.isEqual(pos2)
-
-export const isAbortError = (val: any) => typeof val === 'object' && val !== null && val.name === 'AbortError'
-
-export function throwIfAbortError(err: any): void {
-    if (isAbortError(err)) {
-        throw err
-    }
-}
-
-export const createAbortError = () => Object.assign(new Error('Aborted'), { name: 'AbortError' })
 
 export const observableFromAsyncIterable = <T>(iterable: AsyncIterable<T>): Observable<T> =>
     new Observable(observer => {
@@ -104,13 +93,3 @@ export function distinctUntilChanged<P extends any[], R>(
         return previousResult
     }
 }
-
-/**
- * Flatmaps the source iterable with `selector`, `concurrency` times at a time.
- */
-export const flatMapConcurrent = <T, R>(
-    source: AsyncIterable<T>,
-    concurrency: number,
-    selector: (value: T) => AsyncIterable<R>
-): AsyncIterable<R> =>
-    new MergeAsyncIterable(new Array<AsyncIterable<R>>(concurrency).fill(share(flatMap(source, selector))))

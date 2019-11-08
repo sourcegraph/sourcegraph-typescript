@@ -63,8 +63,12 @@ import {
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
-import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
-import { LangTypescriptConfiguration } from './config'
+import { throwIfCancelled } from '../../common/src/cancellation'
+import { LangTypescriptConfiguration } from '../../common/src/config'
+import { flatMapConcurrent } from '../../common/src/ix'
+import { Logger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from '../../common/src/logging'
+import { tracePromise } from '../../common/src/tracing'
+import { toAxiosCancelToken } from './cancellation'
 import {
     cloneUrlFromPackageMeta,
     fetchPackageMeta,
@@ -77,9 +81,8 @@ import {
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAllAsync } from './disposable'
 import { resolveRepository } from './graphql'
-import { flatMapConcurrent } from './ix'
 import { LanguageServer, spawnLanguageServer } from './language-server'
-import { Logger, LSPLogger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from './logging'
+import { LSPLogger } from './logging'
 import { createProgressProvider, noopProgressProvider, ProgressProvider } from './progress'
 import { WindowProgressClientCapabilities } from './protocol.progress.proposed'
 import {
@@ -89,7 +92,6 @@ import {
     ResourceNotFoundError,
     walkUp,
 } from './resources'
-import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { relativeUrl, URLMap, URLSet } from './uri'
 import { install } from './yarn'

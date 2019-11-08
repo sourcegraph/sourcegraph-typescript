@@ -1,9 +1,8 @@
 {
   "extends": "../tsconfig.json",
-  "references": [{ "path": "../common" }],
+  "references": [],
   "compilerOptions": {
-    "module": "esnext",
-    "lib": ["webworker", "es2018", "esnext.asynciterable"],
+    "lib": [],
     "rootDir": "src",
     "outDir": "out",
   },

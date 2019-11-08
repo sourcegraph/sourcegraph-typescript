@@ -1,9 +1,16 @@
 {
   "extends": "@sourcegraph/tsconfig",
+  "references": [{ "path": "server" }, { "path": "extension" }],
   "compilerOptions": {
-    "target": "es2016",
-    "module": "esnext",
+    "target": "es2019",
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+    "composite": true,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
   },
+  "files": [],
 }

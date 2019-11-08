@@ -8,7 +8,6 @@ steps:
       yarn run yarn-deduplicate --strategy fewer --fail --list
       yarn run prettier-check
       yarn run tslint
-      yarn run typecheck-ext
       yarn run build
     label: ':typescript:'
 

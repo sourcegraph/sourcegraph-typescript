@@ -4,7 +4,7 @@ import { MessageType } from 'vscode-languageserver-protocol'
 export type LogLevel = 'error' | 'warn' | 'info' | 'log'
 export type Logger = Record<LogLevel, (...values: any[]) => void>
 
-abstract class AbstractLogger implements Logger {
+export abstract class AbstractLogger implements Logger {
     protected abstract logType(type: LogLevel, values: any[]): void
 
     public log(...values: any[]): void {
@@ -33,6 +33,13 @@ export class NoopLogger extends AbstractLogger {
     }
 }
 
+export const LOG_LEVEL_TO_LSP: Record<LogLevel, MessageType> = {
+    log: MessageType.Log,
+    info: MessageType.Info,
+    warn: MessageType.Warning,
+    error: MessageType.Error,
+}
+
 export const LSP_TO_LOG_LEVEL: Record<MessageType, LogLevel> = {
     [MessageType.Log]: 'log',
     [MessageType.Info]: 'info',
@@ -43,7 +50,7 @@ export const LSP_TO_LOG_LEVEL: Record<MessageType, LogLevel> = {
 /**
  * Formats values to a message by pretty-printing objects
  */
-const format = (value: any): string => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))
+export const format = (value: any): string => (typeof value === 'string' ? value : inspect(value, { depth: Infinity }))
 
 /**
  * Removes auth info from URLs
@@ -72,5 +79,17 @@ export class PrefixedLogger extends AbstractLogger {
 
     protected logType(type: LogLevel, values: any[]): void {
         this.logger[type](`[${this.prefix}]`, ...values)
+    }
+}
+
+export class MultiLogger extends AbstractLogger {
+    constructor(private loggers: Logger[]) {
+        super()
+    }
+
+    protected logType(type: LogLevel, values: any[]): void {
+        for (const logger of this.loggers) {
+            logger[type](...values)
+        }
     }
 }

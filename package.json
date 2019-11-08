@@ -165,19 +165,15 @@
   ],
   "scripts": {
     "prettier": "prettier --list-different --write \"**/{*.{js?(on),ts,md,yml},.*.yml}\"",
-    "prettier-check": "npm run prettier -- --write=false",
-    "config-types": "dot-json package.json contributes.configuration | json2ts --unreachableDefinitions --style.singleQuote --no-style.semi",
-    "config-types-ext": "npm run config-types -- -o extension/src/config.ts",
-    "config-types-server": "npm run config-types -- -o server/src/config.ts",
-    "tslint": "tslint -p extension/tsconfig.json --format stylish && tslint -p server/tsconfig.json --format stylish",
-    "build": "npm run build-ext && npm run build-server",
-    "build-server": "npm run config-types-server && tsc -p ./server/tsconfig.json",
-    "watch-server": "npm run config-types-server && tsc -w -p ./server/tsconfig.json",
-    "build-ext": "npm run config-types-ext && parcel build --out-file extension.js extension/src/extension.ts && dot-json dist/extension.map sourceRoot https://sourcegraph.com/github.com/sourcegraph/sourcegraph-typescript@$(git rev-parse HEAD)/-/raw/extension/src/",
-    "serve-ext": "npm run symlink-package && npm run config-types-ext && parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
-    "typecheck-ext": "npm run config-types-ext && tsc -p ./extension/tsconfig.json",
+    "prettier-check": "yarn run prettier --write=false",
+    "config-types": "dot-json package.json contributes.configuration | json2ts --unreachableDefinitions --style.singleQuote --no-style.semi -o common/src/config.ts",
+    "tslint": "tslint -p tsconfig.json --format stylish",
+    "build-ts": "yarn run config-types && tsc -b .",
+    "watch-ts": "yarn run config-types && tsc -b . -w",
+    "build": "yarn run build-ts && parcel build --out-file extension.js extension/src/extension.ts && dot-json dist/extension.map sourceRoot https://sourcegraph.com/github.com/sourcegraph/sourcegraph-typescript@$(git rev-parse HEAD)/-/raw/extension/src/",
+    "serve-ext": "yarn run symlink-package && yarn run build-ts && parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
     "symlink-package": "mkdirp dist && lnfs ./package.json ./dist/package.json",
-    "sourcegraph:prepublish": "npm run build-ext"
+    "sourcegraph:prepublish": "yarn run build-ext"
   },
   "devDependencies": {
     "@sourcegraph/prettierrc": "^3.0.0",

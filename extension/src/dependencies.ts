@@ -1,7 +1,8 @@
 import { Span, Tracer } from 'opentracing'
+import { Logger, redact } from '../../common/src/logging'
+import { logErrorEvent, tracePromise } from '../../common/src/tracing'
 import { queryExtensions, resolveRepository, search } from './graphql'
-import { Logger, redact } from './logging'
-import { logErrorEvent, tracedFetch, tracePromise } from './tracing'
+import { tracedFetch } from './tracing'
 import { SourcegraphEndpoint } from './util'
 
 export async function fetchPackageMeta(
