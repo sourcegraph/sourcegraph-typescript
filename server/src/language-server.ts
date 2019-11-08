@@ -85,7 +85,7 @@ export async function spawnLanguageServer({
     disposables.add({ dispose: () => serverProcess.kill() })
     // Log language server STDERR output
     const languageServerLogger = new PrefixedLogger(logger, 'langserver')
-    serverProcess.stderr.on('data', chunk => languageServerLogger.log(chunk + ''))
+    serverProcess.stderr!.on('data', chunk => languageServerLogger.log(chunk + ''))
     const languageServerReader = new IPCMessageReader(serverProcess)
     const languageServerWriter = new IPCMessageWriter(serverProcess)
     disposables.add(languageServerWriter)

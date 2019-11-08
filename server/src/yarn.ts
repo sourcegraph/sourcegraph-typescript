@@ -171,8 +171,8 @@ export function spawnYarn({ span = new Span(), logger = new NoopLogger(), ...opt
     }
 
     // Yarn writes JSON messages to both STDOUT and STDERR depending on event type
-    parseStream(yarn.stdout)
-    parseStream(yarn.stderr)
+    parseStream(yarn.stdout!)
+    parseStream(yarn.stderr!)
 
     yarn.on('exit', (code, signal) => {
         if (code === 0) {
