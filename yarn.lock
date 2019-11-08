@@ -991,15 +991,15 @@
   dependencies:
     "@types/node" "*"
 
-"@types/node@*", "@types/node@12.12.6":
+"@types/node@*", "@types/node@^11.10.4", "@types/node@^11.11.6":
+  version "11.15.2"
+  resolved "https://registry.npmjs.org/@types/node/-/node-11.15.2.tgz#998b9cacc5f26e441d8396340818fde8e08aada5"
+  integrity sha512-BqCU9uIFkUH9Sgo2uLYbmIiFB1T+VBiM8AI/El3LIAI5KzwtckeSG+3WOYZr9aMoX4UIvRFBWBeSaOu6hFue2Q==
+
+"@types/node@12.12.6":
   version "12.12.6"
   resolved "https://registry.npmjs.org/@types/node/-/node-12.12.6.tgz#a47240c10d86a9a57bb0c633f0b2e0aea9ce9253"
   integrity sha512-FjsYUPzEJdGXjwKqSpE0/9QEh6kzhTAeObA54rn6j3rR4C/mzpI9L0KNfoeASSPMMdxIsoJuCLDWcM/rVjIsSA==
-
-"@types/node@^11.10.4":
-  version "11.10.5"
-  resolved "https://registry.npmjs.org/@types/node/-/node-11.10.5.tgz#fbaca34086bdc118011e1f05c47688d432f2d571"
-  integrity sha512-DuIRlQbX4K+d5I+GMnv+UfnGh+ist0RdlvOp+JZ7ePJ6KQONCFQv/gKYSU1ZzbVdFSUCKZOltjmpFAGGv5MdYA==
 
 "@types/prettier@^1.16.1":
   version "1.16.1"
@@ -3993,12 +3993,12 @@ isstream@~0.1.2:
   resolved "https://registry.npmjs.org/isstream/-/isstream-0.1.2.tgz#47e63f7af55afa6f92e1500e690eb8b8529c099a"
   integrity sha1-R+Y/evVa+m+S4VAOaQ64uFKcCZo=
 
-ix@^2.3.5:
-  version "2.5.2"
-  resolved "https://registry.npmjs.org/ix/-/ix-2.5.2.tgz#90fe46859f98c7d5bd01e28e67c657b42f6a8be4"
-  integrity sha512-RY0NlNdA5frPtUDx9Bctw/L8OTMUgb7OqOa+Z2r9XqiWnUAjLM6xZ4hj9M+/NNI1NLAsXju5WUFyZC9l2kqnMQ==
+ix@^2.5.3:
+  version "2.5.3"
+  resolved "https://registry.npmjs.org/ix/-/ix-2.5.3.tgz#b62899723297b2805343d1c77756b8568ed8dbec"
+  integrity sha512-Syz3oYUx5+P0T9F3BZOE2DzvWYF31Mbha1VqDbJsr4e4A+twhxTAf2c1BO8TMlwon12oAvvxAtQ+NJm9P8ISYQ==
   dependencies:
-    "@types/node" "^11.10.4"
+    "@types/node" "^11.11.6"
     tslib "^1.9.3"
 
 js-levenshtein@^1.1.3:
