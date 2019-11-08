@@ -5,11 +5,11 @@ cd $(dirname "${BASH_SOURCE[0]}")
 # Install dependencies
 yarn
 
-# Build & publish extension
-src ext publish
+# Build
+yarn run build
 
-# Compile Server
-yarn run build-server
+# Publish extension
+src ext publish
 
 # Build image
 VERSION=$(printf "%05d" $BUILDKITE_BUILD_NUMBER)_$(date +%Y-%m-%d)_$(git rev-parse --short HEAD)

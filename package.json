@@ -173,7 +173,7 @@
     "build": "yarn run build-ts && parcel build --out-file extension.js extension/src/extension.ts && dot-json dist/extension.map sourceRoot https://sourcegraph.com/github.com/sourcegraph/sourcegraph-typescript@$(git rev-parse HEAD)/-/raw/extension/src/",
     "serve-ext": "yarn run symlink-package && yarn run build-ts && parcel serve --no-hmr --out-file dist/extension.js extension/src/extension.ts",
     "symlink-package": "mkdirp dist && lnfs ./package.json ./dist/package.json",
-    "sourcegraph:prepublish": "yarn run build-ext"
+    "sourcegraph:prepublish": "yarn run build"
   },
   "devDependencies": {
     "@sourcegraph/prettierrc": "^3.0.0",
