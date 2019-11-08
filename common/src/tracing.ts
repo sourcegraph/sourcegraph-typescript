@@ -39,16 +39,21 @@ export function traceSync<T>(
  *
  * @param operationName The operation name for the new span
  * @param tracer OpenTracing tracer
- * @param childOf The parent span
+ * @param childOfOrOptions The parent span or custom soptions
  * @param operation The function to call
  */
 export async function tracePromise<T>(
     operationName: string,
     tracer: Tracer,
-    childOf: Span | SpanContext | undefined,
+    childOfOrOptions: Span | SpanContext | SpanOptions | undefined,
     operation: (span: Span) => Promise<T>
 ): Promise<T> {
-    const span = tracer.startSpan(operationName, { childOf })
+    const span = tracer.startSpan(
+        operationName,
+        childOfOrOptions instanceof Span || childOfOrOptions instanceof SpanContext
+            ? { childOf: childOfOrOptions }
+            : childOfOrOptions
+    )
     try {
         return await operation(span)
     } catch (err) {
