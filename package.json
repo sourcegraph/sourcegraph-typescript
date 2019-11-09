@@ -239,7 +239,7 @@
     "sourcegraph": "^23.0.1",
     "tagged-template-noop": "^2.1.0",
     "tail": "^2.0.2",
-    "tar": "^4.4.13",
+    "tar": "^5.0.5",
     "type-is": "^1.6.18",
     "type-zoo": "^3.2.1",
     "typescript": "^3.7.2",
