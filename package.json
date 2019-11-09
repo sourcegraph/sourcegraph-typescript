@@ -228,7 +228,7 @@
     "mz": "^2.7.0",
     "npm-registry-fetch": "^5.0.0",
     "opentracing": "^0.14.4",
-    "pretty-bytes": "^5.1.0",
+    "pretty-bytes": "^5.3.0",
     "prom-client": "^11.5.3",
     "relateurl": "^0.2.7",
     "rmfr": "^2.0.0",
