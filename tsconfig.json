@@ -1,6 +1,6 @@
 {
   "extends": "@sourcegraph/tsconfig",
-  "references": [{ "path": "server" }, { "path": "extension" }],
+  "references": [{ "path": "src/common/tsconfig.json" }, { "path": "src/server" }, { "path": "src/extension" }],
   "compilerOptions": {
     "target": "es2019",
     "esModuleInterop": true,

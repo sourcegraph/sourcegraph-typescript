@@ -14,9 +14,9 @@ import {
     ResponseMessage,
 } from 'vscode-jsonrpc/lib/messages'
 import { MessageReader, MessageWriter } from 'vscode-languageserver-protocol'
-import { isAbortError, tryCancel } from '../../common/src/cancellation'
-import { Logger } from '../../common/src/logging'
-import { logErrorEvent } from '../../common/src/tracing'
+import { isAbortError, tryCancel } from '../common/cancellation'
+import { Logger } from '../common/logging'
+import { logErrorEvent } from '../common/tracing'
 
 interface Connection {
     reader: MessageReader

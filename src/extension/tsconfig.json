@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "references": [{ "path": "../common/tsconfig.json" }],
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["webworker", "es2018", "esnext.asynciterable"],
+    "rootDir": ".",
+    "outDir": "../../lib/extension",
+  },
+  "include": ["**/*"],
+}

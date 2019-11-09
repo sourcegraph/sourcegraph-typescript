@@ -1,12 +1,12 @@
 {
-  "extends": "../tsconfig.json",
-  "references": [{ "path": "../common" }],
+  "extends": "../../tsconfig.json",
+  "references": [{ "path": "../common/tsconfig.json" }],
   "compilerOptions": {
     "module": "commonjs",
     "lib": ["es2018", "esnext.asynciterable", "dom"],
     "typeRoots": ["../node_modules/@types", "./src/types"],
-    "outDir": "out",
-    "rootDir": "src",
+    "outDir": "../../lib/server",
+    "rootDir": ".",
   },
-  "include": ["src/**/*"],
+  "include": ["**/*"],
 }

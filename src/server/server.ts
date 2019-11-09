@@ -63,11 +63,11 @@ import {
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
-import { throwIfCancelled } from '../../common/src/cancellation'
-import { LangTypescriptConfiguration } from '../../common/src/config'
-import { flatMapConcurrent } from '../../common/src/ix'
-import { Logger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from '../../common/src/logging'
-import { tracePromise } from '../../common/src/tracing'
+import { throwIfCancelled } from '../common/cancellation'
+import { LangTypescriptConfiguration } from '../common/config'
+import { flatMapConcurrent } from '../common/ix'
+import { Logger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from '../common/logging'
+import { tracePromise } from '../common/tracing'
 import { toAxiosCancelToken } from './cancellation'
 import {
     cloneUrlFromPackageMeta,

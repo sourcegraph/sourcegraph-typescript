@@ -1,7 +1,7 @@
 import { noop } from 'lodash'
 import { Observable } from 'rxjs'
 import * as sourcegraph from 'sourcegraph'
-import { createAbortError } from '../../common/src/cancellation'
+import { createAbortError } from '../common/cancellation'
 
 export interface SourcegraphEndpoint {
     url: URL

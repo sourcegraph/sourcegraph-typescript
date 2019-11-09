@@ -1,6 +1,6 @@
 import { MessageConnection } from 'vscode-jsonrpc'
 import { LogMessageNotification } from 'vscode-languageserver-protocol'
-import { AbstractLogger, format, LOG_LEVEL_TO_LSP, LogLevel } from '../../common/src/logging'
+import { AbstractLogger, format, LOG_LEVEL_TO_LSP, LogLevel } from '../common/logging'
 
 /**
  * A logger implementation that sends window/logMessage notifications to an LSP client

@@ -1,6 +1,6 @@
 import { FORMAT_HTTP_HEADERS, Span, Tracer } from 'opentracing'
 import { HTTP_METHOD, HTTP_STATUS_CODE, HTTP_URL } from 'opentracing/lib/ext/tags'
-import { redact } from '../../common/src/logging'
+import { redact } from '../common/logging'
 
 export async function tracedFetch(
     url: string | URL,

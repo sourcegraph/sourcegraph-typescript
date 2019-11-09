@@ -46,17 +46,17 @@ import {
     ReferencesRequest,
     TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol'
-import { throwIfAbortError } from '../../common/src/cancellation'
-import { LangTypescriptConfiguration } from '../../common/src/config'
-import { flatMapConcurrent } from '../../common/src/ix'
-import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from '../../common/src/logging'
+import { throwIfAbortError } from '../common/cancellation'
+import { LangTypescriptConfiguration } from '../common/config'
+import { flatMapConcurrent } from '../common/ix'
+import { Logger, LSP_TO_LOG_LEVEL, redact, RedactingLogger } from '../common/logging'
 import {
     canGenerateTraceUrl,
     logErrorEvent,
     sendTracedRequest,
     traceAsyncGenerator,
     tracePromise,
-} from '../../common/src/tracing'
+} from '../common/tracing'
 import { getOrCreateAccessToken } from './auth'
 import { initBasicCodeIntel } from './basic-code-intel'
 import {

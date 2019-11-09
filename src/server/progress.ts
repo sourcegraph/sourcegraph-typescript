@@ -3,7 +3,7 @@ import { Observer, Subject } from 'rxjs'
 import { distinctUntilChanged, scan, takeWhile, throttleTime } from 'rxjs/operators'
 import { MessageConnection } from 'vscode-jsonrpc'
 import { MessageType, ShowMessageNotification } from 'vscode-languageserver-protocol'
-import { Logger } from '../../common/src/logging'
+import { Logger } from '../common/logging'
 import { WindowProgressNotification } from './protocol.progress.proposed'
 import { tryLogError } from './util'
 

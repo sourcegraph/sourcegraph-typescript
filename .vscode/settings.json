@@ -5,4 +5,10 @@
   "tslint.autoFixOnSave": true,
   "editor.formatOnSave": true,
   "files.eol": "\n",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "lib": true,
+    "dist": true,
+  },
 }

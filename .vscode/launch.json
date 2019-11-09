@@ -10,6 +10,7 @@
       "name": "Launch Server",
       "program": "${workspaceFolder}/server/dist/server.js",
       "outFiles": ["${workspaceFolder}/server/dist/**/*.js"],
+      "runtimeArgs": ["--enable-source-maps"],
       "skipFiles": ["async_hooks.js"],
     },
   ],

@@ -1,6 +1,6 @@
 import { Span, Tracer } from 'opentracing'
 import gql from 'tagged-template-noop'
-import { tracePromise } from '../../common/src/tracing'
+import { tracePromise } from '../common/tracing'
 import { tracedFetch } from './tracing'
 import { SourcegraphEndpoint } from './util'
 

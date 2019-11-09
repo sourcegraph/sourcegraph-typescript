@@ -1,6 +1,6 @@
 import { Span, Tracer } from 'opentracing'
-import { Logger, redact } from '../../common/src/logging'
-import { logErrorEvent, tracePromise } from '../../common/src/tracing'
+import { Logger, redact } from '../common/logging'
+import { logErrorEvent, tracePromise } from '../common/tracing'
 import { queryExtensions, resolveRepository, search } from './graphql'
 import { tracedFetch } from './tracing'
 import { SourcegraphEndpoint } from './util'

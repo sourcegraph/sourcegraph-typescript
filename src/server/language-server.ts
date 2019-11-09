@@ -13,8 +13,8 @@ import {
     MessageConnection,
 } from 'vscode-jsonrpc'
 import { LogMessageNotification } from 'vscode-languageserver-protocol'
-import { LangTypescriptConfiguration } from '../../common/src/config'
-import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, PrefixedLogger } from '../../common/src/logging'
+import { LangTypescriptConfiguration } from '../common/config'
+import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, PrefixedLogger } from '../common/logging'
 import { createDispatcher, Dispatcher } from './dispatcher'
 import { disposeAll, subscriptionToDisposable } from './disposable'
 
