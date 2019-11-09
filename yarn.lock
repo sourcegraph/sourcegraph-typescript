@@ -7055,11 +7055,6 @@ type-is@^1.6.18, type-is@~1.6.16:
     media-typer "0.3.0"
     mime-types "~2.1.24"
 
-type-zoo@^3.2.1:
-  version "3.3.0"
-  resolved "https://registry.npmjs.org/type-zoo/-/type-zoo-3.3.0.tgz#d5b59393b09a48ac30380c50e2369e828817e9b3"
-  integrity sha512-ID2kIg4QMbujPOpphFvSl7yyk0JaN2+5m2cprhxpzJqYWHhozLbYOHCAZqq7j1PPfzLe8XrYeZfPb99v96WVRw==
-
 typedarray@^0.0.6:
   version "0.0.6"
   resolved "https://registry.npmjs.org/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
