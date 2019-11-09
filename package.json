@@ -223,7 +223,7 @@
     "ix": "^2.5.3",
     "json5": "^2.1.1",
     "lightstep-tracer": "^0.22.3",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.15",
     "mkdirp-promise": "^5.0.1",
     "mz": "^2.7.0",
     "npm-registry-fetch": "^5.0.0",
