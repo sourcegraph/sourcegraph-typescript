@@ -23,7 +23,6 @@ import { Span, Tracer } from 'opentracing'
 import { BehaviorSubject, from, fromEventPattern, Subscription } from 'rxjs'
 import * as rxop from 'rxjs/operators'
 import * as sourcegraph from 'sourcegraph'
-import { Omit } from 'type-zoo'
 import {
     CancellationToken,
     CancellationTokenSource,
