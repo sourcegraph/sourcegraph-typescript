@@ -734,9 +734,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                                                             )
                                                         )
                                                         logger.log(
-                                                            `Found ${
-                                                                references.length
-                                                            } references in dependent repo ${repoName}`
+                                                            `Found ${references.length} references in dependent repo ${repoName}`
                                                         )
                                                         // Only include references in the external repo, do not duplicate references in the same repo
                                                         return references.filter(location =>
