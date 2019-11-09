@@ -960,6 +960,13 @@
   resolved "https://registry.npmjs.org/@types/minimatch/-/minimatch-3.0.3.tgz#3dca0e3f33b200fc7d1139c0cd96c1268cadfd9d"
   integrity sha512-tHq6qdbT9U1IRSGf14CL0pUlULksvY9OZ+5eEgl1N7t+OA3tGvNpxJCzuKQlsNgCVwbAs670L1vcVQi8j9HjnA==
 
+"@types/minipass@*":
+  version "2.2.0"
+  resolved "https://registry.npmjs.org/@types/minipass/-/minipass-2.2.0.tgz#51ad404e8eb1fa961f75ec61205796807b6f9651"
+  integrity sha512-wuzZksN4w4kyfoOv/dlpov4NOunwutLA/q7uc00xU02ZyUY+aoM5PWIXEKBMnm0NHd4a+N71BMjq+x7+2Af1fg==
+  dependencies:
+    "@types/node" "*"
+
 "@types/mkdirp-promise@5.0.0":
   version "5.0.0"
   resolved "https://registry.npmjs.org/@types/mkdirp-promise/-/mkdirp-promise-5.0.0.tgz#1a60377e189539fb9a26d988fd87a3e870837634"
@@ -1054,11 +1061,12 @@
   resolved "https://registry.npmjs.org/@types/tail/-/tail-1.2.2.tgz#93651a2ae3353e8be1b94433cb1cf6eca50c9cd9"
   integrity sha512-I0GyFDwPtTP7/cv2WR43oItLsQcIxTafPGuObYElMuDzSu28EP4NOE+Mz2NuntrcII1Q3W30QhTSKEf+zU45aA==
 
-"@types/tar@4.0.0":
-  version "4.0.0"
-  resolved "https://registry.npmjs.org/@types/tar/-/tar-4.0.0.tgz#e3239d969eeb693a012200613860d0eb871c94f0"
-  integrity sha512-YybbEHNngcHlIWVCYsoj7Oo1JU9JqONuAlt1LlTH/lmL8BMhbzdFUgReY87a05rY1j8mfK47Del+TCkaLAXwLw==
+"@types/tar@4.0.3":
+  version "4.0.3"
+  resolved "https://registry.npmjs.org/@types/tar/-/tar-4.0.3.tgz#e2cce0b8ff4f285293243f5971bd7199176ac489"
+  integrity sha512-Z7AVMMlkI8NTWF0qGhC4QIX0zkV/+y0J8x7b/RsHrN0310+YNjoJd8UrApCiGBCWtKjxS9QhNqLi2UJNToh5hA==
   dependencies:
+    "@types/minipass" "*"
     "@types/node" "*"
 
 "@types/tough-cookie@*":
@@ -6762,7 +6770,7 @@ tail@^2.0.2:
   resolved "https://registry.npmjs.org/tail/-/tail-2.0.2.tgz#86073f3a9a568807b7fd886897a7350314275b5f"
   integrity sha512-raFipiKWdGKEzxbvZwnhUGqjvsv0gpa/1A479rL//NOxnNwYZDN4MPk6xJJdUFs8P2Xrff3nbH5fcyYRLU4UHQ==
 
-tar@^4, tar@^4.4.8:
+tar@^4, tar@^4.4.13:
   version "4.4.13"
   resolved "https://registry.npmjs.org/tar/-/tar-4.4.13.tgz#43b364bc52888d555298637b10d60790254ab525"
   integrity sha512-w2VwSrBoHa5BsSyH+KxEqeQBAllHhccyMFVHtGtdMpF4W7IRWfZjFiQceJPChOeTsSDVUpER2T8FA93pr0L+QA==
