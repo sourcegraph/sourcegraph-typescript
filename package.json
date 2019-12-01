@@ -151,6 +151,10 @@
             "requestTime",
             "verbose"
           ]
+        },
+        "codeIntel.lsif": {
+          "description": "Whether to use pre-computed LSIF data for code intelligence (such as hovers, definitions, and references). See https://docs.sourcegraph.com/user/code_intelligence/lsif.",
+          "type": "boolean"
         }
       }
     }
