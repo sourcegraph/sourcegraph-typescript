@@ -513,9 +513,11 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     logger.log('Hover trace', span.generateTraceURL())
                 }
 
-                if (await isLSIFAvailable(textDocument)) {
-                    const lsifResult = await lsif.hover(textDocument, position)
-                    yield lsifResult && lsifResult.value
+                const lsifResult = (await isLSIFAvailable(textDocument))
+                    ? await lsif.hover(textDocument, position)
+                    : undefined
+                if (lsifResult) {
+                    yield lsifResult.value
                 } else if (!config.value['typescript.serverUrl']) {
                     yield await basicCodeIntel.hover(textDocument, position)
                 } else {
@@ -560,9 +562,11 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         logger.log('Definition trace', span.generateTraceURL())
                     }
 
-                    if (await isLSIFAvailable(textDocument)) {
-                        const lsifResult = await lsif.definition(textDocument, position)
-                        yield lsifResult ? lsifResult.value : null
+                    const lsifResult = (await isLSIFAvailable(textDocument))
+                        ? await lsif.definition(textDocument, position)
+                        : undefined
+                    if (lsifResult) {
+                        yield lsifResult.value
                     } else if (!config.value['typescript.serverUrl']) {
                         yield await basicCodeIntel.definition(textDocument, position)
                     } else {
@@ -609,11 +613,10 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     logger.log('References trace', span.generateTraceURL())
                 }
 
-                if (await isLSIFAvailable(textDocument)) {
-                    const lsifResult = await lsif.references(textDocument, position)
-                    yield (lsifResult && lsifResult.value) || []
-                } else if (!config.value['typescript.serverUrl']) {
-                    yield (await basicCodeIntel.references(textDocument, position)) || []
+                if (!config.value['typescript.serverUrl']) {
+                    const lsifReferences = await lsif.references(textDocument, position)
+                    const fuzzyReferences = (await basicCodeIntel.references(textDocument, position)) || []
+                    yield [...(lsifReferences === undefined ? [] : lsifReferences.value), ...fuzzyReferences]
                 } else {
                     const textDocumentUri = new URL(textDocument.uri)
                     const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
