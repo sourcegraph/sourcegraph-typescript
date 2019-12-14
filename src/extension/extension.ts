@@ -614,9 +614,19 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 }
 
                 if (!config.value['typescript.serverUrl']) {
+                    // Gets an opaque value that is the same for all locations
+                    // within a file but different from other files.
+                    const file = (loc: sourcegraph.Location) => `${loc.uri.host} ${loc.uri.pathname} ${loc.uri.hash}`
+
                     const lsifReferences = await lsif.references(textDocument, position)
                     const fuzzyReferences = (await basicCodeIntel.references(textDocument, position)) || []
-                    yield [...(lsifReferences === undefined ? [] : lsifReferences.value), ...fuzzyReferences]
+
+                    const lsifFiles = new Set((lsifReferences ? lsifReferences.value : []).map(file))
+
+                    yield [
+                        ...(lsifReferences === undefined ? [] : lsifReferences.value),
+                        ...fuzzyReferences.filter(fuzzyRef => !lsifFiles.has(file(fuzzyRef))),
+                    ]
                 } else {
                     const textDocumentUri = new URL(textDocument.uri)
                     const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
