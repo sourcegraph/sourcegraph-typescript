@@ -248,7 +248,7 @@
     "uuid": "^3.3.3",
     "vscode-languageserver-protocol": "^3.14.1",
     "vscode-languageserver-types": "^3.14.0",
-    "whatwg-url": "^7.1.0",
+    "whatwg-url": "^8.0.0",
     "ws": "^7.2.0",
     "yarn": "^1.19.1"
   },
