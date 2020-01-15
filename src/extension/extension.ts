@@ -519,7 +519,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 if (lsifResult) {
                     yield lsifResult.value
                 } else if (!config.value['typescript.serverUrl']) {
-                    yield { ...(await basicCodeIntel.hover(textDocument, position)), badge: impreciseBadge }
+                    const result = await basicCodeIntel.hover(textDocument, position)
+                    if (result) {
+                        yield { ...result, badge: impreciseBadge }
+                    } else {
+                        yield undefined
+                    }
                 } else {
                     const textDocumentUri = new URL(textDocument.uri)
                     const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
@@ -569,10 +574,14 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         yield lsifResult.value
                     } else if (!config.value['typescript.serverUrl']) {
                         const result = await basicCodeIntel.definition(textDocument, position)
-                        if (Array.isArray(result)) {
-                            yield result.map(v => ({ ...v, badge: impreciseBadge }))
+                        if (result) {
+                            if (Array.isArray(result)) {
+                                yield result.map(v => ({ ...v, badge: impreciseBadge }))
+                            } else {
+                                yield { ...result, badge: impreciseBadge }
+                            }
                         } else {
-                            yield { ...result, badge: impreciseBadge }
+                            yield undefined
                         }
                     } else {
                         const textDocumentUri = new URL(textDocument.uri)
