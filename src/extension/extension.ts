@@ -6,7 +6,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { initLSIF, mkIsLSIFAvailable, impreciseBadge } from '@sourcegraph/basic-code-intel'
+import { initLSIF, impreciseBadge } from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -120,9 +120,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const config = new BehaviorSubject(getConfig())
     ctx.subscriptions.add(sourcegraph.configuration.subscribe(() => config.next(getConfig())))
 
-    // This now only determines if we have data via the legacy HTTP API
-    // and will always return false for GraphQL API-initialized LSIF :(
-    const isLSIFAvailable = mkIsLSIFAvailable()
     const lsif = initLSIF()
     const basicCodeIntel = initBasicCodeIntel()
 
@@ -470,7 +467,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         return
                     }
 
-                    if (!(await isLSIFAvailable(textDocument)) && config.value['typescript.serverUrl']) {
+                    if (config.value['typescript.serverUrl']) {
                         const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
                         const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
                         const connection = await getOrCreateConnection(serverRootUri, { token, span })
@@ -839,10 +836,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 tracePromise('Provide implementations', tracer, undefined, async span => {
                     if (canGenerateTraceUrl(span)) {
                         logger.log('Implementation trace', span.generateTraceURL())
-                    }
-
-                    if (await isLSIFAvailable(textDocument)) {
-                        return null
                     }
 
                     const textDocumentUri = new URL(textDocument.uri)
