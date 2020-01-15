@@ -6,7 +6,7 @@ import { URL as _URL, URLSearchParams as _URLSearchParams } from 'whatwg-url'
 Object.assign(_URL, self.URL)
 Object.assign(self, { URL: _URL, URLSearchParams: _URLSearchParams })
 
-import { initLSIF, mkIsLSIFAvailable } from '@sourcegraph/basic-code-intel'
+import { initLSIF, mkIsLSIFAvailable, impreciseBadge } from '@sourcegraph/basic-code-intel'
 import { Tracer as LightstepTracer } from '@sourcegraph/lightstep-tracer-webworker'
 import {
     createMessageConnection,
@@ -92,6 +92,7 @@ import {
     observableFromAsyncGenerator,
     SourcegraphEndpoint,
 } from './util'
+import { groupByResultIdentityAsync } from 'ix/asynciterable/groupby'
 
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
@@ -519,7 +520,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 if (lsifResult) {
                     yield lsifResult.value
                 } else if (!config.value['typescript.serverUrl']) {
-                    yield await basicCodeIntel.hover(textDocument, position)
+                    yield { ...(await basicCodeIntel.hover(textDocument, position)), badge: impreciseBadge }
                 } else {
                     const textDocumentUri = new URL(textDocument.uri)
                     const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
@@ -568,7 +569,12 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     if (lsifResult) {
                         yield lsifResult.value
                     } else if (!config.value['typescript.serverUrl']) {
-                        yield await basicCodeIntel.definition(textDocument, position)
+                        const result = await basicCodeIntel.definition(textDocument, position)
+                        if (Array.isArray(result)) {
+                            yield result.map(v => ({ ...v, badge: impreciseBadge }))
+                        } else {
+                            yield { ...result, badge: impreciseBadge }
+                        }
                     } else {
                         const textDocumentUri = new URL(textDocument.uri)
                         const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
@@ -625,7 +631,9 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
 
                     yield [
                         ...(lsifReferences === undefined ? [] : lsifReferences.value),
-                        ...fuzzyReferences.filter(fuzzyRef => !lsifFiles.has(file(fuzzyRef))),
+                        ...fuzzyReferences
+                            .filter(fuzzyRef => !lsifFiles.has(file(fuzzyRef)))
+                            .map(v => ({ ...v, badge: impreciseBadge })),
                     ]
                 } else {
                     const textDocumentUri = new URL(textDocument.uri)
