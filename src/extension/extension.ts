@@ -92,7 +92,6 @@ import {
     observableFromAsyncGenerator,
     SourcegraphEndpoint,
 } from './util'
-import { groupByResultIdentityAsync } from 'ix/asynciterable/groupby'
 
 const HOVER_DEF_POLL_INTERVAL = 2000
 const EXTERNAL_REFS_CONCURRENCY = 7
