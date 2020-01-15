@@ -120,6 +120,8 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
     const config = new BehaviorSubject(getConfig())
     ctx.subscriptions.add(sourcegraph.configuration.subscribe(() => config.next(getConfig())))
 
+    // This now only determines if we have data via the legacy HTTP API
+    // and will always return false for GraphQL API-initialized LSIF :(
     const isLSIFAvailable = mkIsLSIFAvailable()
     const lsif = initLSIF()
     const basicCodeIntel = initBasicCodeIntel()
@@ -513,9 +515,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     logger.log('Hover trace', span.generateTraceURL())
                 }
 
-                const lsifResult = (await isLSIFAvailable(textDocument))
-                    ? await lsif.hover(textDocument, position)
-                    : undefined
+                const lsifResult = await lsif.hover(textDocument, position)
                 if (lsifResult) {
                     yield lsifResult.value
                 } else if (!config.value['typescript.serverUrl']) {
@@ -567,9 +567,7 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                         logger.log('Definition trace', span.generateTraceURL())
                     }
 
-                    const lsifResult = (await isLSIFAvailable(textDocument))
-                        ? await lsif.definition(textDocument, position)
-                        : undefined
+                    const lsifResult = await lsif.definition(textDocument, position)
                     if (lsifResult) {
                         yield lsifResult.value
                     } else if (!config.value['typescript.serverUrl']) {
