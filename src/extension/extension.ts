@@ -503,37 +503,37 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 }
 
                 // const lsifResult = await lsif.hover(textDocument, position)
-                // if (lsifResult) {
-                //     yield lsifResult.value
-                // } else if (!config.value['typescript.serverUrl']) {
-                //     const result = await basicCodeIntel.hover(textDocument, position)
-                //     if (result) {
-                //         yield { ...result, badge: impreciseBadge }
-                //     } else {
-                //         yield undefined
-                //     }
-                // } else {
-                const textDocumentUri = new URL(textDocument.uri)
-                const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-                const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+                if (false) {
+                    //     yield lsifResult.value
+                    // } else if (!config.value['typescript.serverUrl']) {
+                    //     const result = await basicCodeIntel.hover(textDocument, position)
+                    //     if (result) {
+                    //         yield { ...result, badge: impreciseBadge }
+                    //     } else {
+                    //         yield undefined
+                    //     }
+                } else {
+                    const textDocumentUri = new URL(textDocument.uri)
+                    const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
 
-                const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                // Poll server to get updated results when e.g. dependency installation finished
-                while (true) {
-                    const hoverResult = await sendTracedRequest(
-                        connection,
-                        HoverRequest.type,
-                        {
-                            textDocument: { uri: serverTextDocumentUri.href },
-                            position,
-                        },
-                        { span, tracer, token }
-                    )
-                    rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
-                    yield convertHover(hoverResult)
-                    await delayPromise(HOVER_DEF_POLL_INTERVAL)
+                    const connection = await getOrCreateConnection(serverRootUri, { span, token })
+                    // Poll server to get updated results when e.g. dependency installation finished
+                    while (true) {
+                        const hoverResult = await sendTracedRequest(
+                            connection,
+                            HoverRequest.type,
+                            {
+                                textDocument: { uri: serverTextDocumentUri.href },
+                                position,
+                            },
+                            { span, tracer, token }
+                        )
+                        rewriteUris(hoverResult, toSourcegraphTextDocumentUri)
+                        yield convertHover(hoverResult)
+                        await delayPromise(HOVER_DEF_POLL_INTERVAL)
+                    }
                 }
-                // }
             })
         )
         // providers.add(
@@ -555,40 +555,40 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     }
 
                     // const lsifResult = await lsif.definition(textDocument, position)
-                    // if (lsifResult) {
-                    //     yield lsifResult.value
-                    // } else if (!config.value['typescript.serverUrl']) {
-                    //     const result = await basicCodeIntel.definition(textDocument, position)
-                    //     if (result) {
-                    //         if (Array.isArray(result)) {
-                    //             yield result.map(v => ({ ...v, badge: impreciseBadge }))
-                    //         } else {
-                    //             yield { ...result, badge: impreciseBadge }
-                    //         }
-                    //     } else {
-                    //         yield undefined
-                    //     }
-                    // } else {
-                    const textDocumentUri = new URL(textDocument.uri)
-                    const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
-                    const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                    // Poll server to get updated contents when e.g. dependency installation finished
-                    while (true) {
-                        const definitionResult = (await sendTracedRequest(
-                            connection,
-                            DefinitionRequest.type,
-                            {
-                                textDocument: { uri: serverTextDocumentUri.href },
-                                position,
-                            },
-                            { span, tracer, token }
-                        )) as Location[] | Location | null
-                        rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
-                        yield convertLocations(definitionResult)
-                        await delayPromise(HOVER_DEF_POLL_INTERVAL)
+                    if (false) {
+                        //     yield lsifResult.value
+                        // } else if (!config.value['typescript.serverUrl']) {
+                        //     const result = await basicCodeIntel.definition(textDocument, position)
+                        //     if (result) {
+                        //         if (Array.isArray(result)) {
+                        //             yield result.map(v => ({ ...v, badge: impreciseBadge }))
+                        //         } else {
+                        //             yield { ...result, badge: impreciseBadge }
+                        //         }
+                        //     } else {
+                        //         yield undefined
+                        //     }
+                    } else {
+                        const textDocumentUri = new URL(textDocument.uri)
+                        const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                        const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+                        const connection = await getOrCreateConnection(serverRootUri, { span, token })
+                        // Poll server to get updated contents when e.g. dependency installation finished
+                        while (true) {
+                            const definitionResult = (await sendTracedRequest(
+                                connection,
+                                DefinitionRequest.type,
+                                {
+                                    textDocument: { uri: serverTextDocumentUri.href },
+                                    position,
+                                },
+                                { span, tracer, token }
+                            )) as Location[] | Location | null
+                            rewriteUris(definitionResult, toSourcegraphTextDocumentUri)
+                            yield convertLocations(definitionResult)
+                            await delayPromise(HOVER_DEF_POLL_INTERVAL)
+                        }
                     }
-                    // }
                 })
         )
         // providers.add(
@@ -612,196 +612,199 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                     logger.log('References trace', span.generateTraceURL())
                 }
 
-                // if (!config.value['typescript.serverUrl']) {
-                //     // Gets an opaque value that is the same for all locations
-                //     // within a file but different from other files.
-                //     const file = (loc: sourcegraph.Location) => `${loc.uri.host} ${loc.uri.pathname} ${loc.uri.hash}`
+                if (false) {
+                    //     // Gets an opaque value that is the same for all locations
+                    //     // within a file but different from other files.
+                    //     const file = (loc: sourcegraph.Location) => `${loc.uri.host} ${loc.uri.pathname} ${loc.uri.hash}`
+                    //     const lsifReferences = await lsif.references(textDocument, position)
+                    //     const fuzzyReferences = (await basicCodeIntel.references(textDocument, position)) || []
+                    //     const lsifFiles = new Set((lsifReferences ? lsifReferences.value : []).map(file))
+                    //     yield [
+                    //         ...(lsifReferences === undefined ? [] : lsifReferences.value),
+                    //         ...fuzzyReferences
+                    //             .filter(fuzzyRef => !lsifFiles.has(file(fuzzyRef)))
+                    //             .map(v => ({ ...v, badge: impreciseBadge })),
+                    //     ]
+                } else {
+                    const textDocumentUri = new URL(textDocument.uri)
+                    const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
 
-                //     const lsifReferences = await lsif.references(textDocument, position)
-                //     const fuzzyReferences = (await basicCodeIntel.references(textDocument, position)) || []
+                    const connection = await getOrCreateConnection(serverRootUri, { span, token })
 
-                //     const lsifFiles = new Set((lsifReferences ? lsifReferences.value : []).map(file))
-
-                //     yield [
-                //         ...(lsifReferences === undefined ? [] : lsifReferences.value),
-                //         ...fuzzyReferences
-                //             .filter(fuzzyRef => !lsifFiles.has(file(fuzzyRef)))
-                //             .map(v => ({ ...v, badge: impreciseBadge })),
-                //     ]
-                // } else {
-                const textDocumentUri = new URL(textDocument.uri)
-                const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-                const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
-
-                const connection = await getOrCreateConnection(serverRootUri, { span, token })
-
-                const findLocalReferences = () =>
-                    traceAsyncGenerator('Find local references', tracer, span, async function*(span) {
-                        logger.log('Searching for same-repo references')
-                        const localReferences = asArray(
-                            await sendTracedRequest(
-                                connection,
-                                ReferencesRequest.type,
-                                {
-                                    textDocument: { uri: serverTextDocumentUri.href },
-                                    position,
-                                    context,
-                                },
-                                { span, tracer, token }
-                            )
-                        )
-                        logger.log(`Found ${localReferences.length} same-repo references`)
-                        yield localReferences
-                    })
-
-                const findExternalReferences = () =>
-                    traceAsyncGenerator('Find external references', tracer, span, async function*(span) {
-                        try {
-                            logger.log('Getting canonical definition for cross-repo references')
-                            const definition: Location | undefined = asArray((await sendTracedRequest(
-                                connection,
-                                DefinitionRequest.type,
-                                {
-                                    textDocument: { uri: serverTextDocumentUri.href },
-                                    position,
-                                },
-                                { span, tracer, token }
-                            )) as Location[] | Location | null)[0]
-                            if (!definition) {
-                                return
-                            }
-                            span.setTag('uri', redact(definition.uri))
-                            span.setTag('line', definition.range.start.line)
-
-                            const findPackageDependents =
-                                clientSgEndpoint.url.hostname === 'sourcegraph.com'
-                                    ? findPackageDependentsWithNpm
-                                    : findPackageDependentsWithSourcegraphSearch
-
-                            logger.log(`Getting external references for definition`, definition)
-
-                            const definitionUri = new URL(definition.uri)
-
-                            const referenceParams: ReferenceParams = {
-                                textDocument: { uri: definitionUri.href },
-                                position: definition.range.start,
-                                context: { includeDeclaration: false },
-                            }
-
-                            // The definition returned by the server points to the server endpoint, rewrite to the client endpoint
-                            const clientDefinitionUrl = new URL(definitionUri.href)
-                            clientDefinitionUrl.protocol = clientSgEndpoint.url.protocol
-                            clientDefinitionUrl.host = clientSgEndpoint.url.host
-                            const packageName = await findPackageName(clientDefinitionUrl, { logger, tracer, span })
-
-                            // Find dependent packages on the package
-                            const dependents =
-                                packageName === 'sourcegraph'
-                                    ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
-                                      // Extensions are not published to npm, so search the extension registry
-                                      findDependentsWithSourcegraphExtensionRegistry(clientSgEndpoint, {
-                                          logger,
-                                          tracer,
-                                          span,
-                                      })
-                                    : findPackageDependents(packageName, clientSgEndpoint, { logger, tracer, span })
-
-                            // Search for references in each dependent
-                            const findExternalRefsInDependent = (repoName: string) =>
-                                traceAsyncGenerator(
-                                    'Find external references in dependent',
-                                    tracer,
-                                    span,
-                                    async function*(span) {
-                                        try {
-                                            logger.log(`Looking for external references in dependent repo ${repoName}`)
-                                            span.setTag('repoName', repoName)
-                                            const commitID = await resolveRev(repoName, 'HEAD', clientSgEndpoint, {
-                                                span,
-                                                tracer,
-                                            })
-                                            const rootUri = new URL(
-                                                `${repoName}@${commitID}/-/raw/`,
-                                                serverSgEndpoint.url
-                                            )
-                                            if (serverSgEndpoint.accessToken) {
-                                                rootUri.username = serverSgEndpoint.accessToken
-                                            }
-
-                                            yield await withTempConnection(
-                                                rootUri,
-                                                { span, token },
-                                                async connection => {
-                                                    const references = asArray(
-                                                        await sendTracedRequest(
-                                                            connection,
-                                                            ReferencesRequest.type,
-                                                            referenceParams,
-                                                            {
-                                                                span,
-                                                                tracer,
-                                                                token,
-                                                            }
-                                                        )
-                                                    )
-                                                    logger.log(
-                                                        `Found ${references.length} references in dependent repo ${repoName}`
-                                                    )
-                                                    // Only include references in the external repo, do not duplicate references in the same repo
-                                                    return references.filter(location =>
-                                                        location.uri.startsWith(rootUri.href)
-                                                    )
-                                                }
-                                            )
-                                        } catch (err) {
-                                            throwIfAbortError(err)
-                                            logErrorEvent(span, err)
-                                            logger.error(
-                                                `Error searching dependent repo ${repoName} for references`,
-                                                err
-                                            )
-                                        }
-                                    }
+                    const findLocalReferences = () =>
+                        traceAsyncGenerator('Find local references', tracer, span, async function*(span) {
+                            logger.log('Searching for same-repo references')
+                            const localReferences = asArray(
+                                await sendTracedRequest(
+                                    connection,
+                                    ReferencesRequest.type,
+                                    {
+                                        textDocument: { uri: serverTextDocumentUri.href },
+                                        position,
+                                        context,
+                                    },
+                                    { span, tracer, token }
                                 )
-                            yield* flatMapConcurrent(dependents, EXTERNAL_REFS_CONCURRENCY, findExternalRefsInDependent)
-                            logger.log('Done going through dependents')
-                        } catch (err) {
-                            logger.error('Could not find external references', err)
-                        }
-                    })
+                            )
+                            logger.log(`Found ${localReferences.length} same-repo references`)
+                            yield localReferences
+                        })
 
-                yield* merge(findLocalReferences(), findExternalReferences()).pipe(
-                    // Same-repo references
-                    // Cross-repo references
-                    // Find canonical source location
-                    filter(chunk => chunk.length > 0),
-                    tap({
-                        next: chunk => {
-                            span.log({ event: 'chunk', count: chunk.length })
-                        },
-                    }),
-                    // Rewrite URIs and convert from LSP to Sourcegraph Location
-                    map(chunk =>
-                        chunk
-                            .map(location => {
-                                try {
-                                    return convertLocation({
-                                        ...location,
-                                        uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
-                                    })
-                                } catch (err) {
-                                    return undefined
+                    const findExternalReferences = () =>
+                        traceAsyncGenerator('Find external references', tracer, span, async function*(span) {
+                            try {
+                                logger.log('Getting canonical definition for cross-repo references')
+                                const definition: Location | undefined = asArray((await sendTracedRequest(
+                                    connection,
+                                    DefinitionRequest.type,
+                                    {
+                                        textDocument: { uri: serverTextDocumentUri.href },
+                                        position,
+                                    },
+                                    { span, tracer, token }
+                                )) as Location[] | Location | null)[0]
+                                if (!definition) {
+                                    return
                                 }
-                            })
-                            .filter((location): location is Exclude<typeof location, undefined> => !!location)
-                    ),
-                    // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
-                    scan<sourcegraph.Location[], sourcegraph.Location[]>(
-                        (allReferences, chunk) => allReferences.concat(chunk),
-                        []
+                                span.setTag('uri', redact(definition.uri))
+                                span.setTag('line', definition.range.start.line)
+
+                                const findPackageDependents =
+                                    clientSgEndpoint.url.hostname === 'sourcegraph.com'
+                                        ? findPackageDependentsWithNpm
+                                        : findPackageDependentsWithSourcegraphSearch
+
+                                logger.log(`Getting external references for definition`, definition)
+
+                                const definitionUri = new URL(definition.uri)
+
+                                const referenceParams: ReferenceParams = {
+                                    textDocument: { uri: definitionUri.href },
+                                    position: definition.range.start,
+                                    context: { includeDeclaration: false },
+                                }
+
+                                // The definition returned by the server points to the server endpoint, rewrite to the client endpoint
+                                const clientDefinitionUrl = new URL(definitionUri.href)
+                                clientDefinitionUrl.protocol = clientSgEndpoint.url.protocol
+                                clientDefinitionUrl.host = clientSgEndpoint.url.host
+                                const packageName = await findPackageName(clientDefinitionUrl, { logger, tracer, span })
+
+                                // Find dependent packages on the package
+                                const dependents =
+                                    packageName === 'sourcegraph'
+                                        ? // If the package name is "sourcegraph", we are looking for references to a symbol in the Sourcegraph extension API
+                                          // Extensions are not published to npm, so search the extension registry
+                                          findDependentsWithSourcegraphExtensionRegistry(clientSgEndpoint, {
+                                              logger,
+                                              tracer,
+                                              span,
+                                          })
+                                        : findPackageDependents(packageName, clientSgEndpoint, { logger, tracer, span })
+
+                                // Search for references in each dependent
+                                const findExternalRefsInDependent = (repoName: string) =>
+                                    traceAsyncGenerator(
+                                        'Find external references in dependent',
+                                        tracer,
+                                        span,
+                                        async function*(span) {
+                                            try {
+                                                logger.log(
+                                                    `Looking for external references in dependent repo ${repoName}`
+                                                )
+                                                span.setTag('repoName', repoName)
+                                                const commitID = await resolveRev(repoName, 'HEAD', clientSgEndpoint, {
+                                                    span,
+                                                    tracer,
+                                                })
+                                                const rootUri = new URL(
+                                                    `${repoName}@${commitID}/-/raw/`,
+                                                    serverSgEndpoint.url
+                                                )
+                                                if (serverSgEndpoint.accessToken) {
+                                                    rootUri.username = serverSgEndpoint.accessToken
+                                                }
+
+                                                yield await withTempConnection(
+                                                    rootUri,
+                                                    { span, token },
+                                                    async connection => {
+                                                        const references = asArray(
+                                                            await sendTracedRequest(
+                                                                connection,
+                                                                ReferencesRequest.type,
+                                                                referenceParams,
+                                                                {
+                                                                    span,
+                                                                    tracer,
+                                                                    token,
+                                                                }
+                                                            )
+                                                        )
+                                                        logger.log(
+                                                            `Found ${references.length} references in dependent repo ${repoName}`
+                                                        )
+                                                        // Only include references in the external repo, do not duplicate references in the same repo
+                                                        return references.filter(location =>
+                                                            location.uri.startsWith(rootUri.href)
+                                                        )
+                                                    }
+                                                )
+                                            } catch (err) {
+                                                throwIfAbortError(err)
+                                                logErrorEvent(span, err)
+                                                logger.error(
+                                                    `Error searching dependent repo ${repoName} for references`,
+                                                    err
+                                                )
+                                            }
+                                        }
+                                    )
+                                yield* flatMapConcurrent(
+                                    dependents,
+                                    EXTERNAL_REFS_CONCURRENCY,
+                                    findExternalRefsInDependent
+                                )
+                                logger.log('Done going through dependents')
+                            } catch (err) {
+                                logger.error('Could not find external references', err)
+                            }
+                        })
+
+                    yield* merge(findLocalReferences(), findExternalReferences()).pipe(
+                        // Same-repo references
+                        // Cross-repo references
+                        // Find canonical source location
+                        filter(chunk => chunk.length > 0),
+                        tap({
+                            next: chunk => {
+                                span.log({ event: 'chunk', count: chunk.length })
+                            },
+                        }),
+                        // Rewrite URIs and convert from LSP to Sourcegraph Location
+                        map(chunk =>
+                            chunk
+                                .map(location => {
+                                    try {
+                                        return convertLocation({
+                                            ...location,
+                                            uri: toSourcegraphTextDocumentUri(new URL(location.uri)).href,
+                                        })
+                                    } catch (err) {
+                                        return undefined
+                                    }
+                                })
+                                .filter((location): location is Exclude<typeof location, undefined> => !!location)
+                        ),
+                        // Aggregate individual chunks into a growing array (which is what Sourcegraph expects)
+                        scan<sourcegraph.Location[], sourcegraph.Location[]>(
+                            (allReferences, chunk) => allReferences.concat(chunk),
+                            []
+                        )
                     )
-                )
-                // }
+                }
             })
         // providers.add(
         //     sourcegraph.languages.registerReferenceProvider(documentSelector, {
