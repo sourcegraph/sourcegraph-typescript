@@ -768,16 +768,23 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 yield convertLocations(implementationResult)
             })
 
-        activateCodeIntel(ctx, documentSelector, handlerArgs, {
-            definition: provideDefinition,
-            references: provideReferences,
-            hover: provideHover,
-            implementations: {
-                implId: 'ts.impl',
-                panelTitle: 'Implementations',
-                locations: provideImpls,
-            },
-        })
+        activateCodeIntel(
+            ctx,
+            documentSelector,
+            handlerArgs,
+            config.value['typescript.serverUrl']
+                ? {
+                      definition: provideDefinition,
+                      references: provideReferences,
+                      hover: provideHover,
+                      implementations: {
+                          implId: 'ts.impl',
+                          panelTitle: 'Implementations',
+                          locations: provideImpls,
+                      },
+                  }
+                : undefined
+        )
     }
 }
 
