@@ -740,34 +740,6 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                 )
             })
 
-        // Implementations
-        const provideImpls = (
-            textDocument: sourcegraph.TextDocument,
-            position: sourcegraph.Position
-        ): AsyncGenerator<sourcegraph.Location[] | null> =>
-            traceAsyncGenerator('Provide implementations', tracer, undefined, async function*(span) {
-                if (canGenerateTraceUrl(span)) {
-                    logger.log('Implementation trace', span.generateTraceURL())
-                }
-
-                const textDocumentUri = new URL(textDocument.uri)
-                const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
-                const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
-                const connection = await getOrCreateConnection(serverRootUri, { span, token })
-                const implementationParams: TextDocumentPositionParams = {
-                    textDocument: { uri: serverTextDocumentUri.href },
-                    position,
-                }
-                const implementationResult = (await sendTracedRequest(
-                    connection,
-                    ImplementationRequest.type,
-                    implementationParams,
-                    { span, tracer, token }
-                )) as Location[] | Location | null
-                rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
-                yield convertLocations(implementationResult)
-            })
-
         activateCodeIntel(
             ctx,
             documentSelector,
@@ -777,14 +749,50 @@ export async function activate(ctx: sourcegraph.ExtensionContext): Promise<void>
                       definition: provideDefinition,
                       references: provideReferences,
                       hover: provideHover,
-                      implementations: {
-                          implId: 'ts.impl',
-                          panelTitle: 'Implementations',
-                          locations: provideImpls,
-                      },
                   }
                 : undefined
         )
+
+        if (config.value['typescript.serverUrl']) {
+            // Implementations
+            const IMPL_ID = 'ts.impl' // implementations panel and provider ID
+            const provideImpls = (
+                textDocument: sourcegraph.TextDocument,
+                position: sourcegraph.Position
+            ): Promise<sourcegraph.Location[] | null> =>
+                tracePromise('Provide implementations', tracer, undefined, async span => {
+                    if (canGenerateTraceUrl(span)) {
+                        logger.log('Implementation trace', span.generateTraceURL())
+                    }
+
+                    const textDocumentUri = new URL(textDocument.uri)
+                    const serverRootUri = resolveServerRootUri(textDocumentUri, serverSgEndpoint)
+                    const serverTextDocumentUri = toServerTextDocumentUri(textDocumentUri, serverSgEndpoint)
+                    const connection = await getOrCreateConnection(serverRootUri, { span, token })
+                    const implementationParams: TextDocumentPositionParams = {
+                        textDocument: { uri: serverTextDocumentUri.href },
+                        position,
+                    }
+                    const implementationResult = (await sendTracedRequest(
+                        connection,
+                        ImplementationRequest.type,
+                        implementationParams,
+                        { span, tracer, token }
+                    )) as Location[] | Location | null
+                    rewriteUris(implementationResult, toSourcegraphTextDocumentUri)
+                    return convertLocations(implementationResult)
+                })
+            providers.add(
+                sourcegraph.languages.registerLocationProvider(IMPL_ID, documentSelector, {
+                    provideLocations: provideImpls,
+                })
+            )
+            const panelView = sourcegraph.app.createPanelView(IMPL_ID)
+            panelView.title = 'Implementations'
+            panelView.component = { locationProvider: IMPL_ID }
+            panelView.priority = 160
+            providers.add(panelView)
+        }
     }
 }
 
