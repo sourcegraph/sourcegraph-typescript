@@ -17,7 +17,7 @@ export class LSPLogger extends AbstractLogger {
         try {
             this.client.sendNotification(LogMessageNotification.type, {
                 type: LOG_LEVEL_TO_LSP[type],
-                message: format(values),
+                message: values.map(format).join(' '),
             })
         } catch (err) {
             // ignore
