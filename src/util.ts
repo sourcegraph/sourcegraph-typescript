@@ -1,4 +1,4 @@
-import { Logger } from '../common/logging'
+import { Logger } from './logging'
 
 export function tryLogError(logger: Logger, func: () => void): void {
     try {

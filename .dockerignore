@@ -9,7 +9,6 @@
 *.pem
 buildkite.yml
 deploy.sh
-dist/
 extension/
 kubernetes/
 package.json

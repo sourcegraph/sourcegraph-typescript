@@ -1,16 +1,20 @@
 {
   "extends": "@sourcegraph/tsconfig",
-  "references": [{ "path": "src/common/tsconfig.json" }, { "path": "src/server" }, { "path": "src/extension" }],
   "compilerOptions": {
     "target": "es2019",
     "esModuleInterop": true,
     "moduleResolution": "node",
-    "composite": true,
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    "module": "commonjs",
+    "lib": ["es2018", "esnext.asynciterable", "dom"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "outDir": "dist",
+    "rootDir": ".",
   },
+  "include": ["./src/**/*"],
   "files": [],
 }

@@ -1,0 +1,1 @@
+Have a wa to sing config.ts between the extension and the server.
