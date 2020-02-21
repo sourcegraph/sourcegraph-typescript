@@ -64,7 +64,7 @@
   "dependencies": {
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^3.0.0",
-    "axios": "^0.19.0",
+    "axios": "^0.19.2",
     "express": "^4.16.4",
     "fast-glob": "^3.2.1",
     "got": "^9.6.0",
