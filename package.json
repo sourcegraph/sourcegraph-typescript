@@ -51,7 +51,7 @@
     "@types/tar": "4.0.3",
     "@types/type-is": "1.6.3",
     "@types/uuid": "3.4.7",
-    "@types/ws": "6.0.4",
+    "@types/ws": "7.2.1",
     "dot-json": "^1.2.0",
     "husky": "^3.1.0",
     "json-schema-to-typescript": "^8.0.1",
@@ -93,7 +93,7 @@
     "typescript": "^3.8.2",
     "uuid": "^3.4.0",
     "vscode-languageserver-protocol": "^3.14.1",
-    "ws": "^7.2.0",
+    "ws": "^7.2.1",
     "yarn": "^1.22.0"
   }
 }
