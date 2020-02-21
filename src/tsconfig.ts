@@ -6,8 +6,8 @@ import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { flatMapConcurrent } from './ix'
 import { Logger } from './logging'
-import { logErrorEvent, tracePromise } from './tracing'
 import { ResourceRetrieverPicker } from './resources'
+import { logErrorEvent, tracePromise } from './tracing'
 
 export async function sanitizeTsConfigs({
     dir,

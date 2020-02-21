@@ -6,8 +6,8 @@ import { URL } from 'url'
 import { CancellationToken } from 'vscode-jsonrpc'
 import { throwIfCancelled } from './cancellation'
 import { Logger } from './logging'
-import { logErrorEvent, tracePromise } from './tracing'
 import { ResourceNotFoundError, ResourceRetrieverPicker, walkUp } from './resources'
+import { logErrorEvent, tracePromise } from './tracing'
 
 export async function fetchPackageMeta(
     packageName: string,

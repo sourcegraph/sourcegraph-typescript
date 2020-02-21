@@ -4,8 +4,6 @@ import 'source-map-support/register'
 import { AbortController } from 'abort-controller'
 Object.assign(global, { AbortController })
 
-import 'ix'
-
 import {
     createMessageConnection,
     IWebSocket,
@@ -19,6 +17,7 @@ import { highlight } from 'highlight.js'
 import * as http from 'http'
 import * as https from 'https'
 import * as ini from 'ini'
+import 'ix'
 import { AsyncIterableX, merge } from 'ix/asynciterable'
 import { IterableX } from 'ix/iterable'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
@@ -63,12 +62,8 @@ import {
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
 import { Server } from 'ws'
-import { throwIfCancelled } from './cancellation'
+import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
 import { LangTypescriptConfiguration } from './config'
-import { flatMapConcurrent } from './ix'
-import { Logger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from './logging'
-import { tracePromise } from './tracing'
-import { toAxiosCancelToken } from './cancellation'
 import {
     cloneUrlFromPackageMeta,
     fetchPackageMeta,
@@ -81,8 +76,9 @@ import {
 import { createDispatcher, createRequestDurationMetric, RequestType } from './dispatcher'
 import { AsyncDisposable, Disposable, disposeAllAsync } from './disposable'
 import { resolveRepository } from './graphql'
+import { flatMapConcurrent } from './ix'
 import { LanguageServer, spawnLanguageServer } from './language-server'
-import { LSPLogger } from './logging'
+import { Logger, LSPLogger, MultiLogger, PrefixedLogger, redact, RedactingLogger } from './logging'
 import { createProgressProvider, noopProgressProvider, ProgressProvider } from './progress'
 import { WindowProgressClientCapabilities } from './protocol.progress.proposed'
 import {
@@ -92,6 +88,7 @@ import {
     ResourceNotFoundError,
     walkUp,
 } from './resources'
+import { tracePromise } from './tracing'
 import { sanitizeTsConfigs } from './tsconfig'
 import { relativeUrl, URLMap, URLSet } from './uri'
 import { install } from './yarn'

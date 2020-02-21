@@ -7,10 +7,10 @@ import { filter, map, switchMap, withLatestFrom } from 'rxjs/operators'
 import { Readable } from 'stream'
 import { CancellationToken, Disposable } from 'vscode-jsonrpc'
 import { createAbortError, throwIfCancelled } from './cancellation'
-import { Logger, NoopLogger } from './logging'
-import { tracePromise } from './tracing'
 import { disposeAll } from './disposable'
+import { Logger, NoopLogger } from './logging'
 import { Progress, ProgressProvider } from './progress'
+import { tracePromise } from './tracing'
 
 export interface YarnStep {
     message: string

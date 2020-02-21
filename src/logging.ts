@@ -1,7 +1,6 @@
-import { MessageConnection } from 'vscode-jsonrpc'
-import { LogMessageNotification } from 'vscode-languageserver-protocol'
 import { inspect } from 'util'
-import { MessageType } from 'vscode-languageserver-protocol'
+import { MessageConnection } from 'vscode-jsonrpc'
+import { LogMessageNotification, MessageType } from 'vscode-languageserver-protocol'
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'log'
 export type Logger = Record<LogLevel, (...values: unknown[]) => void>
