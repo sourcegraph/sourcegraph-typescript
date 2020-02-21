@@ -94,6 +94,6 @@
     "uuid": "^3.3.3",
     "vscode-languageserver-protocol": "^3.14.1",
     "ws": "^7.2.0",
-    "yarn": "^1.19.1"
+    "yarn": "^1.22.0"
   }
 }
