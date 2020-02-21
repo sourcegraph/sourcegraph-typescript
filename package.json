@@ -51,7 +51,6 @@
     "@types/tar": "4.0.3",
     "@types/type-is": "1.6.3",
     "@types/uuid": "3.4.6",
-    "@types/whatwg-url": "6.4.0",
     "@types/ws": "6.0.4",
     "dot-json": "^1.1.0",
     "husky": "^3.0.9",
@@ -63,13 +62,9 @@
     "yarn-deduplicate": "^1.1.1"
   },
   "dependencies": {
-    "@sourcegraph/basic-code-intel": "^10.0.0",
-    "@sourcegraph/lightstep-tracer-webworker": "^0.20.14-fork.3",
-    "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^3.0.0",
     "axios": "^0.19.0",
-    "delay": "^4.3.0",
     "express": "^4.16.4",
     "fast-glob": "^3.1.0",
     "got": "^9.6.0",
@@ -91,7 +86,6 @@
     "semver": "^6.3.0",
     "source-map": "^0.7.3",
     "source-map-support": "^0.5.16",
-    "sourcegraph": "^23.1.0",
     "tagged-template-noop": "^2.1.0",
     "tail": "^2.0.3",
     "tar": "^5.0.5",
@@ -99,8 +93,6 @@
     "typescript": "^3.7.2",
     "uuid": "^3.3.3",
     "vscode-languageserver-protocol": "^3.14.1",
-    "vscode-languageserver-types": "^3.14.0",
-    "whatwg-url": "^7.1.0",
     "ws": "^7.2.0",
     "yarn": "^1.19.1"
   }
