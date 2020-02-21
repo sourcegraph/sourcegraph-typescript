@@ -13,10 +13,10 @@ import {
     MessageConnection,
 } from 'vscode-jsonrpc'
 import { LogMessageNotification } from 'vscode-languageserver-protocol'
-import { LangTypescriptConfiguration } from '../common/config'
-import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, PrefixedLogger } from '../common/logging'
+import { Settings } from './config'
 import { createDispatcher, Dispatcher } from './dispatcher'
 import { disposeAll, subscriptionToDisposable } from './disposable'
+import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, PrefixedLogger } from './logging'
 
 const TYPESCRIPT_LANGSERVER_JS_BIN = path.resolve(
     __dirname,
@@ -46,7 +46,7 @@ export async function spawnLanguageServer({
 }: {
     tempDir: string
     tsserverCacheDir: string
-    configuration: LangTypescriptConfiguration
+    configuration: Settings
     connectionId: string
     logger: Logger
     tracer: Tracer

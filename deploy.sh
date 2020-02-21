@@ -8,9 +8,6 @@ yarn
 # Build
 yarn run build
 
-# Publish extension
-src ext publish
-
 # Build image
 VERSION=$(printf "%05d" $BUILDKITE_BUILD_NUMBER)_$(date +%Y-%m-%d)_$(git rev-parse --short HEAD)
 docker build -t sourcegraph/lang-typescript:$VERSION .

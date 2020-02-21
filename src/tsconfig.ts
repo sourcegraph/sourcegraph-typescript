@@ -3,11 +3,11 @@ import { writeFile } from 'mz/fs'
 import { Span, Tracer } from 'opentracing'
 import { fileURLToPath, URL } from 'url'
 import { CancellationToken } from 'vscode-jsonrpc'
-import { throwIfCancelled } from '../common/cancellation'
-import { flatMapConcurrent } from '../common/ix'
-import { Logger } from '../common/logging'
-import { logErrorEvent, tracePromise } from '../common/tracing'
+import { throwIfCancelled } from './cancellation'
+import { flatMapConcurrent } from './ix'
+import { Logger } from './logging'
 import { ResourceRetrieverPicker } from './resources'
+import { logErrorEvent, tracePromise } from './tracing'
 
 export async function sanitizeTsConfigs({
     dir,

@@ -1,3 +1,4 @@
+import axios, { CancelToken } from 'axios'
 import { CancellationToken, CancellationTokenSource } from 'vscode-jsonrpc'
 
 export interface AbortError extends Error {
@@ -36,4 +37,10 @@ export function tryCancel(token: CancellationTokenSource): void {
     } catch (err) {
         // ignore
     }
+}
+
+export function toAxiosCancelToken(token: CancellationToken): CancelToken {
+    const source = axios.CancelToken.source()
+    token.onCancellationRequested(() => source.cancel())
+    return source.token
 }

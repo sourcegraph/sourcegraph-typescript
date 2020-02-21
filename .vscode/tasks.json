@@ -5,16 +5,6 @@
   "tasks": [
     {
       "type": "npm",
-      "script": "serve-ext",
-      "label": "Serve and watch extension",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "never",
-        "panel": "dedicated",
-      },
-    },
-    {
-      "type": "npm",
       "script": "watch-ts",
       "problemMatcher": ["$tsc-watch"],
       "group": "build",

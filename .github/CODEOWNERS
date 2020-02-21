@@ -1,7 +1,7 @@
 # https://help.github.com/en/articles/about-code-owners
 
 * @sourcegraph/code-intel
-src/server @felixfbecker
+src @felixfbecker
 
 # Renovate PR reviewers are controlled with Renovate config
 package.json
