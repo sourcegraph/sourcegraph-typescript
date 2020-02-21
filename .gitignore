@@ -2,7 +2,6 @@ dist/
 node_modules/
 .cache/
 *.log
-**/config.ts
 *.tsbuildinfo
 out/
 lib/
