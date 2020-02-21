@@ -90,7 +90,7 @@
     "tail": "^2.0.3",
     "tar": "^5.0.5",
     "type-is": "^1.6.18",
-    "typescript": "^3.7.2",
+    "typescript": "^3.8.2",
     "uuid": "^3.3.3",
     "vscode-languageserver-protocol": "^3.14.1",
     "ws": "^7.2.0",
