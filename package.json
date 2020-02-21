@@ -28,7 +28,8 @@
     "prettier-check": "yarn run prettier --write=false",
     "tslint": "tslint -p tsconfig.json --format stylish",
     "build-ts": "tsc -b .",
-    "watch-ts": "tsc -b . -w"
+    "watch-ts": "tsc -b . -w",
+    "build": "yarn run build-ts"
   },
   "devDependencies": {
     "@sourcegraph/prettierrc": "^3.0.1",
