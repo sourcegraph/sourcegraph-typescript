@@ -801,10 +801,10 @@
   resolved "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz#9a06f4f137ee84d7df0460c1fdb1135ffa6c50fd"
   integrity sha512-ONhaKPIufzzrlNbqtWFFd+jlnemX6lJAgq9ZeiZtS7I1PIf/la7CW4m83rTXRnVnsMbW2k56pGYu7AUFJD9Pow==
 
-"@sourcegraph/prettierrc@^3.0.1":
-  version "3.0.1"
-  resolved "https://registry.npmjs.org/@sourcegraph/prettierrc/-/prettierrc-3.0.1.tgz#e1db0046dca3c5e770d0f2ac68bbd794fee37138"
-  integrity sha512-Xyfsk2zLbtJXjgzPC5Q91AdoZ9YECB7Z5pyUCoYb36zqClBRkN2F/VoT+04pLqBf9xsr9uKfJoaf/WGGngLlVg==
+"@sourcegraph/prettierrc@^3.0.2":
+  version "3.0.2"
+  resolved "https://registry.npmjs.org/@sourcegraph/prettierrc/-/prettierrc-3.0.2.tgz#a8fb80ed5712a59cd60eb62f0969090ebc386a80"
+  integrity sha512-HCEKIIgOLap22yvnMcr+v6X/1LK6LuVd5MhGLxjYsb7irI2KNEQpalR5SKjsfYPawzVcgCPu1QsD0Oy4iGdPuA==
 
 "@sourcegraph/tsconfig@^4.0.0":
   version "4.0.0"
@@ -5633,10 +5633,10 @@ prepend-http@^2.0.0:
   resolved "https://registry.npmjs.org/prepend-http/-/prepend-http-2.0.0.tgz#e92434bfa5ea8c19f41cdfd401d741a3c819d897"
   integrity sha1-6SQ0v6XqjBn0HN/UAddBo8gZ2Jc=
 
-prettier@^1.18.2:
-  version "1.18.2"
-  resolved "https://registry.npmjs.org/prettier/-/prettier-1.18.2.tgz#6823e7c5900017b4bd3acf46fe9ac4b4d7bda9ea"
-  integrity sha512-OeHeMc0JhFE9idD4ZdtNibzY0+TPHSpSSb9h8FqtP+YnoZZ1sl8Vc9b1sasjfymH3SonAF4QcA2+mzHPhMvIiw==
+prettier@^1.18.2, prettier@^1.19.1:
+  version "1.19.1"
+  resolved "https://registry.npmjs.org/prettier/-/prettier-1.19.1.tgz#f7d7f5ff8a9cd872a7be4ca142095956a60797cb"
+  integrity sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew==
 
 pretty-bytes@^5.3.0:
   version "5.3.0"

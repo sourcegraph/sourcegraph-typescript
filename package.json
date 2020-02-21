@@ -32,7 +32,7 @@
     "build": "yarn run build-ts"
   },
   "devDependencies": {
-    "@sourcegraph/prettierrc": "^3.0.1",
+    "@sourcegraph/prettierrc": "^3.0.2",
     "@sourcegraph/tsconfig": "^4.0.0",
     "@sourcegraph/tslint-config": "^13.4.0",
     "@types/express": "4.16.1",
@@ -57,7 +57,7 @@
     "json-schema-to-typescript": "^7.1.0",
     "lnfs-cli": "^2.1.0",
     "parcel-bundler": "^1.12.4",
-    "prettier": "^1.18.2",
+    "prettier": "^1.19.1",
     "tslint": "^5.20.1",
     "yarn-deduplicate": "^1.1.1"
   },
