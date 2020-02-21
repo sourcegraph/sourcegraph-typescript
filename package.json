@@ -88,7 +88,7 @@
     "source-map-support": "^0.5.16",
     "tagged-template-noop": "^2.1.1",
     "tail": "^2.0.3",
-    "tar": "^5.0.5",
+    "tar": "^6.0.1",
     "type-is": "^1.6.18",
     "typescript": "^3.8.2",
     "uuid": "^3.3.3",
