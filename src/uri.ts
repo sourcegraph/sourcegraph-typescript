@@ -1,4 +1,5 @@
-import { map } from 'ix/iterable'
+import { of } from 'ix/iterable'
+import { map } from 'ix/iterable/operators'
 import RelateUrl from 'relateurl'
 import { URL } from 'url'
 
@@ -27,7 +28,7 @@ export const relativeUrl = (from: URL, to: URL): string => RelateUrl.relate(from
 export class URLMap<V> implements Map<URL, V> {
     private map: Map<string, V>
     constructor(entries: Iterable<[URL, V]> = []) {
-        this.map = new Map(map(entries, ([uri, value]): [string, V] => [uri.href, value]))
+        this.map = new Map(of(...entries).pipe(map(([uri, value]): [string, V] => [uri.href, value])))
     }
     public get size(): number {
         return this.map.size
@@ -80,7 +81,7 @@ export class URLSet implements Set<URL> {
     private set: Set<string>
 
     constructor(values: Iterable<URL> = []) {
-        this.set = new Set(map(values, uri => uri.href))
+        this.set = new Set(of(...values).pipe(map(uri => uri.href)))
     }
     public get size(): number {
         return this.set.size
