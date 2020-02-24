@@ -62,6 +62,7 @@
     "yarn-deduplicate": "^1.1.1"
   },
   "dependencies": {
+    "@sourcegraph/typescript-language-server": "^0.3.7-fork",
     "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^3.0.0",
     "axios": "^0.19.2",
@@ -95,5 +96,8 @@
     "vscode-languageserver-protocol": "^3.14.1",
     "ws": "^7.2.1",
     "yarn": "^1.22.0"
+  },
+  "resolutions": {
+    "vscode-languageserver-protocol": "3.14.1"
   }
 }

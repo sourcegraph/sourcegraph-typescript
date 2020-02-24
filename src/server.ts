@@ -18,8 +18,8 @@ import * as http from 'http'
 import * as https from 'https'
 import * as ini from 'ini'
 import 'ix'
-import { AsyncIterableX, merge } from 'ix/asynciterable'
-import { IterableX } from 'ix/iterable'
+import { from, merge } from 'ix/asynciterable'
+import { from as iterableFrom, IterableX } from 'ix/iterable'
 import { Tracer as LightstepTracer } from 'lightstep-tracer'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
@@ -304,7 +304,7 @@ webSocketServer.on('connection', connection => {
             // Run yarn install for all package.jsons that contain the dependency we are looking for
             logger.log(`Installing dependencies for all package.jsons that depend on "${packageName}"`)
             await Promise.all(
-                IterableX.from(packageRootUris).map(async packageRootUri => {
+                iterableFrom(packageRootUris).map(async packageRootUri => {
                     const pkgJsonUri = new URL('package.json', packageRootUri)
                     const pkgJson = await readPackageJson(pkgJsonUri, pickResourceRetriever, { span, tracer })
                     if (
@@ -326,7 +326,7 @@ webSocketServer.on('connection', connection => {
                                         ignore: ['**/node_modules'],
                                     }),
                                     // Find any tsconfig in parent directories of the package root
-                                    AsyncIterableX.from(walkUp(filePackageRoot)).filter(async dir => {
+                                    from(walkUp(filePackageRoot)).filter(async dir => {
                                         const tsconfigUri = new URL('tsconfig.json', dir)
                                         return await pickResourceRetriever(tsconfigUri).exists(tsconfigUri)
                                     })
@@ -336,7 +336,7 @@ webSocketServer.on('connection', connection => {
                                 ): AsyncGenerator<never, void, void> {
                                     const pattern = new URL('**/*.ts?(x)', projectRoot)
                                     // Find a random TS file in the project and open it
-                                    const typescriptFile = await AsyncIterableX.from(
+                                    const typescriptFile = await from(
                                         pickResourceRetriever(pattern).glob(pattern)
                                     ).first()
                                     logger.log(`Opening ${typescriptFile} to trigger project load of ${projectRoot}`)
@@ -359,7 +359,7 @@ webSocketServer.on('connection', connection => {
                     path.posix.join(`**/node_modules/${packageName}`, packageRootRelativePath),
                     tempDirUri
                 )
-                const file = await AsyncIterableX.from(
+                const file = await from(
                     pickResourceRetriever(patternUrl).glob(patternUrl, {
                         span,
                         tracer,
@@ -389,9 +389,7 @@ webSocketServer.on('connection', connection => {
                 `Looking for declaration maps to map source file ${incomingUri} to declaration file in node_modules`
             )
             const patternUrl = new URL(`**/node_modules/${packageName}/**/*.d.ts.map`, tempDirUri)
-            const declarationMapUrls = AsyncIterableX.from(
-                pickResourceRetriever(patternUrl).glob(patternUrl, { span, tracer })
-            )
+            const declarationMapUrls = from(pickResourceRetriever(patternUrl).glob(patternUrl, { span, tracer }))
             const mappedParams = await flatMapConcurrent(declarationMapUrls, 10, async function*(declarationMapUrl) {
                 try {
                     const declarationMap: RawSourceMap = JSON.parse(
@@ -678,7 +676,7 @@ webSocketServer.on('connection', connection => {
      * @return HTTP URLs of package.json directories
      */
     const findParentPackageRoots = (uri: URL): IterableX<URL> =>
-        IterableX.from(packageRootUris).filter(packageRoot => uri.href.startsWith(packageRoot.href))
+        iterableFrom(packageRootUris).filter(packageRoot => uri.href.startsWith(packageRoot.href))
 
     async function installDependenciesForPackage(
         packageRootUri: URL,
