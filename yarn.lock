@@ -4174,7 +4174,7 @@ json-schema-ref-parser@^6.1.0:
     js-yaml "^3.12.1"
     ono "^4.0.11"
 
-json-schema-to-typescript@^8.0.1:
+json-schema-to-typescript@^8.1.0:
   version "8.1.0"
   resolved "https://registry.npmjs.org/json-schema-to-typescript/-/json-schema-to-typescript-8.1.0.tgz#c92174a3f70d5eb68646c1ab16cb6bcba6d1cbee"
   integrity sha512-SGGX82OofMggPDUIO6+GYc14g8bew4ETtEif9G8I9SSXYFVHPSfoNE0AaNcfTFwI/xHSepHRse4aMurAtc8+mw==
