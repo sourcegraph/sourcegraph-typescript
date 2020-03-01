@@ -59,7 +59,7 @@
     "parcel-bundler": "^1.12.4",
     "prettier": "^1.19.1",
     "tslint": "^5.20.1",
-    "yarn-deduplicate": "^1.1.1"
+    "yarn-deduplicate": "^2.0.0"
   },
   "dependencies": {
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
