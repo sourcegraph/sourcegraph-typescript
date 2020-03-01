@@ -1029,10 +1029,15 @@
   dependencies:
     "@types/node" "*"
 
-"@types/node@*", "@types/node@12.12.14", "@types/node@>=4.5.0", "@types/node@^12.0.4":
+"@types/node@*", "@types/node@12.12.14", "@types/node@>=4.5.0":
   version "12.12.14"
   resolved "https://registry.npmjs.org/@types/node/-/node-12.12.14.tgz#1c1d6e3c75dba466e0326948d56e8bd72a1903d2"
   integrity sha512-u/SJDyXwuihpwjXy7hOOghagLEV1KdAST6syfnOk6QZAMzZuWZqXy5aYYZbh8Jdpd4escVFP0MvftHNDb9pruA==
+
+"@types/node@^11.11.6":
+  version "11.15.7"
+  resolved "https://registry.npmjs.org/@types/node/-/node-11.15.7.tgz#97559c6d7f8b15dcf275365512799f405c20cd4e"
+  integrity sha512-3c3Kc7VIdE5UpqpmztRy7FU+turZgIurGnwpGFy/fRFOirfPc7ZnoFL83qVoqEDENJENqDhtGyQZ5fkXNQ6Qkw==
 
 "@types/parse-json@^4.0.0":
   version "4.0.0"
@@ -4055,12 +4060,12 @@ isstream@~0.1.2:
   resolved "https://registry.npmjs.org/isstream/-/isstream-0.1.2.tgz#47e63f7af55afa6f92e1500e690eb8b8529c099a"
   integrity sha1-R+Y/evVa+m+S4VAOaQ64uFKcCZo=
 
-ix@^2.5.3:
-  version "2.5.4"
-  resolved "https://registry.npmjs.org/ix/-/ix-2.5.4.tgz#18f2785643d5de8fc8ce9e41335d6da7e7c42efa"
-  integrity sha512-hiYaItAtpFOlPiDpKCtkSZ73B8XcXBUMKypfJL/lQ3PgbnP5BbgtmJOQiRjggFVErwloy5QRtI7e5OYC/PiCbQ==
+ix@^2.5.5:
+  version "2.5.5"
+  resolved "https://registry.npmjs.org/ix/-/ix-2.5.5.tgz#2aef77fbdee79dd0e7f62280c1810d5a39ff1cd4"
+  integrity sha512-WCeaFy6lddyLxqRlY1RpgpSfNxLucn/kht9AaZfOl3yTVKNRP1iiJo7Ib1uedIGNHy9U225dvVXQrU6h2jNE2w==
   dependencies:
-    "@types/node" "^12.0.4"
+    "@types/node" "^11.11.6"
     tslib "^1.9.3"
 
 "js-tokens@^3.0.0 || ^4.0.0", js-tokens@^4.0.0:
