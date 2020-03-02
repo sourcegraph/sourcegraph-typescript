@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/sourcegraph/sourcegraph/master/shared/src/schema/extension.schema.json",
   "name": "typescript",
   "description": "TypeScript/JavaScript code intelligence",
   "private": true,
@@ -11,17 +10,6 @@
     "type": "git",
     "url": "https://github.com/sourcegraph/sourcegraph-typescript"
   },
-  "categories": [
-    "Programming languages"
-  ],
-  "tags": [
-    "typescript",
-    "javascript",
-    "react",
-    "jsx",
-    "cross-repository",
-    "language-server"
-  ],
   "license": "MIT",
   "scripts": {
     "prettier": "prettier --list-different --write \"**/{*.{js?(on),ts,md,yml},.*.yml}\"",
@@ -39,6 +27,7 @@
     "@types/got": "9.6.9",
     "@types/highlight.js": "9.12.3",
     "@types/ini": "1.3.30",
+    "@types/jaeger-client": "3.15.3",
     "@types/json5": "0.0.30",
     "@types/lodash": "4.14.149",
     "@types/mkdirp-promise": "5.0.0",
@@ -72,8 +61,8 @@
     "highlight.js": "^9.18.1",
     "ini": "^1.3.5",
     "ix": "^3.0.2",
+    "jaeger-client": "^3.17.2",
     "json5": "^2.1.1",
-    "lightstep-tracer": "^0.25.2",
     "lodash": "^4.17.15",
     "mkdirp-promise": "^5.0.1",
     "mz": "^2.7.0",

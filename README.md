@@ -184,14 +184,15 @@ To enable TLS, set the `TLS_KEY` and `TLS_CERT` environment variables. TLS optio
 #### Enabling OpenTracing
 
 The server can report spans through OpenTracing to diagnose issues.
-If the environment variable `LIGHTSTEP_ACCESS_TOKEN` is set, the server will send tracing data to the given LightStep instance.
+If the environment variable `JAEGER_DISABLED` is not set,
+the server will send tracing data to a Jaeger agent (by default `localhost:6832`).
 
-Support for other OpenTracing implementations can easily added here.
+Tracing can be further configured through [environment variables](https://github.com/jaegertracing/jaeger-client-node#environment-variables). Example:
 
 ```diff
   env:
-+   - name: LIGHTSTEP_ACCESS_TOKEN
-+     value: abcdefg
++   - name: JAEGER_AGENT_HOST
++     value: my-jaeger-agent
 ```
 
 #### Enabling Prometheus metrics
