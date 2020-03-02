@@ -55,7 +55,7 @@ export async function spawnLanguageServer({
     const args: string[] = [
         '--node-ipc',
         // Use local tsserver instead of the tsserver of the repo for security reasons
-        '--tsserver-path=' + path.join(__dirname, '..', '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
+        '--tsserver-path=' + path.join(__dirname, '..', 'node_modules', 'typescript', 'bin', 'tsserver'),
     ]
     if (configuration['typescript.langserver.log']) {
         args.push('--log-level=' + LOG_LEVEL_TO_LSP[configuration['typescript.langserver.log'] || 'log'])

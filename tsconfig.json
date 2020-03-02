@@ -13,7 +13,7 @@
     "lib": ["es2018", "esnext.asynciterable", "dom"],
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "outDir": "dist",
-    "rootDir": ".",
+    "rootDir": "src",
   },
   "include": ["./src/**/*"],
   "files": [],

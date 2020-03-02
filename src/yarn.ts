@@ -107,7 +107,7 @@ export interface YarnSpawnOptions {
     span?: Span
 }
 
-const YARN_BIN_JS = path.resolve(__dirname, '..', '..', 'node_modules', 'yarn', 'lib', 'cli.js')
+const YARN_BIN_JS = path.resolve(__dirname, '..', 'node_modules', 'yarn', 'lib', 'cli.js')
 
 /**
  * Spawns a yarn child process.

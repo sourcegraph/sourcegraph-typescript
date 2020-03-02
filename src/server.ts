@@ -146,9 +146,9 @@ const isTypeScriptFile = (path: string): boolean => /((\.d)?\.[tj]sx?|json)$/.te
 
 const pickResourceRetriever = createResourceRetrieverPicker([new HttpResourceRetriever(), new FileResourceRetriever()])
 
-const TYPESCRIPT_DIR_URI = pathToFileURL(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript') + '/')
+const TYPESCRIPT_DIR_URI = pathToFileURL(path.resolve(__dirname, '..', 'node_modules', 'typescript') + '/')
 const TYPESCRIPT_VERSION = JSON.parse(
-    fs.readFileSync(path.resolve(__dirname, '..', '..', 'node_modules', 'typescript', 'package.json'), 'utf-8')
+    fs.readFileSync(path.resolve(__dirname, '..', 'node_modules', 'typescript', 'package.json'), 'utf-8')
 ).version
 globalLogger.log(`Using TypeScript version ${TYPESCRIPT_VERSION} from ${TYPESCRIPT_DIR_URI}`)
 
