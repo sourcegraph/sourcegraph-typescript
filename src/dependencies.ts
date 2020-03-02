@@ -226,8 +226,9 @@ export function cloneUrlFromPackageMeta(packageMeta: PackageJson): string {
     }
     let repoUrl = typeof packageMeta.repository === 'string' ? packageMeta.repository : packageMeta.repository.url
     // GitHub shorthand
-    if (/^[^\/]+\/[^\/]+$/.test(repoUrl)) {
-        repoUrl = 'https://github.com/' + repoUrl
+    const shortHandMatch = repoUrl.match(/^(?:github:)?([^\/]+\/[^\/]+)$/)
+    if (shortHandMatch) {
+        repoUrl = 'https://github.com/' + shortHandMatch[1]
     }
     return repoUrl
 }
