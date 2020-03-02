@@ -20,7 +20,7 @@ import * as ini from 'ini'
 import 'ix'
 import { from, merge } from 'ix/asynciterable'
 import { from as iterableFrom, IterableX } from 'ix/iterable'
-import { Tracer as LightstepTracer } from 'lightstep-tracer'
+import { initTracerFromEnv } from 'jaeger-client'
 import { noop } from 'lodash'
 import mkdirp from 'mkdirp-promise'
 import * as fs from 'mz/fs'
@@ -103,14 +103,7 @@ process.on('uncaughtException', err => {
 const CACHE_DIR = process.env.CACHE_DIR || fs.realpathSync(tmpdir())
 globalLogger.log(`Using CACHE_DIR ${CACHE_DIR}`)
 
-let tracer = new Tracer()
-if (process.env.LIGHTSTEP_ACCESS_TOKEN) {
-    globalLogger.log('LightStep tracing enabled')
-    tracer = new LightstepTracer({
-        access_token: process.env.LIGHTSTEP_ACCESS_TOKEN,
-        component_name: 'lang-typescript',
-    })
-}
+const tracer = initTracerFromEnv({ serviceName: 'lang-typescript' }, { logger: globalLogger })
 
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080
 
