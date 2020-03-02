@@ -52,7 +52,6 @@
   },
   "dependencies": {
     "@sourcegraph/typescript-language-server": "^0.3.7-fork",
-    "@sourcegraph/vscode-ws-jsonrpc": "0.0.3-fork",
     "abort-controller": "^3.0.0",
     "axios": "^0.19.2",
     "express": "^4.17.1",
@@ -82,7 +81,8 @@
     "type-is": "^1.6.18",
     "typescript": "^3.8.3",
     "uuid": "^7.0.1",
-    "vscode-languageserver-protocol": "^3.14.1",
+    "vscode-languageserver-protocol": "^3.15.3",
+    "vscode-ws-jsonrpc": "^0.2.0",
     "ws": "^7.2.1",
     "yarn": "^1.22.0"
   }
