@@ -66,7 +66,7 @@ export function createDispatcher(
          *
          * @see createRequestDurationMetric
          */
-        requestDurationMetric?: prometheus.Histogram
+        requestDurationMetric?: prometheus.Histogram<string>
     }
 ): Dispatcher {
     const cancellationTokenSources = new Map<RequestId, CancellationTokenSource>()
