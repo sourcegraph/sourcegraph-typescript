@@ -93,7 +93,7 @@
     "type-is": "^1.6.18",
     "typescript": "^3.8.3",
     "uuid": "^7.0.1",
-    "vscode-languageserver-protocol": "^3.14.1",
+    "vscode-languageserver-protocol": "^3.15.3",
     "ws": "^7.2.1",
     "yarn": "^1.22.0"
   }
