@@ -4,13 +4,6 @@ import 'source-map-support/register'
 import { AbortController } from 'abort-controller'
 Object.assign(global, { AbortController })
 
-import {
-    createMessageConnection,
-    IWebSocket,
-    WebSocketMessageReader,
-    WebSocketMessageWriter,
-} from '@sourcegraph/vscode-ws-jsonrpc'
-import * as rpcServer from '@sourcegraph/vscode-ws-jsonrpc/lib/server'
 import axios from 'axios'
 import express from 'express'
 import { highlight } from 'highlight.js'
@@ -61,6 +54,8 @@ import {
     TextDocumentPositionParams,
     TypeDefinitionRequest,
 } from 'vscode-languageserver-protocol'
+import { createMessageConnection, IWebSocket, WebSocketMessageReader, WebSocketMessageWriter } from 'vscode-ws-jsonrpc'
+import * as rpcServer from 'vscode-ws-jsonrpc/lib/server'
 import { Server } from 'ws'
 import { throwIfCancelled, toAxiosCancelToken } from './cancellation'
 import { Settings } from './config'
