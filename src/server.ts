@@ -37,7 +37,7 @@ import { extract, FileStat } from 'tar'
 import * as type from 'type-is'
 import { fileURLToPath, pathToFileURL, URL } from 'url'
 import { inspect } from 'util'
-import uuid from 'uuid'
+import * as uuid from 'uuid'
 import {
     CancellationToken,
     ClientCapabilities,
