@@ -25,12 +25,11 @@ export async function requestGraphQL(
     if (accessToken) {
         headers.Authorization = 'token ' + accessToken
     }
-    const response = await got.post(new URL('/.api/graphql', instanceUrl), {
+    const response = await got.post(new URL('/.api/graphql', instanceUrl).href, {
         headers,
-        body: { query, variables },
-        json: true,
+        body: JSON.stringify({ query, variables }),
     })
-    return response.body
+    return JSON.parse(response.body)
 }
 
 /**
