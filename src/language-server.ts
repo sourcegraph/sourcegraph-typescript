@@ -21,7 +21,6 @@ import { LOG_LEVEL_TO_LSP, Logger, LSP_TO_LOG_LEVEL, PrefixedLogger } from './lo
 const TYPESCRIPT_LANGSERVER_JS_BIN = path.resolve(
     __dirname,
     '..',
-    '..',
     'node_modules',
     '@sourcegraph',
     'typescript-language-server',
