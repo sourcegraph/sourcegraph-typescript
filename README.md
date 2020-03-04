@@ -1,10 +1,36 @@
 # Language server for TypeScript/JavaScript
 
-This is a is a TypeScript language server that speaks [Language Server Protocol](https://github.com/Microsoft/language-server-protocol).
+This is a backend for the [Sourcegraph TypeScript extension](https://github.com/sourcegraph/code-intel-extensions/tree/master/extensions/typescript),
+speaking the [Language Server Protocol](https://github.com/Microsoft/language-server-protocol) over WebSockets.
 
-It supports editor features such as go-to-definition, hover, and find-references for TypeScript and JavaScript projects.
+It supports editor features such as go-to-definition, hover, and find-references for TypeScript and JavaScript projects,
+including support for dependencies and cross-repository code intelligence.
 
-## Language server
+Monitoring is available through OpenTracing (Jaeger) and Prometheus.
+
+## How it works
+
+Check out the [@felixfbecker](https://github.com/felixfecker)'s talk at FOSDEM for an overview & deep dive of the architecture:
+
+<p>
+  <a href="https://vimeo.com/327174558" title="Talk Recording: Advanced TypeScript Tooling at Scale">
+    <img
+      alt="Talk Recording: Advanced TypeScript Tooling at Scale"
+      src="https://i.vimeocdn.com/filter/overlay?src0=https%3A%2F%2Fi.vimeocdn.com%2Fvideo%2F771375540_960.jpg&src1=http%3A%2F%2Ff.vimeocdn.com%2Fp%2Fimages%2Fcrawler_play.png"
+      width="480"
+    />
+  </a>
+</p>
+
+Topics covered:
+
+- Basic features
+- LSP WebSocket architecture
+- Repository contents through the Sourcegraph raw HTTP API
+- Cross-repository Go-to-Definition
+- Cross-repository Find-References
+
+## Deployment
 
 The server is available as a Docker image `sourcegraph/lang-typescript` from Docker Hub.
 
@@ -345,4 +371,23 @@ Dependencies on private npm packages and private registries is supported by sett
 It contains the same key/value settings as your `.npmrc` file in your home folder, and therefor supports the same scoping to registries and package scopes.
 See https://docs.npmjs.com/misc/config#config-settings for more information on what is possible to configure in `.npmrc`.
 
+Example:
+
+```json
+"typescript.npmrc": {
+  "//registry.npmjs.org/:_authToken": "asfdh21e-1234-asdn-123v-1234asdb2"
+}
+```
+
 For dependencies on private git repositories, mount an SSH key into `~/.ssh`.
+
+## Contributing
+
+You need NodeJS >=11.1.0 and yarn installed.
+
+```sh
+# Install dependencies
+yarn
+# Build the extension and the server
+yarn run build
+```
