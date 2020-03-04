@@ -1,5 +1,7 @@
 # Language server for TypeScript/JavaScript
 
+[![Build status](https://badge.buildkite.com/6399fffb5ec930dde31cf654b2cd694b56f2233345e2bc0db4.svg?branch=master)](https://buildkite.com/sourcegraph/sourcegraph-typescript)
+
 This is a backend for the [Sourcegraph TypeScript extension](https://github.com/sourcegraph/code-intel-extensions/tree/master/extensions/typescript),
 speaking the [Language Server Protocol](https://github.com/Microsoft/language-server-protocol) over WebSockets.
 
