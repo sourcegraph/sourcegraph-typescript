@@ -92,19 +92,19 @@ You can always revoke the `PASSWORD` by deleting the `.htpasswd` file and restar
 
 ### Using Docker
 
-1. Run the Go language server:
+Run the server:
 
-   ```sh
-   docker run -p 8080:8080 sourcegraph/lang-typescript
-   ```
+```sh
+docker run -p 8080:8080 sourcegraph/lang-typescript
+```
 
-   You can verify it's up and running with [`ws`](https://github.com/hashrocket/ws):
+You can verify it's up and running with [`ws`](https://github.com/hashrocket/ws):
 
-   ```sh
-   $ go get -u github.com/hashrocket/ws
-   $ ws ws://localhost:8080
-   >
-   ```
+```sh
+$ go get -u github.com/hashrocket/ws
+$ ws ws://localhost:8080
+>
+```
 
 #### TLS in Docker
 
