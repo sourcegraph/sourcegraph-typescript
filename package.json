@@ -20,7 +20,7 @@
     "build": "yarn run build-ts"
   },
   "devDependencies": {
-    "@sourcegraph/prettierrc": "^3.0.2",
+    "@sourcegraph/prettierrc": "^3.0.3",
     "@sourcegraph/tsconfig": "^4.0.0",
     "@sourcegraph/tslint-config": "^13.4.0",
     "@types/express": "4.17.3",
