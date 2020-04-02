@@ -47,7 +47,7 @@
     "lnfs-cli": "^2.1.0",
     "parcel-bundler": "^1.12.4",
     "prettier": "^1.19.1",
-    "tslint": "^6.1.0",
+    "tslint": "^6.1.1",
     "yarn-deduplicate": "^2.0.0"
   },
   "dependencies": {
