@@ -1,4 +1,4 @@
-FROM node:13.11.0-alpine@sha256:5769ed0cbef82ecd0d3b9522a086da41927d09ed38a286ab3c76b36bfc5f4e7a
+FROM node:13.13.0-alpine@sha256:80e4f9b287449c07083854eb11a8bd18209e4c228848295705ae7adfa00a39c9
 
 # Use tini (https://github.com/krallin/tini) for proper signal handling.
 RUN apk add --no-cache tini
