@@ -34,7 +34,7 @@
     "@types/mz": "2.7.4",
     "@types/node": "12.20.17",
     "@types/relateurl": "0.2.29",
-    "@types/rmfr": "2.0.0",
+    "@types/rmfr": "2.0.1",
     "@types/semver": "7.1.0",
     "@types/tail": "2.0.0",
     "@types/tar": "4.0.5",

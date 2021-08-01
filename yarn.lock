@@ -1119,10 +1119,10 @@
     "@types/glob" "*"
     "@types/node" "*"
 
-"@types/rmfr@2.0.0":
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/@types/rmfr/-/rmfr-2.0.0.tgz#38236d832291c5c14a43f972d9aa8b25bf0f81f4"
-  integrity sha512-gDyAn7J4d9kIFHtnNWy8J9hI3W6810brUCukkBxAS0UyMnAv9vMeFqx66WJHMPZwW6h7Sl4/njhQBxOTIosoxA==
+"@types/rmfr@2.0.1":
+  version "2.0.1"
+  resolved "https://registry.npmjs.org/@types/rmfr/-/rmfr-2.0.1.tgz#73333a50ef3e405e76d534179f5027f63e774505"
+  integrity sha512-GIGQZrDVDY+Cf/eaolghOHkpgTWQ6P/NQngozVf3c6UhWh+Lxgs3kg/gRBmi8iRW8URXLNLx83EdhF4DtDWg3Q==
   dependencies:
     "@types/rimraf" "*"
 
