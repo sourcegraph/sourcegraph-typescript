@@ -32,7 +32,7 @@
     "@types/lodash": "4.14.171",
     "@types/mkdirp-promise": "5.0.0",
     "@types/mz": "2.7.4",
-    "@types/node": "12.20.16",
+    "@types/node": "12.20.17",
     "@types/relateurl": "0.2.29",
     "@types/rmfr": "2.0.0",
     "@types/semver": "7.1.0",
