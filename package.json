@@ -37,7 +37,7 @@
     "@types/rmfr": "2.0.1",
     "@types/semver": "7.1.0",
     "@types/tail": "2.0.0",
-    "@types/tar": "4.0.5",
+    "@types/tar": "6.1.0",
     "@types/type-is": "1.6.3",
     "@types/uuid": "7.0.0",
     "@types/ws": "7.4.4",
