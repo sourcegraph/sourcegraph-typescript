@@ -2,7 +2,10 @@ env:
   FORCE_COLOR: '1'
 
 steps:
-  # Run tests
+  - label: ':lock: security - checkov'
+    command: .buildkite/ci-checkov.sh
+
+# Run tests
   - command: |-
       yarn
       yarn run yarn-deduplicate --strategy fewer --fail --list
