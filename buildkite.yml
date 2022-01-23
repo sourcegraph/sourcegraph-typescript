@@ -3,7 +3,7 @@ env:
 
 steps:
   - label: ':lock: security - checkov'
-    command: .buildkite/ci-checkov.sh
+    command: ./ci-checkov.sh
 
 # Run tests
   - command: |-
