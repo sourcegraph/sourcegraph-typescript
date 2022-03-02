@@ -4,3 +4,4 @@ dist/
 .cache/
 lib/
 .github/
+buildkite.yml
