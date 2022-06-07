@@ -1,3 +1,9 @@
+This repository has been superseded by [scip-typescript](https://github.com/sourcegraph/scip-typescript).
+
+Using this code is not supported.
+
+---
+
 # Language server for TypeScript/JavaScript
 
 [![Build status](https://badge.buildkite.com/6399fffb5ec930dde31cf654b2cd694b56f2233345e2bc0db4.svg?branch=master)](https://buildkite.com/sourcegraph/sourcegraph-typescript)
