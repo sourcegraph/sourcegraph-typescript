@@ -1141,10 +1141,10 @@
     "@types/express-serve-static-core" "*"
     "@types/mime" "*"
 
-"@types/tail@2.0.0":
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/@types/tail/-/tail-2.0.0.tgz#d1d035cd0caa5a2ed4a5b805acc6596fc6a233a2"
-  integrity sha512-TYTfnILhrZUAZKGNgot5+sBDap7oPIzV3818p7g4VhKGc81+/eoEZ93wKBTGnSg/tpDjzWSb8Wx5E737FCH/Sw==
+"@types/tail@2.2.1":
+  version "2.2.1"
+  resolved "https://registry.npmjs.org/@types/tail/-/tail-2.2.1.tgz#ca8d8ea542cf3fefbdac9e8f131ae04990596f1e"
+  integrity sha512-j75Gs5MiIpNR14wztQ4vtViUqxZi+lcgflyXC7P9iMgNnMab7XcV5p+2590IO3njsWWn5l8C+55ILk2CDDyaHg==
 
 "@types/tar@6.1.1":
   version "6.1.1"
@@ -6832,10 +6832,10 @@ tagged-template-noop@^2.1.1:
   resolved "https://registry.npmjs.org/tagged-template-noop/-/tagged-template-noop-2.1.1.tgz#0d215fd9eec557290f41838a22116a8d4ce606dd"
   integrity sha512-diZ004cBHKVueqSr5p+/EPZhofCBRW7w7zZL71FcK8x+209BbMw77ICrP9AWXpVjPyyyIqRYYFAM4Wjk2HNWQg==
 
-tail@^2.0.3:
-  version "2.0.3"
-  resolved "https://registry.npmjs.org/tail/-/tail-2.0.3.tgz#37567adc4624a70b35f1d146c3376fa3d6ef7c04"
-  integrity sha512-s9NOGkLqqiDEtBttQZI7acLS8ycYK5sTlDwNjGnpXG9c8AWj0cfAtwEIzo/hVRMMiC5EYz+bXaJWC1u1u0GPpQ==
+tail@^2.2.4:
+  version "2.2.4"
+  resolved "https://registry.npmjs.org/tail/-/tail-2.2.4.tgz#90dd4c5a174a3fa39dcb65a1df1950a4a0093a41"
+  integrity sha512-PX8klSxW1u3SdgDrDeewh5GNE+hkJ4h02JvHfV6YrHqWOVJ88nUdSQqtsUf/gWhgZlPAws3fiZ+F1f8euspcuQ==
 
 tar@^6.0.1:
   version "6.0.1"
