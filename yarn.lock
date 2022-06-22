@@ -5025,10 +5025,10 @@ opentracing@^0.13.0:
   resolved "https://registry.npmjs.org/opentracing/-/opentracing-0.13.0.tgz#6a341442f09d7d866bc11ed03de1e3828e3d6aab"
   integrity sha1-ajQUQvCdfYZrwR7QPeHjgo49aqs=
 
-opentracing@^0.14.4, opentracing@~0.14.3:
-  version "0.14.4"
-  resolved "https://registry.npmjs.org/opentracing/-/opentracing-0.14.4.tgz#a113408ea740da3a90fde5b3b0011a375c2e4268"
-  integrity sha512-nNnZDkUNExBwEpb7LZaeMeQgvrlO8l4bgY/LvGNZCR0xG/dGWqHqjKrAmR5GUoYo0FIz38kxasvA1aevxWs2CA==
+opentracing@^0.14.7, opentracing@~0.14.3:
+  version "0.14.7"
+  resolved "https://registry.npmjs.org/opentracing/-/opentracing-0.14.7.tgz#25d472bd0296dc0b64d7b94cbc995219031428f5"
+  integrity sha512-vz9iS7MJ5+Bp1URw8Khvdyw1H/hGvzHWlKQ7eRrQojSCDL1/SrWfrY9QebLw97n2deyRtzHRC3MkQfVNUCo91Q==
 
 opn@^5.1.0:
   version "5.5.0"
